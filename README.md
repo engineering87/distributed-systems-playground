@@ -154,7 +154,10 @@ This project exists to make that gap visible.
 - Scenarios saved in the browser, exported as JSON, or shared as a link.
 
 **Practicalities**
-- A single static HTML file, no dependencies, light and dark themes, usable on mobile.
+- A single static HTML file, no dependencies, light and dark themes.
+- Layouts for phones, tablets, laptops and large monitors: on desktop the app fills the window, on narrow screens it becomes one column with the graph first.
+- Touch support: larger controls, dragging processes with a finger, and page scrolling over the empty graph and the diagram.
+- Smooth playback on large runs: the graph is redrawn in place, animations reuse their elements, and the diagram batches its drawing.
 
 ## Quick start
 
@@ -169,6 +172,8 @@ open index.html        # or double-click the file
 ```
 
 **Keyboard shortcuts**
+
+Shortcuts work everywhere except while typing in a text field.
 
 | Key | Action |
 |---|---|
@@ -572,7 +577,7 @@ The GitHub Actions workflow runs the tests and verifies that `index.html` matche
 ## Limitations
 
 - The engine runs on the browser's main thread and stops after 150,000 events. Scenarios for teaching stay well below that, but long runs with many timers can reach it.
-- The topology animation draws at most 400 messages in flight at once.
+- The topology animation draws at most 400 messages in flight at once. With more than 120 in flight, packets are drawn as dots without labels, and with more than 200 without trails.
 - Link failures and partitions are symmetric: a link cannot yet fail in one direction only.
 - A process cannot yet pause (for example for garbage collection) or omit messages on its own; omissions come from the channels.
 - Correctness properties are checked with local `assert` statements; global invariants such as agreement are not yet evaluated automatically.
@@ -589,7 +594,7 @@ The GitHub Actions workflow runs the tests and verifies that `index.html` matche
 - Engine in a Web Worker for larger scenarios
 - Byzantine processes written in Upon
 
-The current differences between the implementation and the specification are listed in [Appendix B of the specification](docs/SPEC.md#appendix-b--implementation-status-v03).
+The current differences between the implementation and the specification are listed in [Appendix B of the specification](docs/SPEC.md#appendix-b--implementation-status-v04).
 
 ## Related tools
 

@@ -95,6 +95,7 @@ textarea { resize: vertical; width: 100%; }
 input[aria-invalid="true"] { border-color: var(--red); background: var(--err-bg); }
 input:disabled { opacity: .5; }
 .narrow { width: 84px; }
+.tiny { width: 58px; }
 .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; min-width: 0; }
 .field > span { font-size: 12.5px; color: var(--muted); }
 .field.inline { flex-direction: row; align-items: center; gap: 6px; margin: 0; }
@@ -115,7 +116,7 @@ input:disabled { opacity: .5; }
 /* ---------- layout ---------- */
 .app {
   display: grid; gap: 10px; padding: 10px;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 470px);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 600px);
   grid-template-rows: minmax(460px, calc(100vh - 470px)) auto;
   grid-template-areas: "topo side" "timeline timeline";
 }
@@ -125,11 +126,17 @@ input:disabled { opacity: .5; }
 .topo { grid-area: topo; }
 .side { grid-area: side; }
 .timeline { grid-area: timeline; }
-.panel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+.panel-bar { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
 
 /* ---------- topologia ---------- */
 .canvas-wrap { position: relative; flex: 1; min-height: 280px; }
-#topo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; background: var(--paper); }
+#topo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; background: var(--paper); }
+/* animation overlay: composited separately so the static graph is not repainted on every frame */
+#topo-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; will-change: transform; overflow: hidden; }
+#topo-fx .pk { pointer-events: auto; }
+/* touch: the page scrolls over the empty graph, but not when dragging a process or using a tool */
+#topo .nd { touch-action: none; }
+body:not([data-mode="move"]) #topo { touch-action: none; }
 .grid-line { fill: none; stroke: var(--grid); stroke-width: 1; }
 .grid-line.strong { stroke: var(--grid-strong); }
 .arrowhead { fill: var(--muted); }
@@ -230,16 +237,18 @@ h3 { font-size: 14px; margin: 14px 0 6px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 12.5px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--rule); white-space: nowrap; }
 .chip.bad { border-color: var(--red); color: var(--red); font-weight: 700; }
-.st-area { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 470px); min-height: 0; }
+.st-area { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 30vw, 600px); min-height: 0; }
 .st-col { min-width: 0; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
 .log-col { display: flex; flex-direction: column; min-width: 0; }
-.st-bar { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; min-height: 36px; }
+.st-bar { display: flex; align-items: center; gap: 6px 10px; padding: 5px 10px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; min-height: 36px; }
+.st-bar .status { flex: 1 1 200px; min-width: 0; }
+.zoom { display: inline-flex; gap: 4px; }
 .st-bar .lbl { font-weight: 700; }
 .status { font-size: 13px; }
 .status.err { color: var(--red); font-weight: 700; }
 .status.ok { color: var(--muted); }
 .st-wrap { position: relative; height: 250px; overflow-y: auto; overflow-x: hidden; }
-#st { display: block; width: 100%; cursor: grab; }
+#st { display: block; width: 100%; cursor: grab; touch-action: pan-y pinch-zoom; }
 #st.dragging { cursor: grabbing; }
 .tip {
   position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule);
@@ -247,7 +256,7 @@ h3 { font-size: 14px; margin: 14px 0 6px; }
   box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 15%, transparent);
 }
 .tip code { word-break: break-all; }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 4px 10px 6px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--grid); }
+.legend { display: flex; gap: 4px 12px; flex-wrap: wrap; padding: 4px 10px 6px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--grid); }
 .lg { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
 .lg.deliver { border-color: var(--blue); }
 .lg.late { border-color: var(--red); }
@@ -281,25 +290,59 @@ dialog h2 { margin: 0 0 6px; font-size: 18px; }
 .toast button { background: transparent; color: var(--paper); border-color: color-mix(in srgb, var(--paper) 50%, transparent); }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1100px) {
-  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: "topo" "side" "timeline"; }
+/* wide enough for two columns and tall enough: the app fills the window and nothing scrolls but the panels */
+@media (min-width: 960px) and (min-height: 620px) and (pointer: fine), (min-width: 960px) and (min-height: 900px) {
+  html, body { height: 100%; }
+  body { min-height: 0; }
+  .app { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr) clamp(220px, 37vh, 620px); }
+  .timeline { min-height: 0; overflow: hidden; }
+  .st-area { flex: 1; min-height: 0; }
+  .st-col, .log-col { min-height: 0; }
+  .st-wrap { height: auto; flex: 1; min-height: 60px; }
+  .log { height: auto; flex: 1; min-height: 0; }
+  .canvas-wrap { min-height: 200px; }
+}
+/* one column: the graph first, then the run, then the configuration */
+@media (max-width: 959px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: "topo" "timeline" "side"; }
   .topo, .side { min-height: auto; }
-  .canvas-wrap { min-height: 380px; }
-  .side .tab-body { max-height: 70vh; }
+  .canvas-wrap { min-height: clamp(300px, 55vh, 640px); }
+  .side .tab-body { max-height: 75vh; }
   .st-area { grid-template-columns: minmax(0, 1fr); }
   .st-col { border-right: 0; border-bottom: 1px solid var(--rule); }
-  .log { height: 240px; }
+  .st-wrap { height: clamp(200px, 35vh, 420px); }
+  .log { height: clamp(180px, 30vh, 380px); }
+  #example { max-width: none; }
 }
 @media (max-width: 560px) {
   .grid2, .grid3 { grid-template-columns: 1fr; }
   .brand h1 { font-size: 15px; }
-  .tlabel { min-width: 0; }
-  .topbar { padding: 8px 10px; }
-  .app { padding: 6px; }
+  .tlabel { min-width: 0; flex: 1 1 100%; text-align: center; }
+  .topbar { padding: 8px 10px; gap: 8px; }
+  .app { padding: 6px; gap: 6px; }
   .toolbar { width: 100%; }
-  #example { max-width: none; width: 100%; min-width: 0; flex: 1; }
-  .field.inline { flex: 1 1 100%; min-width: 0; }
-  .transport select { flex: 1; }
+  .toolbar .ex-field { flex: 1 1 100%; min-width: 0; }
+  .toolbar .ex-field select { width: 100%; min-width: 0; flex: 1; }
+  #scrub { flex: 1 1 100%; order: 10; }
+  .topo-legend { display: none; }
+  .panel-bar .sep { display: none; }
+  .transport select { flex: 1 1 auto; }
+  .props { font-size: 13px; }
+  .props .inject input:not(.narrow) { width: 100% !important; }
+}
+/* touch screens: larger targets, 16px text in fields (avoids zoom on focus in iOS) */
+@media (pointer: coarse) {
+  button, select, input:not([type=checkbox]):not([type=radio]):not([type=range]) { min-height: 40px; }
+  button.icon { width: 42px; }
+  button.icon.small { width: 40px; }
+  .symbols button { width: 38px; min-height: 38px; }
+  .check input { width: 20px; height: 20px; }
+  input, select, textarea { font-size: 16px; }
+  #code, #code-hl, .gutter { font-size: 15px; }
+  .tabs button { padding: 12px 14px 10px; }
+  #scrub { height: 36px; }
+  .log li { padding: 8px 10px; }
+  .diag li { padding: 8px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
@@ -373,3 +416,8 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
 .fault-form .field { margin-bottom: 4px; }
 .props .inject .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
 @media (prefers-reduced-motion: reduce) { .recoverring { display: none; } }
+
+/* small screens: the diagram legend already explains the colors */
+@media (max-width: 560px) {
+  .topo-legend { display: none; }
+}

@@ -21,7 +21,7 @@
     <h1>Distributed Systems Playground</h1>
   </div>
   <div class="toolbar">
-    <label class="field inline"><span>Example</span>
+    <label class="field inline ex-field"><span>Example</span>
       <select id="example"><option value="">Choose…</option></select>
     </label>
     <label class="field inline"><span>Seed</span>
@@ -54,11 +54,11 @@
         <option value="random">Random</option>
         <option value="tree">Binary tree</option>
       </select>
-      <input id="gen-n" type="number" min="2" max="40" value="6" class="narrow" aria-label="Number of processes">
+      <input id="gen-n" type="number" min="2" max="40" value="6" class="tiny" aria-label="Number of processes" title="Number of processes (2 to 40)">
       <button id="btn-gen" type="button" class="ghost">Generate</button>
       <button id="btn-fit" type="button" class="ghost" title="Fit to view">Fit</button>
       <span class="sep"></span>
-      <label class="check"><input type="checkbox" id="labels" checked> Message labels</label>
+      <label class="check" title="Show the message type on packets in flight"><input type="checkbox" id="labels" checked> Labels</label>
     </div>
     <div class="canvas-wrap">
       <svg id="topo" role="img" aria-label="Process graph">
@@ -69,8 +69,9 @@
           <marker id="arrow-sel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrowhead sel"/></marker>
         </defs>
         <rect id="topo-bg" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grid-l)"/>
-        <g id="g-links"></g><g id="g-fx"></g><g id="g-nodes"></g><g id="g-msgs"></g><g id="g-top"></g>
+        <g id="g-links"></g><g id="g-nodes"></g>
       </svg>
+      <svg id="topo-fx" aria-hidden="true"><g id="g-fx"></g><g id="g-msgs"></g><g id="g-top"></g></svg>
       <div id="stale" class="stale" hidden>The scenario has changed. <button type="button" id="btn-rerun" class="link">Run again</button></div>
       <div class="topo-legend" aria-hidden="true">
         <span><i class="pk-dot ok"></i>in transit</span>
@@ -249,7 +250,7 @@ starttimer(t, 100ms)   canceltimer(t)
         <option value="1000">1 s per second</option>
         <option value="5000">5 s per second</option>
       </select>
-      <label class="check"><input type="checkbox" id="autoplay" checked> Play after run</label>
+      <label class="check" title="Start playing after every run"><input type="checkbox" id="autoplay" checked> Autoplay</label>
       <input id="scrub" type="range" min="0" max="10000" value="0" aria-label="Position in time">
       <output id="tlabel" class="tlabel">t = 0</output>
       <div id="chips" class="chips"></div>
@@ -259,12 +260,14 @@ starttimer(t, 100ms)   canceltimer(t)
         <div class="st-bar">
           <span id="status" class="status"></span>
           <span class="grow"></span>
-          <label class="check"><input type="checkbox" id="ghost"> Show the future</label>
-          <label class="check"><input type="checkbox" id="follow" checked> Follow cursor</label>
-          <button type="button" id="zoom-out" class="icon small" aria-label="Zoom out">−</button>
-          <button type="button" id="zoom-in" class="icon small" aria-label="Zoom in">+</button>
-          <button type="button" id="zoom-fit" class="ghost small" title="Zoom to where the action is">Action</button>
-          <button type="button" id="zoom-all" class="ghost small" title="Show the whole run">All</button>
+          <label class="check" title="Show events after the cursor, faded"><input type="checkbox" id="ghost"> Future</label>
+          <label class="check" title="Scroll the diagram to keep the cursor in view"><input type="checkbox" id="follow" checked> Follow</label>
+          <span class="zoom" role="group" aria-label="Zoom">
+            <button type="button" id="zoom-out" class="icon small" aria-label="Zoom out" title="Zoom out">−</button>
+            <button type="button" id="zoom-in" class="icon small" aria-label="Zoom in" title="Zoom in (Ctrl + wheel)">+</button>
+            <button type="button" id="zoom-fit" class="ghost small" title="Zoom to where the action is">Action</button>
+            <button type="button" id="zoom-all" class="ghost small" title="Show the whole run">All</button>
+          </span>
         </div>
         <div id="st-wrap" class="st-wrap"><canvas id="st"></canvas><div id="tip" class="tip" hidden></div></div>
         <div class="legend">
@@ -275,7 +278,7 @@ starttimer(t, 100ms)   canceltimer(t)
           <span><i class="lg out"></i>output</span>
           <span><i class="lg crash"></i>crashed</span>
           <span><i class="lg recover"></i>recovery</span>
-          <span><i class="lg cut"></i>partition or link down</span>
+          <span><i class="lg cut"></i>network cut</span>
         </div>
       </div>
       <div class="log-col">

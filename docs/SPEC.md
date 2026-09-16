@@ -1,6 +1,6 @@
 # SPEC — Distributed Systems Playground
 
-Version: 0.3 (draft) · Status: proposal, partially implemented (see Appendix B)
+Version: 0.4 (draft) · Status: proposal, partially implemented (see Appendix B)
 
 ## 1. Purpose
 
@@ -402,6 +402,7 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.1** | DSL, `Net`/`timer`/`Rounds`, crashes, presets, space-time diagram, time travel |
 | **v0.2** | English UI, animated execution on the topology, event-by-event playback, interactive injection |
 | **v0.3** | crash-recovery with `stable`, link failures and partitions over time, fault injection at the cursor |
+| **v0.4** | responsive layouts and touch support, faster rendering of large runs, robustness fixes |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |
 | **v1.2** | failure detector oracles (P, ◇P, Ω) as provided modules, to study consensus on top of the abstraction |
 | **v2** | Byzantine faults (adversarial nodes written in the DSL), systematic exploration of interleavings, trace export |
@@ -502,7 +503,7 @@ end
 
 ---
 
-## Appendix B — Implementation status (v0.3)
+## Appendix B — Implementation status (v0.4)
 
 ### Implemented
 
@@ -518,6 +519,7 @@ end
 |---|---|---|
 | TypeScript, Vite, React, Lezer, CodeMirror, React Flow | dependency-free JavaScript, SVG and canvas, custom highlighting editor | one static file, no build step needed to use it |
 | Engine in a Web Worker | engine on the main thread, capped at 150,000 events | simplicity; enough for teaching scenarios |
+| Canvas for animation beyond a few hundred nodes | SVG with a static layer redrawn only on topology changes, a separate composited layer for animations, pooled elements, and batched canvas drawing for the diagram; packets switch to a compact form when many are in flight | keeps editing simple while playing large runs smoothly |
 | Periodic snapshots for time travel | the whole run is computed first and then replayed; state recorded at every step that changes it | equivalent thanks to determinism, and simpler |
 | Explicit `stack` in the scenario | automatic binding: for each `uses X`, the first algorithm implementing `X` | less configuration |
 | Standard library in `.dalg` files | algorithms live in the examples; `PerfectLinks` in the ◇P example is a direct link, perfect only with zero loss | stubborn links retransmit forever and make traces grow too much |

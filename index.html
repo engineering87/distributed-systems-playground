@@ -105,6 +105,7 @@ textarea { resize: vertical; width: 100%; }
 input[aria-invalid="true"] { border-color: var(--red); background: var(--err-bg); }
 input:disabled { opacity: .5; }
 .narrow { width: 84px; }
+.tiny { width: 58px; }
 .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; min-width: 0; }
 .field > span { font-size: 12.5px; color: var(--muted); }
 .field.inline { flex-direction: row; align-items: center; gap: 6px; margin: 0; }
@@ -125,7 +126,7 @@ input:disabled { opacity: .5; }
 /* ---------- layout ---------- */
 .app {
   display: grid; gap: 10px; padding: 10px;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 470px);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 600px);
   grid-template-rows: minmax(460px, calc(100vh - 470px)) auto;
   grid-template-areas: "topo side" "timeline timeline";
 }
@@ -135,11 +136,17 @@ input:disabled { opacity: .5; }
 .topo { grid-area: topo; }
 .side { grid-area: side; }
 .timeline { grid-area: timeline; }
-.panel-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+.panel-bar { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
 
 /* ---------- topologia ---------- */
 .canvas-wrap { position: relative; flex: 1; min-height: 280px; }
-#topo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; background: var(--paper); }
+#topo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; background: var(--paper); }
+/* animation overlay: composited separately so the static graph is not repainted on every frame */
+#topo-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; will-change: transform; overflow: hidden; }
+#topo-fx .pk { pointer-events: auto; }
+/* touch: the page scrolls over the empty graph, but not when dragging a process or using a tool */
+#topo .nd { touch-action: none; }
+body:not([data-mode="move"]) #topo { touch-action: none; }
 .grid-line { fill: none; stroke: var(--grid); stroke-width: 1; }
 .grid-line.strong { stroke: var(--grid-strong); }
 .arrowhead { fill: var(--muted); }
@@ -240,16 +247,18 @@ h3 { font-size: 14px; margin: 14px 0 6px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font-size: 12.5px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--rule); white-space: nowrap; }
 .chip.bad { border-color: var(--red); color: var(--red); font-weight: 700; }
-.st-area { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 470px); min-height: 0; }
+.st-area { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 30vw, 600px); min-height: 0; }
 .st-col { min-width: 0; border-right: 1px solid var(--rule); display: flex; flex-direction: column; }
 .log-col { display: flex; flex-direction: column; min-width: 0; }
-.st-bar { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; min-height: 36px; }
+.st-bar { display: flex; align-items: center; gap: 6px 10px; padding: 5px 10px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; min-height: 36px; }
+.st-bar .status { flex: 1 1 200px; min-width: 0; }
+.zoom { display: inline-flex; gap: 4px; }
 .st-bar .lbl { font-weight: 700; }
 .status { font-size: 13px; }
 .status.err { color: var(--red); font-weight: 700; }
 .status.ok { color: var(--muted); }
 .st-wrap { position: relative; height: 250px; overflow-y: auto; overflow-x: hidden; }
-#st { display: block; width: 100%; cursor: grab; }
+#st { display: block; width: 100%; cursor: grab; touch-action: pan-y pinch-zoom; }
 #st.dragging { cursor: grabbing; }
 .tip {
   position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule);
@@ -257,7 +266,7 @@ h3 { font-size: 14px; margin: 14px 0 6px; }
   box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 15%, transparent);
 }
 .tip code { word-break: break-all; }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 4px 10px 6px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--grid); }
+.legend { display: flex; gap: 4px 12px; flex-wrap: wrap; padding: 4px 10px 6px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--grid); }
 .lg { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
 .lg.deliver { border-color: var(--blue); }
 .lg.late { border-color: var(--red); }
@@ -291,25 +300,59 @@ dialog h2 { margin: 0 0 6px; font-size: 18px; }
 .toast button { background: transparent; color: var(--paper); border-color: color-mix(in srgb, var(--paper) 50%, transparent); }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1100px) {
-  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: "topo" "side" "timeline"; }
+/* wide enough for two columns and tall enough: the app fills the window and nothing scrolls but the panels */
+@media (min-width: 960px) and (min-height: 620px) and (pointer: fine), (min-width: 960px) and (min-height: 900px) {
+  html, body { height: 100%; }
+  body { min-height: 0; }
+  .app { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr) clamp(220px, 37vh, 620px); }
+  .timeline { min-height: 0; overflow: hidden; }
+  .st-area { flex: 1; min-height: 0; }
+  .st-col, .log-col { min-height: 0; }
+  .st-wrap { height: auto; flex: 1; min-height: 60px; }
+  .log { height: auto; flex: 1; min-height: 0; }
+  .canvas-wrap { min-height: 200px; }
+}
+/* one column: the graph first, then the run, then the configuration */
+@media (max-width: 959px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: "topo" "timeline" "side"; }
   .topo, .side { min-height: auto; }
-  .canvas-wrap { min-height: 380px; }
-  .side .tab-body { max-height: 70vh; }
+  .canvas-wrap { min-height: clamp(300px, 55vh, 640px); }
+  .side .tab-body { max-height: 75vh; }
   .st-area { grid-template-columns: minmax(0, 1fr); }
   .st-col { border-right: 0; border-bottom: 1px solid var(--rule); }
-  .log { height: 240px; }
+  .st-wrap { height: clamp(200px, 35vh, 420px); }
+  .log { height: clamp(180px, 30vh, 380px); }
+  #example { max-width: none; }
 }
 @media (max-width: 560px) {
   .grid2, .grid3 { grid-template-columns: 1fr; }
   .brand h1 { font-size: 15px; }
-  .tlabel { min-width: 0; }
-  .topbar { padding: 8px 10px; }
-  .app { padding: 6px; }
+  .tlabel { min-width: 0; flex: 1 1 100%; text-align: center; }
+  .topbar { padding: 8px 10px; gap: 8px; }
+  .app { padding: 6px; gap: 6px; }
   .toolbar { width: 100%; }
-  #example { max-width: none; width: 100%; min-width: 0; flex: 1; }
-  .field.inline { flex: 1 1 100%; min-width: 0; }
-  .transport select { flex: 1; }
+  .toolbar .ex-field { flex: 1 1 100%; min-width: 0; }
+  .toolbar .ex-field select { width: 100%; min-width: 0; flex: 1; }
+  #scrub { flex: 1 1 100%; order: 10; }
+  .topo-legend { display: none; }
+  .panel-bar .sep { display: none; }
+  .transport select { flex: 1 1 auto; }
+  .props { font-size: 13px; }
+  .props .inject input:not(.narrow) { width: 100% !important; }
+}
+/* touch screens: larger targets, 16px text in fields (avoids zoom on focus in iOS) */
+@media (pointer: coarse) {
+  button, select, input:not([type=checkbox]):not([type=radio]):not([type=range]) { min-height: 40px; }
+  button.icon { width: 42px; }
+  button.icon.small { width: 40px; }
+  .symbols button { width: 38px; min-height: 38px; }
+  .check input { width: 20px; height: 20px; }
+  input, select, textarea { font-size: 16px; }
+  #code, #code-hl, .gutter { font-size: 15px; }
+  .tabs button { padding: 12px 14px 10px; }
+  #scrub { height: 36px; }
+  .log li { padding: 8px 10px; }
+  .diag li { padding: 8px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
@@ -384,6 +427,11 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
 .props .inject .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
 @media (prefers-reduced-motion: reduce) { .recoverring { display: none; } }
 
+/* small screens: the diagram legend already explains the colors */
+@media (max-width: 560px) {
+  .topo-legend { display: none; }
+}
+
 </style>
 </head>
 <body data-timing="asynchronous">
@@ -396,7 +444,7 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
     <h1>Distributed Systems Playground</h1>
   </div>
   <div class="toolbar">
-    <label class="field inline"><span>Example</span>
+    <label class="field inline ex-field"><span>Example</span>
       <select id="example"><option value="">Choose…</option></select>
     </label>
     <label class="field inline"><span>Seed</span>
@@ -429,11 +477,11 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
         <option value="random">Random</option>
         <option value="tree">Binary tree</option>
       </select>
-      <input id="gen-n" type="number" min="2" max="40" value="6" class="narrow" aria-label="Number of processes">
+      <input id="gen-n" type="number" min="2" max="40" value="6" class="tiny" aria-label="Number of processes" title="Number of processes (2 to 40)">
       <button id="btn-gen" type="button" class="ghost">Generate</button>
       <button id="btn-fit" type="button" class="ghost" title="Fit to view">Fit</button>
       <span class="sep"></span>
-      <label class="check"><input type="checkbox" id="labels" checked> Message labels</label>
+      <label class="check" title="Show the message type on packets in flight"><input type="checkbox" id="labels" checked> Labels</label>
     </div>
     <div class="canvas-wrap">
       <svg id="topo" role="img" aria-label="Process graph">
@@ -444,8 +492,9 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
           <marker id="arrow-sel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrowhead sel"/></marker>
         </defs>
         <rect id="topo-bg" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grid-l)"/>
-        <g id="g-links"></g><g id="g-fx"></g><g id="g-nodes"></g><g id="g-msgs"></g><g id="g-top"></g>
+        <g id="g-links"></g><g id="g-nodes"></g>
       </svg>
+      <svg id="topo-fx" aria-hidden="true"><g id="g-fx"></g><g id="g-msgs"></g><g id="g-top"></g></svg>
       <div id="stale" class="stale" hidden>The scenario has changed. <button type="button" id="btn-rerun" class="link">Run again</button></div>
       <div class="topo-legend" aria-hidden="true">
         <span><i class="pk-dot ok"></i>in transit</span>
@@ -624,7 +673,7 @@ starttimer(t, 100ms)   canceltimer(t)
         <option value="1000">1 s per second</option>
         <option value="5000">5 s per second</option>
       </select>
-      <label class="check"><input type="checkbox" id="autoplay" checked> Play after run</label>
+      <label class="check" title="Start playing after every run"><input type="checkbox" id="autoplay" checked> Autoplay</label>
       <input id="scrub" type="range" min="0" max="10000" value="0" aria-label="Position in time">
       <output id="tlabel" class="tlabel">t = 0</output>
       <div id="chips" class="chips"></div>
@@ -634,12 +683,14 @@ starttimer(t, 100ms)   canceltimer(t)
         <div class="st-bar">
           <span id="status" class="status"></span>
           <span class="grow"></span>
-          <label class="check"><input type="checkbox" id="ghost"> Show the future</label>
-          <label class="check"><input type="checkbox" id="follow" checked> Follow cursor</label>
-          <button type="button" id="zoom-out" class="icon small" aria-label="Zoom out">−</button>
-          <button type="button" id="zoom-in" class="icon small" aria-label="Zoom in">+</button>
-          <button type="button" id="zoom-fit" class="ghost small" title="Zoom to where the action is">Action</button>
-          <button type="button" id="zoom-all" class="ghost small" title="Show the whole run">All</button>
+          <label class="check" title="Show events after the cursor, faded"><input type="checkbox" id="ghost"> Future</label>
+          <label class="check" title="Scroll the diagram to keep the cursor in view"><input type="checkbox" id="follow" checked> Follow</label>
+          <span class="zoom" role="group" aria-label="Zoom">
+            <button type="button" id="zoom-out" class="icon small" aria-label="Zoom out" title="Zoom out">−</button>
+            <button type="button" id="zoom-in" class="icon small" aria-label="Zoom in" title="Zoom in (Ctrl + wheel)">+</button>
+            <button type="button" id="zoom-fit" class="ghost small" title="Zoom to where the action is">Action</button>
+            <button type="button" id="zoom-all" class="ghost small" title="Show the whole run">All</button>
+          </span>
         </div>
         <div id="st-wrap" class="st-wrap"><canvas id="st"></canvas><div id="tip" class="tip" hidden></div></div>
         <div class="legend">
@@ -650,7 +701,7 @@ starttimer(t, 100ms)   canceltimer(t)
           <span><i class="lg out"></i>output</span>
           <span><i class="lg crash"></i>crashed</span>
           <span><i class="lg recover"></i>recovery</span>
-          <span><i class="lg cut"></i>partition or link down</span>
+          <span><i class="lg cut"></i>network cut</span>
         </div>
       </div>
       <div class="log-col">
@@ -3152,6 +3203,11 @@ function blankScenario() {
 }
 
 function ensureScenario(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('not a scenario object');
+  if (!Array.isArray(s.nodes)) throw new Error('"nodes" must be a list');
+  if (typeof s.code !== 'string') throw new Error('"code" must be text');
+  if (s.links !== undefined && !Array.isArray(s.links)) throw new Error('"links" must be a list');
+  if (s.faults !== undefined && !Array.isArray(s.faults)) throw new Error('"faults" must be a list');
   const base = EX.PRESETS.async;
   const out = Object.assign({
     version: 1, seed: 1, nodes: [], links: [], code: '', top: '', inputs: '', faults: [], preset: 'custom',
@@ -3160,12 +3216,16 @@ function ensureScenario(s) {
   out.assumed = Object.assign({}, base.assumed, s.assumed || {});
   out.actual = Object.assign({}, base.actual, s.actual || {});
   out.seed = parseInt(out.seed, 10) || 0;
-  out.nodes = (out.nodes || []).map(n => ({ id: +n.id, x: +n.x || 0, y: +n.y || 0 }));
-  out.links = (out.links || []).map(l => ({
+  const seen = new Set();
+  out.nodes = out.nodes.map(n => ({ id: Math.trunc(+(n && n.id)), x: +(n && n.x) || 0, y: +(n && n.y) || 0 }))
+    .filter(n => Number.isFinite(n.id) && n.id > 0 && !seen.has(n.id) && seen.add(n.id));
+  if (typeof out.inputs !== 'string') out.inputs = '';
+  if (typeof out.stopAt !== 'string') out.stopAt = String(out.stopAt || '5s');
+  out.links = (out.links || []).filter(l => l && typeof l === 'object').map(l => ({
     a: +l.a, b: +l.b, directed: !!l.directed, enabled: l.enabled !== false,
     loss: l.loss === null || l.loss === undefined ? '' : String(l.loss), delay: l.delay || ''
   }));
-  out.faults = (out.faults || []).map(f => {
+  out.faults = (out.faults || []).filter(f => f && typeof f === 'object').map(f => {
     const type = f.type || 'crash';
     const str = v => (v === null || v === undefined ? '' : String(v));
     if (type === 'link') return { type, a: +f.a, b: +f.b, from: str(f.from), to: str(f.to) };
@@ -3413,7 +3473,8 @@ function gotoLine(line, col) {
   const end = off + (lines[line - 1] || '').length;
   ta.focus();
   ta.setSelectionRange(Math.min(end, off + Math.max(0, (col || 1) - 1)), end);
-  ta.scrollTop = Math.max(0, (line - 5) * 12.5 * 1.55);
+  const lh = parseFloat(getComputedStyle(ta).lineHeight) || 19;
+  ta.scrollTop = Math.max(0, (line - 5) * lh);
   syncScroll();
 }
 function insertText(t) {
@@ -3451,7 +3512,10 @@ function bindEditor() {
 
 // ============================================================ topology
 const svg = () => $('#topo');
-function nodeById(id) { return S.scn.nodes.find(n => n.id === id); }
+function nodeById(id) {
+  if (!S.nodeMap || S.nodeMapVer !== S.topoVer) { S.nodeMap = new Map(S.scn.nodes.map(n => [n.id, n])); S.nodeMapVer = S.topoVer; }
+  return S.nodeMap.get(id);
+}
 function nextId() { return S.scn.nodes.reduce((m, n) => Math.max(m, n.id), 0) + 1; }
 function neighborsOf(id) {
   const out = new Set();
@@ -3468,13 +3532,16 @@ function svgPoint(evt) {
 }
 function fitView() {
   const ns = S.scn.nodes, s = svg();
-  if (!ns.length) { s.setAttribute('viewBox', '0 0 700 460'); return; }
+  const fx = $('#topo-fx');
+  if (!ns.length) { s.setAttribute('viewBox', '0 0 700 460'); fx.setAttribute('viewBox', '0 0 700 460'); return; }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const n of ns) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
   const pad = 80;
   const w = Math.max(x1 - x0 + 2 * pad, 420), h = Math.max(y1 - y0 + 2 * pad, 300);
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  s.setAttribute('viewBox', (cx - w / 2) + ' ' + (cy - h / 2) + ' ' + w + ' ' + h);
+  const vb = (cx - w / 2) + ' ' + (cy - h / 2) + ' ' + w + ' ' + h;
+  s.setAttribute('viewBox', vb);
+  fx.setAttribute('viewBox', vb);
 }
 function unit(x, y) { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; }
 function linkGeom(a, b, curved) {
@@ -3493,16 +3560,18 @@ function geomPrefix(g, f) {
   const [px, py] = geomAt(g, f);
   return 'M' + g.x1.toFixed(1) + ' ' + g.y1.toFixed(1) + ' Q' + qx.toFixed(1) + ' ' + qy.toFixed(1) + ' ' + px.toFixed(1) + ' ' + py.toFixed(1);
 }
-function isCurved(a, b) {
-  const fwd = S.scn.links.find(l => l.directed && l.a === a && l.b === b);
-  const rev = S.scn.links.find(l => l.directed && l.a === b && l.b === a);
-  return !!(fwd && rev);
+function dirSet() {
+  if (!V.dirSet || V.dirVer !== S.topoVer) {
+    V.dirSet = new Set(S.scn.links.filter(l => l.directed).map(l => l.a + '>' + l.b));
+    V.dirVer = S.topoVer;
+  }
+  return V.dirSet;
 }
+function isCurved(a, b) { const d = dirSet(); return d.has(a + '>' + b) && d.has(b + '>' + a); }
 function msgGeom(m) {
   const a = nodeById(m.from), b = nodeById(m.to);
   if (!a || !b || m.from === m.to) return null;
-  const hasFwd = S.scn.links.some(l => l.a === m.from && l.b === m.to && l.directed);
-  return linkGeom(a, b, hasFwd && isCurved(m.from, m.to));
+  return linkGeom(a, b, isCurved(m.from, m.to));
 }
 // is process id down at time t in the last run?
 function downAt(id, t) {
@@ -3519,8 +3588,9 @@ function cutAtUI(a, b, t) {
     if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
   for (const p of nf.partitions) {
     if (t < p.from || (p.to !== null && t >= p.to)) continue;
-    const g = id => { const i = p.groups.findIndex(x => x.includes(id)); return i; };
-    if (g(a) !== g(b)) return 'partition';
+    if (!p.groupOf) { p.groupOf = new Map(); p.groups.forEach((g, i) => g.forEach(id => p.groupOf.set(id, i))); }
+    const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1, gb = p.groupOf.has(b) ? p.groupOf.get(b) : -1;
+    if (ga !== gb) return 'partition';
   }
   return null;
 }
@@ -3531,58 +3601,108 @@ function packetLabel(m) {
   return mm ? mm[1] : truncate(m.payload, 14);
 }
 
-function renderTopo() {
-  if (!S.scn) return;
+// ---- topology rendering
+// The static part (links and process nodes) is rebuilt only when the topology, the selection or the run
+// changes; on every frame the existing elements are updated in place, and the animation layers reuse
+// pooled elements. This keeps playback smooth on large graphs.
+const V = { key: '', nodes: new Map(), links: [], dir: new Set(), pools: {} };
+function topoChanged() { S.topoVer = (S.topoVer || 0) + 1; }
+function staticKey() { return String(S.topoVer || 0); }
+function buildStatic() {
   const gL = $('#g-links'), gN = $('#g-nodes');
   gL.textContent = ''; gN.textContent = '';
+  S.nodeMap = new Map(S.scn.nodes.map(n => [n.id, n]));
+  V.dir = new Set(S.scn.links.filter(l => l.directed).map(l => l.a + '>' + l.b));
+  V.links = [];
   S.scn.links.forEach((l, i) => {
     const a = nodeById(l.a), b = nodeById(l.b);
     if (!a || !b) return;
     const g = linkGeom(a, b, l.directed && isCurved(l.a, l.b));
-    const sel = S.selected && S.selected.type === 'link' && S.selected.idx === i;
     const d = geomPath(g);
-    const cut = S.res ? cutAtUI(l.a, l.b, S.cursor) : null;
-    const p = sv('path', { d, class: 'lk' + (l.enabled ? '' : ' off') + (cut ? ' cut' : '') + (sel ? ' sel' : '') });
-    if (l.directed) p.setAttribute('marker-end', sel ? 'url(#arrow-sel)' : 'url(#arrow)');
-    gL.append(p);
+    const path = sv('path', { d, class: 'lk' });
     const hit = sv('path', { d, class: 'lk-hit', 'data-link': i });
-    hit.append(sv('title', {}, 'p' + l.a + (l.directed ? ' → ' : ' — ') + 'p' + l.b + (l.enabled ? '' : ' (disabled)') + (cut ? ' (' + cut + ')' : '')));
-    gL.append(hit);
-    if (cut) {
-      const [mx, my] = geomAt(g, 0.5);
-      gL.append(sv('text', { x: mx, y: my, class: 'cut-mark' }, '✂'));
-    }
+    const title = sv('title', {});
+    hit.append(title);
+    const [mx, my] = geomAt(g, 0.5);
+    const mark = sv('text', { x: mx, y: my, class: 'cut-mark', display: 'none' }, '✂');
+    gL.append(path, hit, mark);
+    V.links.push({ l, i, path, hit, title, mark, cut: undefined, state: {} });
   });
-  const t = S.cursor;
-  const busy = busyAt(t);
+  V.nodes = new Map();
   for (const n of S.scn.nodes) {
     const g = sv('g', { class: 'nd', 'data-node': n.id, transform: 'translate(' + n.x + ' ' + n.y + ')', tabindex: 0, role: 'button', 'aria-label': 'Process p' + n.id });
-    const crashed = !!downAt(n.id, t);
-    const b = busy.get(n.id);
-    if (crashed) g.classList.add('crashed');
-    if (S.selected && S.selected.type === 'node' && S.selected.id === n.id) g.classList.add('sel');
-    if (S.linkFrom === n.id) g.classList.add('from');
-    if (b && !crashed) {
-      g.classList.add('busy');
-      g.append(sv('circle', { r: R_NODE + 6 + 3 * b.strength, class: 'glow', opacity: (0.25 + 0.55 * b.strength).toFixed(2) }));
-    }
-    g.append(sv('circle', { r: R_NODE, class: 'body' }));
-    g.append(sv('text', { class: 'name' }, 'p' + n.id));
-    if (crashed) g.append(sv('path', { class: 'cross', d: 'M-10 -10L10 10M10 -10L-10 10' }));
-    if (b && b.timer && !crashed) g.append(sv('text', { class: 'icon', x: -R_NODE - 4, y: -R_NODE + 2 }, '⏱'));
-    if (S.res) {
-      const o = lastOutput(n.id, t);
-      if (o) g.append(sv('text', { class: 'out', y: R_NODE + 14 }, truncate(o.text, 26)));
-      if (S.res.rounds) {
-        const sn = snapAt(n.id, t);
-        if (sn && sn.round > 0) {
-          const bd = sv('text', { class: 'badge' + (b && b.round ? ' flash' : ''), x: R_NODE + 3, y: -R_NODE + 2 }, 'r' + sn.round);
-          bd.style.textAnchor = 'start';
-          g.append(bd);
-        }
-      }
-    }
+    const glow = sv('circle', { r: R_NODE + 6, class: 'glow', display: 'none' });
+    const cross = sv('path', { class: 'cross', d: 'M-10 -10L10 10M10 -10L-10 10', display: 'none' });
+    const icon = sv('text', { class: 'icon', x: -R_NODE - 4, y: -R_NODE + 2, display: 'none' }, '⏱');
+    const out = sv('text', { class: 'out', y: R_NODE + 14, display: 'none' });
+    const badge = sv('text', { class: 'badge', x: R_NODE + 3, y: -R_NODE + 2, display: 'none' });
+    badge.style.textAnchor = 'start';
+    g.append(glow, sv('circle', { r: R_NODE, class: 'body' }), sv('text', { class: 'name' }, 'p' + n.id), cross, icon, out, badge);
     gN.append(g);
+    V.nodes.set(n.id, { g, glow, cross, icon, out, badge, state: {} });
+  }
+  V.key = staticKey();
+}
+// move a process and its links in place while dragging (no rebuild, so the dragged element survives)
+function moveNodeDOM(n) {
+  const R = V.nodes.get(n.id);
+  if (R) R.g.setAttribute('transform', 'translate(' + n.x + ' ' + n.y + ')');
+  for (const L of V.links) {
+    if (L.l.a !== n.id && L.l.b !== n.id) continue;
+    const a = nodeById(L.l.a), b = nodeById(L.l.b);
+    if (!a || !b) continue;
+    const g = linkGeom(a, b, L.l.directed && isCurved(L.l.a, L.l.b));
+    const d = geomPath(g);
+    L.path.setAttribute('d', d); L.hit.setAttribute('d', d);
+    const [mx, my] = geomAt(g, 0.5);
+    L.mark.setAttribute('x', mx); L.mark.setAttribute('y', my);
+  }
+}
+// set an attribute or text only when it changes
+function setIf(rec, k, el, attr, v) {
+  if (rec.state[k] === v) return;
+  rec.state[k] = v;
+  if (attr === 'text') el.textContent = v;
+  else if (attr === 'class') el.setAttribute('class', v);
+  else el.setAttribute(attr, v);
+}
+function renderTopo() {
+  if (!S.scn) return;
+  if (V.key !== staticKey()) buildStatic();
+  const t = S.cursor;
+  for (const L of V.links) {
+    const cut = S.res ? cutAtUI(L.l.a, L.l.b, t) : null;
+    const sel = !!(S.selected && S.selected.type === 'link' && S.selected.idx === L.i);
+    setIf(L, 'cls', L.path, 'class', 'lk' + (L.l.enabled ? '' : ' off') + (cut ? ' cut' : '') + (sel ? ' sel' : ''));
+    if (L.l.directed) setIf(L, 'mk', L.path, 'marker-end', sel ? 'url(#arrow-sel)' : 'url(#arrow)');
+    if (cut === L.cut) continue;
+    L.cut = cut;
+    L.mark.setAttribute('display', cut ? 'inline' : 'none');
+    L.title.textContent = 'p' + L.l.a + (L.l.directed ? ' → ' : ' — ') + 'p' + L.l.b + (L.l.enabled ? '' : ' (disabled)') + (cut ? ' (' + cut + ')' : '');
+  }
+  const busy = busyAt(t);
+  for (const [id, R] of V.nodes) {
+    const crashed = !!downAt(id, t);
+    const b = crashed ? null : busy.get(id);
+    const base = 'nd' + (S.selected && S.selected.type === 'node' && S.selected.id === id ? ' sel' : '') + (S.linkFrom === id ? ' from' : '');
+    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : ''));
+    setIf(R, 'cross', R.cross, 'display', crashed ? 'inline' : 'none');
+    if (b) {
+      setIf(R, 'glow', R.glow, 'display', 'inline');
+      R.glow.setAttribute('r', (R_NODE + 6 + 3 * b.strength).toFixed(1));
+      R.glow.setAttribute('opacity', (0.25 + 0.55 * b.strength).toFixed(2));
+    } else setIf(R, 'glow', R.glow, 'display', 'none');
+    setIf(R, 'icon', R.icon, 'display', b && b.timer ? 'inline' : 'none');
+    const o = S.res ? lastOutput(id, t) : null;
+    setIf(R, 'outd', R.out, 'display', o ? 'inline' : 'none');
+    if (o) setIf(R, 'outt', R.out, 'text', truncate(o.text, 26));
+    const sn = S.res && S.res.rounds ? snapAt(id, t) : null;
+    const showBadge = !!(sn && sn.round > 0);
+    setIf(R, 'bd', R.badge, 'display', showBadge ? 'inline' : 'none');
+    if (showBadge) {
+      setIf(R, 'bdt', R.badge, 'text', 'r' + sn.round);
+      setIf(R, 'bdc', R.badge, 'class', 'badge' + (b && b.round ? ' flash' : ''));
+    }
   }
   renderAnim();
 }
@@ -3608,103 +3728,180 @@ function busyAt(t) {
   return out;
 }
 
-// packets in flight, trails, arrival ripples, loss marks, output bubbles, crash flashes
+// a pool of SVG elements in one layer: take() hands out an element, finish() hides the unused ones
+function pool(layerId, make) {
+  let P = V.pools[layerId + ':' + make.name];
+  if (!P) {
+    P = V.pools[layerId + ':' + make.name] = { items: [], used: 0, layer: $(layerId) };
+  }
+  return {
+    take() {
+      let it = P.items[P.used];
+      if (!it) { it = make(); P.items.push(it); P.layer.append(it.root); }
+      else if (it.hidden) { it.root.removeAttribute('display'); it.hidden = false; }
+      P.used++;
+      return it;
+    },
+    finish() {
+      for (let i = P.used; i < P.items.length; i++) {
+        const it = P.items[i];
+        if (!it.hidden) { it.root.setAttribute('display', 'none'); it.hidden = true; }
+      }
+      P.used = 0;
+    }
+  };
+}
+function resetPools() {
+  for (const k in V.pools) { const P = V.pools[k]; P.items.forEach(it => it.root.remove()); }
+  V.pools = {};
+}
+function mkTrail() { const root = sv('path', {}); return { root }; }
+function mkPacket() {
+  const root = sv('g', {});
+  const rect = sv('rect', { y: -8.5, height: 17, rx: 8.5 });
+  const dot = sv('circle', { r: 5.5 });
+  const text = sv('text', {});
+  const title = sv('title', {});
+  root.append(rect, dot, text, title);
+  return { root, rect, dot, text, title, s: {} };
+}
+function mkRing() { const root = sv('circle', {}); return { root }; }
+function mkBurst() { const root = sv('path', {}); return { root }; }
+function mkBubble() {
+  const root = sv('g', { class: 'bubble' });
+  const path = sv('path', {});
+  const text = sv('text', { y: -12 });
+  root.append(path, text);
+  return { root, path, text, s: {} };
+}
+
+// packets in flight, trails, arrival ripples, loss marks, output bubbles, crash and recovery flashes
 function renderAnim() {
-  const gM = $('#g-msgs'), gF = $('#g-fx'), gT = $('#g-top');
-  gM.textContent = ''; gF.textContent = ''; gT.textContent = '';
-  if (!S.res) return;
-  const t = S.cursor, W = S.pulse;
-  const labels = $('#labels').checked;
-  const sel = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
-  const hi = upperBound(S.msgsBySend, t, m => m.sendT);
-  const lo = lowerBound(S.msgsBySend, t - S.maxLat - W, m => m.sendT);
-  let packets = 0;
-  for (let i = lo; i < hi; i++) {
-    const m = S.msgsBySend[i];
-    if (m.status === 'dropped-link' || m.recvT === null) continue;
-    if (m.status === 'dropped-cut' && m.recvT === m.sendT) continue;
-    const self = m.from === m.to;
-    const inFlight = m.recvT > t && m.recvT > m.sendT;
-    if (inFlight && !self && packets < 400) {
-      const g = msgGeom(m);
-      if (!g) continue;
-      let f = (t - m.sendT) / (m.recvT - m.sendT);
-      if (m.status === 'dropped-loss') f *= 0.5;
-      if (labels) f = 0.14 + 0.72 * f;
-      const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
-      gF.append(sv('path', { d: geomPrefix(g, f), class: 'trail ' + cls }));
-      const [x, y] = geomAt(g, f);
-      const pg = sv('g', { class: 'pk ' + cls + (m.dup ? ' dup' : '') + (sel === m.id ? ' sel' : ''), transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')', 'data-msg': m.id });
-      if (labels) {
-        const txt = packetLabel(m);
-        const w = Math.max(18, txt.length * 6.7 + 12);
-        pg.append(sv('rect', { x: -w / 2, y: -8.5, width: w, height: 17, rx: 8.5 }));
-        pg.append(sv('text', {}, txt));
+  const trails = pool('#g-fx', mkTrail), rings = pool('#g-fx', mkRing);
+  const packets = pool('#g-msgs', mkPacket);
+  const bursts = pool('#g-top', mkBurst), bubbles = pool('#g-top', mkBubble);
+  if (S.res) {
+    const t = S.cursor, W = S.pulse;
+    // with many packets on screen, labels and trails only add clutter and cost
+    const crowd = S.lastInFlight || 0;
+    const labels = $('#labels').checked && crowd <= 120;
+    const withTrails = crowd <= 200;
+    const sel = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
+    const hi = upperBound(S.msgsBySend, t, m => m.sendT);
+    const lo = lowerBound(S.msgsBySend, t - S.maxLat - W, m => m.sendT);
+    let count = 0;
+    for (let i = lo; i < hi; i++) {
+      const m = S.msgsBySend[i];
+      if (m.status === 'dropped-link' || m.recvT === null) continue;
+      if (m.status === 'dropped-cut' && m.recvT === m.sendT) continue;
+      const self = m.from === m.to;
+      const inFlight = m.recvT > t && m.recvT > m.sendT;
+      if (inFlight) {
+        if (self || count >= 400) continue;
+        const g = msgGeom(m);
+        if (!g) continue;
+        let f = (t - m.sendT) / (m.recvT - m.sendT);
+        if (m.status === 'dropped-loss') f *= 0.5;
+        if (labels) f = 0.14 + 0.72 * f;
+        const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
+        if (withTrails) {
+          const tr = trails.take();
+          tr.root.setAttribute('d', geomPrefix(g, f));
+          tr.root.setAttribute('class', 'trail ' + cls);
+        }
+        const [x, y] = geomAt(g, f);
+        const P = packets.take();
+        P.root.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+        const pcls = 'pk ' + cls + (m.dup ? ' dup' : '') + (sel === m.id ? ' sel' : '');
+        if (P.s.cls !== pcls) { P.root.setAttribute('class', pcls); P.s.cls = pcls; }
+        if (P.s.id !== m.id || P.s.labels !== labels) {
+          P.s.id = m.id; P.s.labels = labels;
+          P.root.setAttribute('data-msg', m.id);
+          P.title.textContent = 'p' + m.from + ' → p' + m.to + ': ' + m.payload;
+          if (labels) {
+            const txt = packetLabel(m);
+            const w = Math.max(18, txt.length * 6.7 + 12);
+            P.rect.setAttribute('x', -w / 2); P.rect.setAttribute('width', w);
+            P.rect.removeAttribute('display'); P.text.removeAttribute('display');
+            P.dot.setAttribute('display', 'none');
+            P.text.textContent = txt;
+          } else {
+            P.rect.setAttribute('display', 'none'); P.text.setAttribute('display', 'none');
+            P.dot.removeAttribute('display');
+          }
+        }
+        count++;
+        continue;
+      }
+      // arrival effects within the pulse window
+      const age = t - m.recvT;
+      if (age < 0 || age > W) continue;
+      const k = age / Math.max(1, W);
+      const to = nodeById(m.to);
+      if (!to) continue;
+      if (m.status === 'delivered') {
+        const r = rings.take().root;
+        r.setAttribute('cx', to.x); r.setAttribute('cy', to.y);
+        r.setAttribute('r', (R_NODE + 4 + 16 * k).toFixed(1));
+        r.setAttribute('class', 'ripple' + (m.violation ? ' late' : ''));
+        r.setAttribute('opacity', (1 - k).toFixed(2));
       } else {
-        pg.append(sv('circle', { r: 5.5 }));
+        let x, y;
+        const g = msgGeom(m);
+        if (m.status === 'dropped-loss' && g) [x, y] = geomAt(g, 0.5);
+        else if (g) [x, y] = geomAt(g, 1);
+        else { x = to.x; y = to.y; }
+        const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
+        const sz = 5 + 4 * k;
+        const b = bursts.take().root;
+        b.setAttribute('d', `M${x - sz} ${y - sz}L${x + sz} ${y + sz}M${x + sz} ${y - sz}L${x - sz} ${y + sz}`);
+        b.setAttribute('class', 'burst ' + cls);
+        b.setAttribute('opacity', (1 - k).toFixed(2));
       }
-      pg.append(sv('title', {}, 'p' + m.from + ' → p' + m.to + ': ' + m.payload));
-      gM.append(pg);
-      packets++;
-      continue;
     }
-    // arrival effects within the pulse window
-    const age = t - m.recvT;
-    if (age < 0 || age > W) continue;
-    const k = age / Math.max(1, W);
-    const to = nodeById(m.to);
-    if (!to) continue;
-    if (m.status === 'delivered') {
-      gF.append(sv('circle', {
-        cx: to.x, cy: to.y, r: (R_NODE + 4 + 16 * k).toFixed(1),
-        class: 'ripple' + (m.violation ? ' late' : ''), opacity: (1 - k).toFixed(2)
-      }));
-    } else {
-      let x, y;
-      const g = msgGeom(m);
-      if (m.status === 'dropped-loss' && g) [x, y] = geomAt(g, 0.5);
-      else if (g) [x, y] = geomAt(g, 1);
-      else { x = to.x; y = to.y; }
-      const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
-      const s = 5 + 4 * k;
-      gT.append(sv('path', {
-        d: `M${x - s} ${y - s}L${x + s} ${y + s}M${x + s} ${y - s}L${x - s} ${y + s}`,
-        class: 'burst ' + cls, opacity: (1 - k).toFixed(2)
-      }));
+    S.lastInFlight = count;
+    // output bubbles
+    for (const id in S.outIdx) {
+      const n = nodeById(+id);
+      if (!n) continue;
+      const arr = S.outIdx[id];
+      const i = upperBound(arr, t, o => o.t) - 1;
+      if (i < 0) continue;
+      const o = arr[i];
+      const age = t - o.t;
+      if (age > 2.5 * W) continue;
+      const k = age / Math.max(1, 2.5 * W);
+      const B = bubbles.take();
+      B.root.setAttribute('transform', 'translate(' + n.x + ' ' + (n.y - R_NODE - 16) + ')');
+      B.root.setAttribute('opacity', (k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3).toFixed(2));
+      const txt = truncate(o.text, 30);
+      if (B.s.txt !== txt) {
+        B.s.txt = txt;
+        const w = txt.length * 6.6 + 16;
+        B.path.setAttribute('d', `M${-w / 2} -22 h${w} a4 4 0 0 1 4 4 v12 a4 4 0 0 1 -4 4 h${-w / 2 + 6} l-6 6 l-6 -6 h${-w / 2 + 6} a4 4 0 0 1 -4 -4 v-12 a4 4 0 0 1 4 -4z`);
+        B.text.textContent = txt;
+      }
     }
-  }
-  // output bubbles
-  for (const id in S.outIdx) {
-    const n = nodeById(+id);
-    if (!n) continue;
-    const arr = S.outIdx[id];
-    const i = upperBound(arr, t, o => o.t) - 1;
-    if (i < 0) continue;
-    const o = arr[i];
-    const age = t - o.t;
-    if (age > 2.5 * W) continue;
-    const k = age / Math.max(1, 2.5 * W);
-    const txt = truncate(o.text, 30);
-    const w = txt.length * 6.6 + 16;
-    const g = sv('g', { class: 'bubble', transform: 'translate(' + n.x + ' ' + (n.y - R_NODE - 16) + ')', opacity: (k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3).toFixed(2) });
-    g.append(sv('path', { d: `M${-w / 2} -22 h${w} a4 4 0 0 1 4 4 v12 a4 4 0 0 1 -4 4 h${-w / 2 + 6} l-6 6 l-6 -6 h${-w / 2 + 6} a4 4 0 0 1 -4 -4 v-12 a4 4 0 0 1 4 -4z` }));
-    g.append(sv('text', { y: -12 }, txt));
-    gT.append(g);
-  }
-  // crash and recovery flashes
-  for (const id in S.res.downs) {
-    const n = nodeById(+id);
-    if (!n) continue;
-    for (const d of S.res.downs[id]) {
-      for (const [at, cls] of [[d.from, 'crashring'], [d.to, 'recoverring']]) {
-        if (at === null) continue;
-        const age = t - at;
-        if (age < 0 || age > 2 * W) continue;
-        const k = age / Math.max(1, 2 * W);
-        gF.append(sv('circle', { cx: n.x, cy: n.y, r: (R_NODE + 6 + 22 * k).toFixed(1), class: cls, opacity: (1 - k).toFixed(2) }));
+    // crash and recovery flashes
+    for (const id in S.res.downs) {
+      const n = nodeById(+id);
+      if (!n) continue;
+      for (const d of S.res.downs[id]) {
+        for (const [at, cls] of [[d.from, 'crashring'], [d.to, 'recoverring']]) {
+          if (at === null) continue;
+          const age = t - at;
+          if (age < 0 || age > 2 * W) continue;
+          const k = age / Math.max(1, 2 * W);
+          const r = rings.take().root;
+          r.setAttribute('cx', n.x); r.setAttribute('cy', n.y);
+          r.setAttribute('r', (R_NODE + 6 + 22 * k).toFixed(1));
+          r.setAttribute('class', cls);
+          r.setAttribute('opacity', (1 - k).toFixed(2));
+        }
       }
     }
   }
+  trails.finish(); rings.finish(); packets.finish(); bursts.finish(); bubbles.finish();
 }
 
 function select(sel) {
@@ -3714,24 +3911,58 @@ function select(sel) {
 }
 function setMode(m) {
   S.mode = m; S.linkFrom = null;
-  $$('[data-mode]').forEach(b => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  $$('.seg [data-mode]').forEach(b => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   syncBodyAttrs(); renderTopo(); renderProps();
 }
 function bindTopo() {
   const s = svg();
   let drag = null;
-  s.addEventListener('pointerdown', e => {
+  // Touch: SVG children ignore touch-action, so dragging a process uses touch events, which can be
+  // cancelled reliably; a swipe on the empty graph still scrolls the page.
+  let tdrag = null;
+  const touchPoint = t => svgPoint({ clientX: t.clientX, clientY: t.clientY });
+  s.addEventListener('touchstart', e => {
+    const nEl = e.target.closest('[data-node]');
+    if (S.mode !== 'move' || nEl) e.preventDefault();
+    if (S.mode === 'move' && nEl && e.touches.length === 1) {
+      const n = nodeById(+nEl.dataset.node);
+      const p = touchPoint(e.touches[0]);
+      if (n) tdrag = { id: n.id, dx: n.x - p.x, dy: n.y - p.y, moved: false };
+    }
+  }, { passive: false });
+  s.addEventListener('touchmove', e => {
+    if (!tdrag) return;
+    e.preventDefault();
+    const n = nodeById(tdrag.id);
+    if (!n) return;
+    const p = touchPoint(e.touches[0]);
+    n.x = Math.round(p.x + tdrag.dx); n.y = Math.round(p.y + tdrag.dy);
+    tdrag.moved = true;
+    moveNodeDOM(n);
+    renderAnim();
+  }, { passive: false });
+  const tend = () => { if (tdrag && tdrag.moved) scheduleSave(); tdrag = null; };
+  s.addEventListener('touchend', tend);
+  s.addEventListener('touchcancel', tend);
+  $('#topo-fx').addEventListener('pointerdown', e => {
     const pEl = e.target.closest('[data-msg]');
-    if (pEl && S.mode === 'move') { stopPlay(); select({ type: 'msg', id: +pEl.dataset.msg }); return; }
+    if (!pEl) return;
+    e.stopPropagation();
+    stopPlay();
+    select({ type: 'msg', id: +pEl.dataset.msg });
+  });
+  s.addEventListener('pointerdown', e => {
     const nEl = e.target.closest('[data-node]'), lEl = e.target.closest('[data-link]');
     const id = nEl ? +nEl.dataset.node : null;
     const li = lEl ? +lEl.dataset.link : null;
     if (S.mode === 'move') {
       if (id !== null) {
         select({ type: 'node', id });
-        const p = svgPoint(e), n = nodeById(id);
-        drag = { id, dx: n.x - p.x, dy: n.y - p.y, moved: false };
-        s.setPointerCapture(e.pointerId);
+        if (e.pointerType !== 'touch') {
+          const p = svgPoint(e), n = nodeById(id);
+          drag = { id, dx: n.x - p.x, dy: n.y - p.y, moved: false };
+          s.setPointerCapture(e.pointerId);
+        }
       } else if (li !== null) select({ type: 'link', idx: li });
       else select(null);
     } else if (S.mode === 'add') {
@@ -3753,7 +3984,8 @@ function bindTopo() {
     if (!n) return;
     n.x = Math.round(p.x + drag.dx); n.y = Math.round(p.y + drag.dy);
     drag.moved = true;
-    renderTopo();
+    moveNodeDOM(n);
+    renderAnim();
   });
   const end = () => { if (drag && drag.moved) scheduleSave(); drag = null; };
   s.addEventListener('pointerup', end);
@@ -3762,12 +3994,13 @@ function bindTopo() {
     const nEl = e.target.closest && e.target.closest('[data-node]');
     if (nEl && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); select({ type: 'node', id: +nEl.dataset.node }); }
   });
-  $$('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $$('.seg [data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('#btn-gen').addEventListener('click', () => generate($('#gen').value, parseInt($('#gen-n').value, 10) || 6));
   $('#btn-fit').addEventListener('click', fitView);
   $('#labels').addEventListener('change', renderAnim);
 }
 function topologyChanged() {
+  topoChanged();
   clearResults('Topology changed: press Run to simulate again.');
   renderTopo(); renderProps(); scheduleSave();
 }
@@ -3921,7 +4154,7 @@ function renderProps() {
   const l = S.scn.links[sel.idx];
   if (!l) return;
   const en = el('input', { type: 'checkbox' }); en.checked = l.enabled;
-  en.addEventListener('change', () => { l.enabled = en.checked; renderTopo(); markStale(); });
+  en.addEventListener('change', () => { l.enabled = en.checked; topoChanged(); renderTopo(); markStale(); });
   const dir = el('input', { type: 'checkbox' }); dir.checked = l.directed;
   dir.addEventListener('change', () => { l.directed = dir.checked; topologyChanged(); });
   const loss = el('input', { class: 'narrow', value: l.loss || '', placeholder: 'global', 'aria-label': 'Link loss' });
@@ -4062,6 +4295,7 @@ function clearResults(msg) {
   if (S.tab === 'state') renderInspector();
 }
 function prepareResults() {
+  S.resVer = (S.resVer || 0) + 1;
   const r = S.res;
   S.msgsBySend = r ? r.msgs.slice().sort((a, b) => a.sendT - b.sendT || a.id - b.id) : [];
   S.msgById = new Map(S.msgsBySend.map(m => [m.id, m]));
@@ -4288,26 +4522,34 @@ function drawDiagram() {
     // processing steps as short bars on the process lines
     const aHi = upperBound(S.activity, Math.min(t, v.start + v.span), a => a.t);
     const aLo = lowerBound(S.activity, v.start - S.maxBusy, a => a.t);
-    ctx.fillStyle = col.blue; ctx.globalAlpha = 0.35;
+    const bars = new Path2D();
+    let lastX = {};
     for (let i = aLo; i < aHi; i++) {
       const a = S.activity[i];
       const y = rowY.get(a.node);
       if (y === undefined) continue;
       const x1 = X(a.t), x2 = Math.max(x1 + 2, X(Math.min(a.end, t)));
-      ctx.fillRect(x1, y - 3, x2 - x1, 6);
+      if (lastX[a.node] !== undefined && x2 <= lastX[a.node]) continue;  // hidden under the previous bar
+      lastX[a.node] = x2;
+      bars.rect(x1, y - 3, x2 - x1, 6);
     }
+    ctx.fillStyle = col.blue; ctx.globalAlpha = 0.35;
+    ctx.fill(bars);
     ctx.globalAlpha = 1;
     // messages
     const hi = upperBound(S.msgsBySend, v.start + v.span, m => m.sendT);
     const lo = lowerBound(S.msgsBySend, v.start - S.maxLat, m => m.sendT);
     let drawn = 0;
     const selId = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
-    for (let i = lo; i < hi && drawn < 30000; i++) {
+    const batches = msgBatches();
+    const last = ghost ? hi : Math.min(hi, upperBound(S.msgsBySend, t, m => m.sendT));
+    for (let i = lo; i < last && drawn < 30000; i++) {
       const m = S.msgsBySend[i];
-      if (m.sendT > t) { if (ghost) drawMsg(ctx, m, 0.16, Infinity, X, rowY, false); continue; }
-      drawMsg(ctx, m, 1, t, X, rowY, m.id === selId);
+      if (m.sendT > t) { drawMsg(batches, m, 0.16, Infinity, X, rowY, false); continue; }
+      drawMsg(batches, m, 1, t, X, rowY, m.id === selId);
       drawn++;
     }
+    batches.flush(ctx);
     // violations, assertions, errors
     const logHi = upperBound(S.logSorted, ghost ? v.start + v.span : Math.min(t, v.start + v.span), e => e.t);
     const logLo = lowerBound(S.logSorted, v.start, e => e.t);
@@ -4367,17 +4609,39 @@ function drawDiagram() {
   }
 }
 
-function drawMsg(ctx, m, alpha, tcut, X, rowY, selected) {
+// Messages are collected into batches that share a style and drawn with one stroke and one fill each.
+function msgBatches() {
+  const map = new Map();
+  return {
+    get(color, width, dash, alpha) {
+      const k = color + '|' + width + '|' + dash.join(',') + '|' + alpha;
+      let b = map.get(k);
+      if (!b) { b = { color, width, dash, alpha, line: new Path2D(), mark: new Path2D(), fill: new Path2D() }; map.set(k, b); }
+      return b;
+    },
+    flush(ctx) {
+      for (const b of map.values()) {
+        ctx.globalAlpha = b.alpha;
+        ctx.strokeStyle = b.color; ctx.fillStyle = b.color;
+        ctx.lineWidth = b.width; ctx.setLineDash(b.dash);
+        ctx.stroke(b.line);
+        ctx.setLineDash([]); ctx.lineWidth = 1.6;
+        ctx.stroke(b.mark);
+        ctx.fill(b.fill);
+      }
+      ctx.globalAlpha = 1;
+    }
+  };
+}
+function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
   const col = S.colors;
   const y1 = rowY.get(m.from);
   const y2 = rowY.get(m.to);
   if (y1 === undefined) return;
   const x1 = X(m.sendT);
-  ctx.globalAlpha = alpha;
   if (m.status === 'dropped-link' || y2 === undefined || (m.status === 'dropped-cut' && m.recvT === m.sendT)) {
-    ctx.strokeStyle = col.amber; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(x1 - 3, y1 - 3); ctx.lineTo(x1 + 3, y1 + 3); ctx.moveTo(x1 + 3, y1 - 3); ctx.lineTo(x1 - 3, y1 + 3); ctx.stroke();
-    ctx.globalAlpha = 1;
+    const b = B.get(col.amber, 1.5, [], alpha);
+    b.mark.moveTo(x1 - 3, y1 - 3); b.mark.lineTo(x1 + 3, y1 + 3); b.mark.moveTo(x1 + 3, y1 - 3); b.mark.lineTo(x1 - 3, y1 + 3);
     return;
   }
   let color = m.violation ? col.red : col.blue;
@@ -4392,32 +4656,26 @@ function drawMsg(ctx, m, alpha, tcut, X, rowY, selected) {
   if (tcut < tt && tt > m.sendT) frac = Math.max(0, (tcut - m.sendT) / (tt - m.sendT));
   const self = m.from === m.to;
   const xe = x1 + (X(tt) - x1) * frac;
-  const ye = y1 + (ty - y1) * frac;
-  ctx.strokeStyle = color; ctx.fillStyle = color;
-  ctx.lineWidth = selected ? 3 : m.violation ? 1.9 : 1.2;
-  ctx.setLineDash(dash);
-  ctx.beginPath();
-  if (self) { ctx.moveTo(x1, y1); ctx.quadraticCurveTo((x1 + xe) / 2, y1 - 11, xe, y1); }
-  else { ctx.moveTo(x1, y1); ctx.lineTo(xe, ye); }
-  ctx.stroke();
-  ctx.setLineDash([]);
+  const ye = self ? y1 : y1 + (ty - y1) * frac;
+  const b = B.get(color, selected ? 3 : m.violation ? 1.9 : 1.2, dash, alpha);
+  b.line.moveTo(x1, y1);
+  if (self) b.line.quadraticCurveTo((x1 + xe) / 2, y1 - 11, xe, y1);
+  else b.line.lineTo(xe, ye);
   if (frac >= 1) {
     if (lost) {
-      ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(xe - 3.5, ye - 3.5); ctx.lineTo(xe + 3.5, ye + 3.5); ctx.moveTo(xe + 3.5, ye - 3.5); ctx.lineTo(xe - 3.5, ye + 3.5); ctx.stroke();
+      b.mark.moveTo(xe - 3.5, ye - 3.5); b.mark.lineTo(xe + 3.5, ye + 3.5); b.mark.moveTo(xe + 3.5, ye - 3.5); b.mark.lineTo(xe - 3.5, ye + 3.5);
     } else if (!self) {
       const a = Math.atan2(ye - y1, xe - x1);
-      ctx.beginPath();
-      ctx.moveTo(xe, ye);
-      ctx.lineTo(xe - 7 * Math.cos(a - 0.4), ye - 7 * Math.sin(a - 0.4));
-      ctx.lineTo(xe - 7 * Math.cos(a + 0.4), ye - 7 * Math.sin(a + 0.4));
-      ctx.closePath(); ctx.fill();
+      b.fill.moveTo(xe, ye);
+      b.fill.lineTo(xe - 7 * Math.cos(a - 0.4), ye - 7 * Math.sin(a - 0.4));
+      b.fill.lineTo(xe - 7 * Math.cos(a + 0.4), ye - 7 * Math.sin(a + 0.4));
+      b.fill.closePath();
     }
   } else {
-    ctx.beginPath(); ctx.arc(xe, self ? y1 : ye, 3.2, 0, Math.PI * 2); ctx.fill();
+    b.fill.moveTo(xe + 3.2, ye);
+    b.fill.arc(xe, ye, 3.2, 0, Math.PI * 2);
   }
-  if (alpha === 1) S.segs.push({ x1, y1, x2: xe, y2: self ? y1 : ye, m });
-  ctx.globalAlpha = 1;
+  if (alpha === 1) S.segs.push({ x1, y1, x2: xe, y2: ye, m });
 }
 function distSeg(px, py, s) {
   const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
@@ -4660,7 +4918,18 @@ function updateLogCursor() {
 }
 
 // ============================================================ state inspector
-function renderInspector() {
+function inspectorKey() {
+  const sel = S.selected;
+  if (!sel || sel.type !== 'node' || !S.res) return 'x|' + (sel ? sel.type + (sel.id || sel.idx) : '') + '|' + (S.resVer || 0);
+  const snaps = S.res.snaps[sel.id] || [];
+  const outs = S.outIdx[sel.id] || [];
+  return [sel.id, S.resVer, upperBound(snaps, S.cursor, x => x.t), upperBound(outs, S.cursor, o => o.t), !!downAt(sel.id, S.cursor),
+    S.playing ? Math.floor(S.cursor / 50000) : S.cursor].join('|');
+}
+function renderInspector(force) {
+  const key = inspectorKey();
+  if (!force && key === S.inspKey) return;
+  S.inspKey = key;
   const box = $('#inspector'); box.textContent = '';
   const sel = S.selected;
   if (!sel || sel.type !== 'node') {
@@ -4775,7 +5044,7 @@ function setTab(t) {
   S.tab = t;
   $$('.tabs [data-tab]').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
   $$('.tab-body').forEach(d => { d.hidden = d.dataset.body !== t; });
-  if (t === 'state') renderInspector();
+  if (t === 'state') renderInspector(true);
   if (t === 'time') drawPreview();
   if (t === 'code') refreshCode();
 }
@@ -4901,7 +5170,15 @@ function toast(text, label, action) {
 function loadScenario(obj, msg, noUndo) {
   const prev = S.scn ? clone(S.scn) : null;
   stopPlay();
-  S.scn = ensureScenario(clone(obj));
+  let next;
+  try { next = ensureScenario(clone(obj)); }
+  catch (e) {
+    toast('Could not open the scenario: ' + e.message);
+    if (prev) return;
+    next = ensureScenario(clone(EX.EXAMPLES[0].scenario));
+  }
+  S.scn = next;
+  topoChanged(); resetPools();
   S.selected = null; S.linkFrom = null; S.runtimeErr = null; S.res = null; S.cursor = 0;
   S.algos = []; S.ifaces = null; S.topReqs = [];
   fillForms(); fitView(); checkCode(); renderTopo(); renderProps();
@@ -4952,8 +5229,14 @@ function bindHeader() {
 function bindKeys() {
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(false); return; }
-    const tag = (e.target && e.target.tagName || '').toLowerCase();
-    if (['input', 'textarea', 'select'].includes(tag) || (e.target && e.target.isContentEditable)) return;
+    const tg = e.target || {};
+    const tag = (tg.tagName || '').toLowerCase();
+    const type = (tg.type || '').toLowerCase();
+    const textLike = tag === 'textarea' || tag === 'select' || tg.isContentEditable ||
+      (tag === 'input' && !['checkbox', 'radio', 'range', 'button', 'submit', 'file'].includes(type));
+    if (textLike) return;
+    // checkboxes and sliders keep Space and the arrow keys for themselves
+    if (tag === 'input' && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End')) return;
     if ($('#dlg-export').open || $('#dlg-import').open) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     switch (e.key) {
@@ -4990,6 +5273,10 @@ async function init() {
   $('#toast').setAttribute('role', 'status');
   bindHeader(); bindForms(); bindEditor(); bindTopo(); bindDiagram(); bindTransport(); bindDialogs(); bindKeys();
   window.addEventListener('resize', () => { if (S.tab === 'time') drawPreview(); });
+  window.addEventListener('hashchange', async () => {
+    try { const shared = await fromHash(); if (shared) loadScenario(shared, 'Opened the shared scenario.'); }
+    catch (e) { toast('The link does not contain a valid scenario.'); }
+  });
   let initial = null;
   try { initial = await fromHash(); }
   catch (e) { toast('The link does not contain a valid scenario: loading the last saved one.'); }
