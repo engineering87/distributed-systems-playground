@@ -36,10 +36,12 @@ Everything runs in the browser from a single HTML file. There is no server to de
   - [1. Flooding on a grid](#1-flooding-on-a-grid)
   - [2. When synchrony is only an assumption](#2-when-synchrony-is-only-an-assumption)
   - [3. Detecting failures without a clock you can trust](#3-detecting-failures-without-a-clock-you-can-trust)
-  - [4. Changing what happened](#4-changing-what-happened)
+  - [4. Splitting the network](#4-splitting-the-network)
+  - [5. Changing what happened](#5-changing-what-happened)
 - [Core concepts](#core-concepts)
 - [The Upon language](#the-upon-language)
 - [Timing model reference](#timing-model-reference)
+- [Faults](#faults)
 - [Scenarios](#scenarios)
 - [The interface](#the-interface)
 - [Included examples](#included-examples)
@@ -141,8 +143,13 @@ This project exists to make that gap visible.
 - A state inspector for every process and every module instance at any point in time.
 - A filterable event log linked to the timeline.
 
+**Faults**
+- Crashes and recoveries, with volatile state reset and `stable` variables preserved.
+- Link failures and network partitions over time intervals, or for the whole run.
+- Message loss, duplication, delays and spikes, globally or per link.
+
 **Interaction and reproducibility**
-- Crash a process or inject an event at the cursor, and the run continues from there.
+- Crash, recover or isolate a process, cut a link, or inject an event at the cursor, and the run continues from there.
 - Deterministic runs: the same scenario and seed always give the same trace.
 - Scenarios saved in the browser, exported as JSON, or shared as a link.
 
@@ -209,12 +216,28 @@ The network is partially synchronous: before GST (3 s, the amber line on the dia
 
 The **State** tab shows `suspected` and `delay` changing over time, which is the eventual accuracy property made concrete.
 
-### 4. Changing what happened
+### 4. Splitting the network
 
-Pause any run, select a process and use the controls in the bar under the graph:
+Load **Failure detector across a partition and a recovery**. It runs the same detector on five processes, with three scheduled faults:
 
-- **Crash here** stops the process at the current time.
-- **Inject event** sends it a request of the main algorithm, for example a new `Broadcast`.
+- from 4 s to 7 s the network splits into {p1, p2} and {p3, p4, p5}. The links that cross the split turn into dashed red lines with a ✂ mark, and the diagram shades the interval;
+- at 9 s p5 crashes, and at 11 s it recovers.
+
+Follow the bubbles and the **State** tab:
+
+- during the partition, p1 and p2 suspect {p3, p4, p5}, while p3, p4 and p5 suspect {p1, p2}. Each side sees the other as crashed, which is exactly why a partition and a crash cannot be told apart from the inside;
+- after the partition heals, every suspicion is withdrawn;
+- while p5 is down, every other process suspects p5 and only p5;
+- when p5 recovers, its volatile state starts again from scratch and its `Init` handler restarts the heartbeats. Shortly afterwards nobody suspects anyone.
+
+### 5. Changing what happened
+
+Pause any run, select a process or a link and use the controls in the bar under the graph:
+
+- **Crash here** or **Recover here** stops or restarts the process at the current time.
+- **Isolate here** cuts the process off from everyone else for the given duration, or for good if the field is empty.
+- **Cut here**, on a selected link, takes that link down for the given duration.
+- **Inject event** sends the process a request of the main algorithm, for example a new `Broadcast`.
 
 The simulation is recomputed and playback resumes from the same instant. Because every source of randomness is seeded per link and per process, everything before the cursor stays exactly as it was, and you can compare the two futures.
 
@@ -393,6 +416,35 @@ Inside an ASCII `trigger`, wrap comparisons in parentheses, because `>` closes t
 | Partially synchronous | a bound exists after GST, value unknown | heavy tails before GST, bounded after |
 | Asynchronous | nothing | unbounded delays |
 
+## Faults
+
+| Fault | Effect | Where to add it |
+|---|---|---|
+| Crash | the process stops; messages that reach it are lost and its timers are discarded | *Scenario* tab, or **Crash here** during playback |
+| Recovery | the process restarts: non-`stable` variables return to their initial value, timers are cleared, and each module receives `Recovery` if it has a handler for it, `Init` otherwise | *Scenario* tab, or **Recover here** on a crashed process |
+| Link failure | messages between two processes, in both directions, are dropped from a start time until an end time | *Scenario* tab, or **Cut here** on a selected link |
+| Partition | messages between different groups are dropped during an interval; processes not listed form one more group | *Scenario* tab, or **Isolate here** on a selected process |
+| Disabled link | the link is down for the whole run | the *Enabled* checkbox of a selected link |
+| Loss, duplication, delay | per message, from the actual timing model | *Timing* tab, or per link |
+
+A message is dropped by a link failure or a partition if the channel is interrupted when the message is sent or when it would arrive. The event log reports every fault as it starts and ends, and the **Faults** filter shows only those entries.
+
+In the *Scenario* tab, partition groups are written as process numbers separated by `|`: `1 2 | 3 4 5` splits the network in two, and `3` alone isolates p3 from everybody else. Leave *Until* empty for a fault that never heals.
+
+```
+algorithm Counter
+  implements App as app
+  uses Net as net
+  state
+    received := 0            // reset on recovery
+    stable total := 0        // kept across crashes
+  upon event ⟨app, Recovery⟩ do
+    log "back online after", total, "messages"
+  end
+  …
+end
+```
+
 ## Scenarios
 
 A scenario contains everything needed to reproduce a run: topology, code, main algorithm, timing models, inputs, faults, seed and duration.
@@ -407,7 +459,7 @@ A scenario contains everything needed to reproduce a run: topology, code, main a
 
 The node can be a number or `*` for every process, and the arguments are Upon expressions.
 
-**Faults** are crashes at a given time. Add them in the *Scenario* tab, in the properties bar of a selected process, or with **Crash here** during playback.
+**Faults** are crashes, recoveries, link failures and partitions, described in [Faults](#faults).
 
 **Saving and sharing.** The current scenario is saved in the browser automatically. **Export** shows the JSON, lets you save it as a file, and builds a link that carries the whole scenario compressed in the URL fragment. **Import** accepts a file or pasted JSON.
 
@@ -419,7 +471,12 @@ The node can be a number or `*` for every process, and the arguments are Upon ex
   "code": "interface Consensus …",
   "top": "FloodSet",
   "inputs": "0ms * Propose | random(1, 9)",
-  "faults": [],
+  "faults": [
+    { "type": "crash", "node": 2, "at": "1.5s" },
+    { "type": "recover", "node": 2, "at": "2.5s" },
+    { "type": "link", "a": 1, "b": 3, "from": "0ms", "to": "1s" },
+    { "type": "partition", "groups": "1 2 | 3 4 5", "from": "500ms", "to": "" }
+  ],
   "assumed": { "timing": "synchronous-rounds", "DELTA": "40ms", "PHI": "10ms", "RHO": "0.0001" },
   "actual": { "delay": "lognormal(3.2, 0.8)", "roundMode": "emulated", "rho": "uniform(-0.0005, 0.0005)" },
   "violationPolicy": "drop",
@@ -436,14 +493,14 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Area | What it holds |
 |---|---|
 | Top bar | example picker, seed, Run, Export, Import |
-| Topology | the graph, the animation, editing tools and generators, and a properties bar for the selected process, link or message |
+| Topology | the graph, the animation, editing tools and generators, and a properties bar for the selected process, link or message, with the controls to inject faults and events at the cursor |
 | Code tab | main algorithm selector, editor, diagnostics, language quick reference |
 | Timing tab | presets, assumed and actual models, delay histogram |
-| Scenario tab | inputs, faults, duration |
+| Scenario tab | inputs, the list of faults with a form to add crashes, recoveries, link failures and partitions, duration |
 | State tab | local clock, round and variables of the selected process at the cursor |
 | Transport | play controls, speed, autoplay, time scrubber, run summary |
 | Diagram | space-time view with pan, zoom, "Action" and "All" views |
-| Events | the log, filterable by outputs, inputs, violations, losses, warnings and assertions |
+| Events | the log, filterable by faults, outputs, inputs, violations, dropped messages, warnings and assertions |
 
 ## Included examples
 
@@ -453,6 +510,7 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Chang-Roberts leader election | asynchronous | directed ring of 8 | Give one link a slow delay distribution and follow the election around it. |
 | FloodSet consensus | synchronous rounds | complete graph of 5 | Switch to *Realistic synchronous* with seed 3 and watch p3 disagree. |
 | Failure detector ◇P | partially synchronous | complete graph of 4 | Move GST later and count the wrong suspicions. |
+| Failure detector across a partition and a recovery | partially synchronous | complete graph of 5 | Make the partition permanent and see which suspicions never go away. |
 
 The *Example* menu also offers an empty scenario to start from.
 
@@ -505,7 +563,7 @@ npm run check    # fail if index.html is out of date
 
 ### Tests
 
-The suite covers every example, the determinism of traces, the correctness properties of each example (for instance, Chang-Roberts elects the highest identifier and ◇P ends up suspecting exactly the crashed process), the static checks, the ASCII syntax, and the guarantee that injecting an event does not alter earlier history.
+The suite covers every example, the determinism of traces, the correctness properties of each example (for instance, Chang-Roberts elects the highest identifier and ◇P ends up suspecting exactly the crashed process), the static checks, the ASCII syntax, crash-recovery with `stable` state, link failures and partitions, fault validation, and the guarantee that injecting an event or a fault does not alter earlier history.
 
 ### Continuous integration and deployment
 
@@ -515,15 +573,15 @@ The GitHub Actions workflow runs the tests and verifies that `index.html` matche
 
 - The engine runs on the browser's main thread and stops after 150,000 events. Scenarios for teaching stay well below that, but long runs with many timers can reach it.
 - The topology animation draws at most 400 messages in flight at once.
-- Crash-recovery is not simulated yet: `stable` variables are accepted but have no effect.
-- Links can be disabled for a whole run, but partitions cannot yet be scheduled over time.
+- Link failures and partitions are symmetric: a link cannot yet fail in one direction only.
+- A process cannot yet pause (for example for garbage collection) or omit messages on its own; omissions come from the channels.
 - Correctness properties are checked with local `assert` statements; global invariants such as agreement are not yet evaluated automatically.
 - Byzantine behavior is not modeled.
 - The playground explores one execution at a time. It is not a model checker and does not prove anything.
 
 ## Roadmap
 
-- Crash-recovery with `stable` state, and scheduled network partitions
+- Process pauses, send and receive omissions, one-way link failures
 - Global invariants checked at every step and marked on the timeline
 - Failure detector oracles (P, ◇P, Ω) as provided modules
 - An explicit module stack in scenarios and a separate standard library
@@ -531,7 +589,7 @@ The GitHub Actions workflow runs the tests and verifies that `index.html` matche
 - Engine in a Web Worker for larger scenarios
 - Byzantine processes written in Upon
 
-The current differences between the implementation and the specification are listed in [Appendix B of the specification](docs/SPEC.md#appendix-b--implementation-status-v02).
+The current differences between the implementation and the specification are listed in [Appendix B of the specification](docs/SPEC.md#appendix-b--implementation-status-v03).
 
 ## Related tools
 

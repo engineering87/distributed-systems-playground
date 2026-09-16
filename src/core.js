@@ -1273,8 +1273,8 @@ const MAX_EVENTS = 150000;
 function runSimulation(scn) {
   const out = {
     ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
-    snaps: {}, crashes: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
-    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: []
+    snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], downs: {}, netFaults: { links: [], partitions: [] }
   };
   // ---- configuration ----
   let cfg;
@@ -1394,14 +1394,15 @@ function runSimulation(scn) {
     const q = args[0];
     netSend(node, q, args[1], spec.id, alias, line);
   };
+  let timerSeq = 0;
   sim.startTimer = function (env, id, d) {
     const inst = env.inst, node = env.node;
-    const gen = (inst.timers[id] || 0) + 1;
+    const gen = ++timerSeq;
     inst.timers[id] = gen;
     const g = Math.max(1, Math.round(d / (1 + node.rho)));
     push({ t: curEnd + g, cls: CLS.timer, node: node.idx, type: 'timer', inst: inst.spec.id, id, gen });
   };
-  sim.cancelTimer = function (env, id) { env.inst.timers[id] = (env.inst.timers[id] || 0) + 1; };
+  sim.cancelTimer = function (env, id) { env.inst.timers[id] = ++timerSeq; };
   sim.assertFail = function (env, msg, line) {
     logE(curEnd, env.node.id, 'assert', msg, line);
     if (cfg.haltOnAssert) throw new HaltSignal('Assertion failed on p' + env.node.id + ': ' + msg);
@@ -1455,6 +1456,7 @@ function runSimulation(scn) {
         const off = self ? Math.round(R * 0.25) : Math.round(R * (0.25 + 0.5 * rng.next()));
         const arr = (rr - 1) * R + off;
         if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr; logE(ts, node.id, 'drop', 'message to p' + q + ' lost (omission)', line); return; }
+        if (cutDrop(rec, node.id, q, ts, arr, line)) return;
         scheduleDeliver(rec, node, q, payload, arr, alias);
         return;
       }
@@ -1462,6 +1464,7 @@ function runSimulation(scn) {
       const qn = byId.get(q);
       let arr = ts + sampleDelay();
       if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr; logE(ts, node.id, 'drop', 'message to p' + q + ' lost', line); return; }
+      if (cutDrop(rec, node.id, q, ts, arr, line)) return;
       const qs = roundStartG(qn, r), qe = roundEndG(qn, r);
       if (arr < qs) arr = qs; // the recipient has not opened the round yet: the message waits
       if (arr > qe) {
@@ -1478,6 +1481,7 @@ function runSimulation(scn) {
     const d = sampleDelay();
     const arr0 = ts + d;
     if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr0; logE(ts, node.id, 'drop', 'message to p' + q + ' lost', line); return; }
+    if (cutDrop(rec, node.id, q, ts, arr0, line)) return;
     const assumeBound = cfg.known.DELTA !== null &&
       (cfg.timing === 'synchronous-timed' || (cfg.timing === 'partial' && cfg.gst !== null && ts >= cfg.gst) ||
        (cfg.timing === 'partial' && cfg.gst === null));
@@ -1497,10 +1501,50 @@ function runSimulation(scn) {
       if (cfg.fifo) { arr2 = Math.max(arr2, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr2); }
       const rec2 = Object.assign({}, rec, { id: msgSeq++, dup: true, violation: false, status: 'pending' });
       out.msgs.push(rec2);
-      scheduleDeliver(rec2, node, q, payload, arr2, alias);
+      if (!cutDrop(rec2, node.id, q, ts, arr2, line)) scheduleDeliver(rec2, node, q, payload, arr2, alias);
     }
   }
   const fifoLast = new Map();
+
+  const linkCuts = cfg.faults.filter(f => f.type === 'link');
+  const partitions = cfg.faults.filter(f => f.type === 'partition').map(p => {
+    const groupOf = new Map();
+    p.groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
+    return Object.assign({}, p, { groupOf });
+  });
+  out.netFaults = {
+    links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to })),
+    partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to }))
+  };
+  // is the channel between a and b interrupted at time t? (processes not listed in a partition form one more group)
+  function cutAt(a, b, t) {
+    for (const l of linkCuts)
+      if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+    for (const p of partitions) {
+      if (t < p.from || (p.to !== null && t >= p.to)) continue;
+      const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1;
+      const gb = p.groupOf.has(b) ? p.groupOf.get(b) : -1;
+      if (ga !== gb) return 'network partition';
+    }
+    return null;
+  }
+  // drops a message sent into, or travelling through, an interrupted channel
+  function cutDrop(rec, from, q, ts, arr, line) {
+    if (from === q || (!linkCuts.length && !partitions.length)) return false;
+    const atSend = cutAt(from, q, ts);
+    if (atSend) {
+      rec.status = 'dropped-cut'; rec.recvT = ts;
+      logE(ts, from, 'drop', 'message to p' + q + ' dropped: ' + atSend, line);
+      return true;
+    }
+    const atArrival = cutAt(from, q, arr);
+    if (atArrival) {
+      rec.status = 'dropped-cut'; rec.recvT = arr;
+      logE(arr, q, 'drop', 'message from p' + from + ' dropped in transit: ' + atArrival);
+      return true;
+    }
+    return false;
+  }
 
   function scheduleDeliver(rec, node, q, payload, arr, alias) {
     rec.recvT = arr;
@@ -1602,10 +1646,25 @@ function runSimulation(scn) {
     // Init from the bottom up
     push({ t: 0, cls: CLS.input - 0.5, node: n.idx, type: 'init' });
   }
+  const groupsText = g => g.map(x => '{' + x.map(id => 'p' + id).join(', ') + '}').join(' | ');
   for (const f of cfg.faults) {
-    const n = byId.get(f.node);
-    if (!n) { out.warnings.push('Fault on missing process p' + f.node); continue; }
-    push({ t: f.at, cls: CLS.crash, node: n.idx, type: 'crash' });
+    if (f.type === 'crash' || f.type === 'recover') {
+      const n = byId.get(f.node);
+      if (!n) { out.warnings.push('Fault on missing process p' + f.node); continue; }
+      push({ t: f.at, cls: CLS.crash, node: n.idx, type: f.type });
+    } else if (f.type === 'link') {
+      if (!byId.has(f.a) || !byId.has(f.b)) { out.warnings.push('Link fault on missing process p' + f.a + ' or p' + f.b); continue; }
+      push({ t: f.from, cls: CLS.crash, node: 0, type: 'netlog', text: 'link p' + f.a + '–p' + f.b + ' goes down' });
+      if (f.to !== null) push({ t: f.to, cls: CLS.crash, node: 0, type: 'netlog', text: 'link p' + f.a + '–p' + f.b + ' is back up' });
+    } else if (f.type === 'partition') {
+      const missing = f.groups.flat().filter(id => !byId.has(id));
+      if (missing.length) out.warnings.push('Partition lists missing processes: ' + missing.map(id => 'p' + id).join(', '));
+      const listed = new Set(f.groups.flat());
+      const rest = nodes.filter(n => !listed.has(n.id)).map(n => n.id);
+      const shown = rest.length ? f.groups.concat([rest]) : f.groups;
+      push({ t: f.from, cls: CLS.crash, node: 0, type: 'netlog', text: 'network partition: ' + groupsText(shown) });
+      if (f.to !== null) push({ t: f.to, cls: CLS.crash, node: 0, type: 'netlog', text: 'partition healed: ' + groupsText(shown) });
+    }
   }
   for (const inp of cfg.inputs) {
     const targets = inp.node === '*' ? nodes : [byId.get(inp.node)].filter(Boolean);
@@ -1635,6 +1694,31 @@ function runSimulation(scn) {
     }
   }
 
+  // restart a crashed process: volatile state and timers are reset, stable variables are kept,
+  // and each instance receives Recovery if it handles it, Init otherwise (bottom-up)
+  function recoverNode(node, t) {
+    node.crashed = false;
+    const d = out.downs[node.id];
+    d[d.length - 1].to = t;
+    node.busyUntil = t;
+    curTime = t; curEnd = t; localQ = []; sim.stepBudget = 200000;
+    for (const inst of node.insts) {
+      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: t };
+      for (const st of inst.algo.state) if (!st.stable) inst.state[st.name] = evalExpr(st.expr, env);
+      inst.timers = {};
+      inst.dirty = true;
+    }
+    logE(t, node.id, 'fault', 'p' + node.id + ' recovers (volatile state reset)');
+    for (let i = stack.specs.length - 1; i >= 0; i--) {
+      const a = stack.specs[i].algo;
+      const hasRecovery = a.handlers.some(h => h.kind === 'event' && h.inst === a.implAlias && h.ev === 'Recovery');
+      dispatch(node, i, a.implAlias, hasRecovery ? 'Recovery' : 'Init', []);
+    }
+    drain(node);
+    snapshot(node, t);
+    out.activity.push({ t, end: t, node: node.id, type: 'recover', msg: null });
+  }
+
   // ---- main loop ----
   let count = 0;
   let curNode = nodes[0];
@@ -1647,8 +1731,18 @@ function runSimulation(scn) {
       const node = nodes[ev.node];
       curNode = node;
       out.endT = Math.max(out.endT, ev.t);
+      if (ev.type === 'netlog') { logE(ev.t, null, 'fault', ev.text); continue; }
       if (ev.type === 'crash') {
-        if (!node.crashed) { node.crashed = true; out.crashes[node.id] = ev.t; logE(ev.t, node.id, 'crash', 'p' + node.id + ' crashes'); }
+        if (!node.crashed) {
+          node.crashed = true;
+          (out.downs[node.id] = out.downs[node.id] || []).push({ from: ev.t, to: null });
+          logE(ev.t, node.id, 'fault', 'p' + node.id + ' crashes');
+        }
+        continue;
+      }
+      if (ev.type === 'recover') {
+        if (!node.crashed) { logE(ev.t, node.id, 'warn', 'p' + node.id + ' is running: recovery ignored'); continue; }
+        recoverNode(node, ev.t);
         continue;
       }
       if (node.crashed) {
@@ -1760,11 +1854,62 @@ function normalizeScenario(s) {
     policy: s.violationPolicy || 'deliver-late',
     tieBreak: s.tieBreak === 'shuffle' ? 'shuffle' : 'stable',
     stopAt: parseDuration(s.stopAt || '10s'),
-    faults: (s.faults || []).map(f => ({ node: f.node, at: parseDuration(f.at) || 0 })),
+    faults: (s.faults || []).map((f, i) => normalizeFault(f, i + 1)),
     inputs,
     paramOverrides: {},
     haltOnAssert: !!s.haltOnAssert
   };
+}
+
+function parseGroups(g) {
+  let groups;
+  if (Array.isArray(g)) groups = g.map(x => (Array.isArray(x) ? x : [x]).map(Number));
+  else groups = String(g || '').split('|').map(part => part.split(/[\s,]+/).filter(Boolean).map(x => parseInt(x.replace(/^p/i, ''), 10)));
+  groups = groups.filter(x => x.length);
+  if (!groups.length || groups.some(x => x.some(id => !Number.isInteger(id))))
+    throw new Error('Partition groups must be process numbers separated by "|", e.g. "1 2 | 3 4"');
+  const seen = new Set();
+  for (const id of groups.flat()) { if (seen.has(id)) throw new Error('p' + id + ' appears in more than one partition group'); seen.add(id); }
+  return groups;
+}
+// Faults: crash/recover {node, at}, link {a, b, from, to}, partition {groups, from, to}; "to" empty = forever
+function normalizeFault(f, n) {
+  const where = 'Fault ' + (n || '') + ': ';
+  const dur = (v, label, optional) => {
+    if (v === undefined || v === null || String(v).trim() === '' || String(v).trim() === 'forever') {
+      if (optional) return null;
+      throw new Error(where + label + ' is required');
+    }
+    let d;
+    try { d = parseDuration(v); } catch (e) { throw new Error(where + e.message); }
+    if (d === null || d < 0) throw new Error(where + label + ' must be a duration ≥ 0');
+    return d;
+  };
+  const pid = (v, label) => {
+    const x = parseInt(v, 10);
+    if (!Number.isInteger(x)) throw new Error(where + label + ' must be a process number');
+    return x;
+  };
+  const type = f.type || 'crash';
+  switch (type) {
+    case 'crash': case 'recover':
+      return { type, node: pid(f.node, 'process'), at: dur(f.at, 'time') };
+    case 'link': {
+      const a = pid(f.a, 'first process'), b = pid(f.b, 'second process');
+      if (a === b) throw new Error(where + 'a link needs two different processes');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, a, b, from, to };
+    }
+    case 'partition': {
+      let groups;
+      try { groups = parseGroups(f.groups); } catch (e) { throw new Error(where + e.message); }
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, groups, from, to };
+    }
+  }
+  throw new Error(where + 'unknown type "' + type + '"');
 }
 
 // Format: TIME NODE Event | arg1, arg2     (NODE = number or *)
@@ -1823,7 +1968,7 @@ function isAtomNamePublic(n) { return isAtomName(n); }
 
 const SimCore = {
   runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay,
-  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs,
+  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups,
   DslError, fmt, KEYWORDS
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = SimCore;

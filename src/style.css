@@ -360,3 +360,16 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
 @media (prefers-reduced-motion: reduce) {
   .ripple, .crashring { display: none; }
 }
+
+/* ---------- faults ---------- */
+.lk.cut { stroke: var(--red); stroke-dasharray: 6 4; stroke-width: 2.2; }
+.cut-mark { font-size: 14px; fill: var(--red); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.recoverring { fill: none; stroke: var(--green); stroke-width: 3; pointer-events: none; }
+.cut-dot { display: inline-block; width: 16px; height: 0; border-top: 2px dashed var(--red); margin-right: 4px; vertical-align: middle; }
+.lg.recover { width: 9px; height: 9px; border: 2px solid var(--green); border-radius: 50%; }
+.lg.cut { width: 14px; height: 9px; border: 0; border-left: 1px dashed var(--red); background: color-mix(in srgb, var(--red) 15%, transparent); }
+.log .k-fault .x { color: var(--violet); font-weight: 700; }
+.faults .ft-crash, .faults .ft-recover, .faults .ft-link, .faults .ft-partition { font-size: 13px; }
+.fault-form .field { margin-bottom: 4px; }
+.props .inject .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
+@media (prefers-reduced-motion: reduce) { .recoverring { display: none; } }

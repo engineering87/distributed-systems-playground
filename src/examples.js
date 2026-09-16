@@ -284,6 +284,35 @@ const EXAMPLES = [
   }
 ];
 
+EXAMPLES.push({
+  key: 'epfd-partition',
+  title: 'Failure detector across a partition and a recovery',
+  scenario: (function () {
+    const ids = [1, 2, 3, 4, 5];
+    return {
+      version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+      code: EPFD.replace(
+        '// Eventually perfect failure detector (◇P) with increasing timeout.',
+        '// Eventually perfect failure detector (◇P) with increasing timeout.\n' +
+        '// In this scenario the network splits into {p1, p2} and {p3, p4, p5}\n' +
+        '// from 4s to 7s, then p5 crashes at 9s and recovers at 11s.'),
+      top: 'IncreasingTimeout',
+      inputs: '',
+      faults: [
+        { type: 'partition', groups: '1 2 | 3 4 5', from: '4s', to: '7s' },
+        { type: 'crash', node: 5, at: '9s' },
+        { type: 'recover', node: 5, at: '11s' }
+      ],
+      preset: 'custom',
+      assumed: { timing: 'partial', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+      actual: { delay: 'uniform(5ms, 40ms)', bound: '50ms', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+        step: 'uniform(100us, 1ms)', offset: 'uniform(0ms, 20ms)', rho: 'uniform(-0.0001, 0.0001)',
+        gst: '1s', preGstDelay: 'pareto(20ms, 1.1)', roundMode: 'lockstep', roundLen: '1s' },
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '14s'
+    };
+  })()
+});
+
 // Timing model presets: they only change assumed/actual/policy
 const PRESETS = {
   'sync-ideal': {

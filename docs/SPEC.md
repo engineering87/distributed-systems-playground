@@ -1,6 +1,6 @@
 # SPEC — Distributed Systems Playground
 
-Version: 0.2 (draft) · Status: proposal, partially implemented (see Appendix B)
+Version: 0.3 (draft) · Status: proposal, partially implemented (see Appendix B)
 
 ## 1. Purpose
 
@@ -148,12 +148,21 @@ In the UI a preset is only a starting point: every parameter stays editable, and
 - **What-if:** adding an input or a fault at time `t` does not change the trace before `t`, so the UI can inject events at the playback cursor and re-run from there.
 - The engine records, besides messages and log entries, an **activity trace** (`t`, `end`, node, event type) that the UI uses to animate processing.
 
-### 4.1 Faults (v1)
+### 4.1 Faults
 
-- **Crash** of a node at a given time.
-- **Recovery** with volatile state reset and `stable` state preserved (§5.3, roadmap).
-- **Link failures** (disabled links) and **scheduled partitions** (sets of nodes, time interval; roadmap).
-- **Interactive injection** during playback: crash a node or inject an event at the cursor time.
+| Type | Fields | Semantics |
+|---|---|---|
+| `crash` | `node`, `at` | the node stops; deliveries to it are recorded as `lost-crash`; pending timers are discarded |
+| `recover` | `node`, `at` | the node restarts: non-`stable` state variables are re-initialized, timers are cleared, and each instance receives `Recovery` if it handles it, `Init` otherwise, bottom-up; ignored with a warning if the node is running |
+| `link` | `a`, `b`, `from`, `to` | the channel between `a` and `b` is down in both directions during `[from, to)`; `to` empty means forever |
+| `partition` | `groups`, `from`, `to` | during `[from, to)` messages between different groups are dropped; nodes not listed form one more group |
+
+- A message is dropped (`dropped-cut`) if its channel is interrupted at send time or at arrival time. Random samples for the message are drawn before the check, so a fault never changes the random streams.
+- Each fault start and end is logged with kind `fault`.
+- Links can also be disabled for the whole run from the topology.
+- **Interactive injection** during playback: crash, recover or isolate a node, cut a link, or inject an event at the cursor time. The cursor is rounded up to a whole microsecond, so that the fault is in effect at the cursor after the re-run.
+- The result exposes `downs` (per node, a list of `{from, to}` intervals) and `netFaults` (links and partitions in microseconds) for the UI.
+- Roadmap: node pauses, send and receive omissions, one-way link failures.
 
 ---
 
@@ -252,13 +261,13 @@ Implementation note: inside a `trigger`, the ASCII `>` closes the event, so comp
 
 ### 5.3 Semantics
 
-- **State:** each algorithm instance has local state per node. `stable` variables survive recovery; the others are reinitialized.
+- **State:** each algorithm instance has local state per node. `stable` variables survive recovery; the others are reinitialized from their declaration.
 - **Instances and composition:** `implements X as a` names the instance the algorithm exposes to upper layers; `uses Y as b` binds a lower-layer instance. v0.x binds automatically (§6).
 - **Events:**
   - `trigger ⟨b, Req | ...⟩` sends a *request* downwards;
   - `trigger ⟨a, Ind | ...⟩` emits an *indication* upwards;
   - the checker verifies direction and arity against the interface.
-- **Init:** each instance receives `⟨a, Init⟩` at start-up, bottom-up.
+- **Init and Recovery:** each instance receives `⟨a, Init⟩` at start-up, bottom-up. After a recovery it receives `⟨a, Recovery⟩` if it has a handler for it, and `⟨a, Init⟩` otherwise.
 - **Pattern matching:**
   - new identifiers bind;
   - already bound identifiers and atoms must be equal;
@@ -312,7 +321,12 @@ A scenario is self-contained and can be shared as a file or as a URL (deflate-co
   "code": "interface … algorithm … end",
   "top": "IncreasingTimeout",
   "inputs": "0ms * Start",
-  "faults": [{ "type": "crash", "node": 2, "at": "6s" }],
+  "faults": [
+    { "type": "crash", "node": 2, "at": "6s" },
+    { "type": "recover", "node": 2, "at": "8s" },
+    { "type": "link", "a": 1, "b": 2, "from": "1s", "to": "2s" },
+    { "type": "partition", "groups": "1 2 | 3", "from": "3s", "to": "" }
+  ],
   "preset": "partial",
   "assumed": { "timing": "partial", "DELTA": "unknown", "PHI": "unknown", "RHO": "unknown" },
   "actual": {
@@ -329,6 +343,7 @@ A scenario is self-contained and can be shared as a file or as a URL (deflate-co
 ```
 
 - `inputs` holds external events, one per line: `TIME NODE Event | arguments`, where `NODE` is a number or `*` and the arguments are DSL expressions.
+- `faults` follows §4.1; `groups` may also be an array of arrays of node ids.
 - `top` is the main algorithm; its interface requests are the events accepted as inputs. For each `uses X`, the first algorithm implementing `X` is instantiated.
 - An explicit `stack` of instances and global `invariants` are planned (Appendix B).
 
@@ -343,14 +358,16 @@ A scenario is self-contained and can be shared as a file or as a URL (deflate-co
    - messages travel along links as labeled packets (the first atom of the payload, e.g. `FLOOD`) with a trail; red for violations, amber for messages the network will lose, gray for messages to a crashed process;
    - arrival ripples on the recipient, ✕ marks where a message is lost or discarded;
    - processing glow while a node executes a step, a timer icon when a timeout fires, a round badge;
-   - an output bubble when a process emits an indication, a flash when it crashes;
+   - an output bubble when a process emits an indication, a flash when it crashes or recovers;
+   - links interrupted by a failure or a partition drawn as dashed red lines with a ✂ mark;
    - clicking a packet pauses and shows its details, with shortcuts to its send and arrival times.
 5. **Playback:** play, pause, previous and next event, time scrubber; speeds from 2 ms to 5 s of simulated time per second, "auto" (the interesting part of the run in about 25 s), and **event by event** (each step animated at a constant pace regardless of the time scale). Optional autoplay after each run.
-6. **Interaction during playback:** with a process selected, inject an event (a request of the main algorithm) or a crash at the cursor time; the simulation re-runs and continues from that point.
-7. **Space-time diagram** synchronized with the cursor: processing bars, messages, violations, outputs, round lines, GST; pan, zoom, "Action" and "All" views; hovering shows message details, clicking selects the message.
-8. **State inspector:** local clock, round and every variable of every instance at the cursor, with changes highlighted.
-9. **Event log:** filterable; clicking an entry moves the cursor.
-10. **Comparison** of two runs side by side (roadmap).
+6. **Interaction during playback:** with a process selected, inject an event (a request of the main algorithm), a crash, a recovery or an isolation at the cursor time; with a link selected, take it down for a given duration. The simulation re-runs and continues from that point.
+7. **Faults list** in the Scenario tab, with a form for every fault type.
+8. **Space-time diagram** synchronized with the cursor: processing bars, messages, violations, outputs, round lines, GST, down intervals with crash and recovery markers, shaded partitions and link failures; pan, zoom, "Action" and "All" views; hovering shows message details, clicking selects the message.
+9. **State inspector:** local clock, round and every variable of every instance at the cursor, with changes highlighted.
+10. **Event log:** filterable; clicking an entry moves the cursor.
+11. **Comparison** of two runs side by side (roadmap).
 
 ---
 
@@ -374,7 +391,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 - With the "Ideal synchronous" preset no `TimingViolation` ever occurs.
 - With "Realistic synchronous" and FloodSet, some seeds produce disagreement, and the trace that causes it can be replayed.
 - The static checker rejects `DELTA` in the asynchronous model.
-- Injecting an event at time `t` leaves the trace before `t` unchanged.
+- Injecting an event or a fault at time `t` leaves the trace before `t` unchanged.
+- Under a partition, each side of the ◇P example suspects the other side, and the suspicions are withdrawn after the partition heals and after a crashed process recovers.
 - Examples include at least: flooding, Chang-Roberts, FloodSet, IncreasingTimeout (◇P).
 
 ## 10. Roadmap
@@ -383,7 +401,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 |---|---|
 | **v0.1** | DSL, `Net`/`timer`/`Rounds`, crashes, presets, space-time diagram, time travel |
 | **v0.2** | English UI, animated execution on the topology, event-by-event playback, interactive injection |
-| **v1.1** | global invariants, crash-recovery with `stable`, scheduled partitions, side-by-side comparison |
+| **v0.3** | crash-recovery with `stable`, link failures and partitions over time, fault injection at the cursor |
+| **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |
 | **v1.2** | failure detector oracles (P, ◇P, Ω) as provided modules, to study consensus on top of the abstraction |
 | **v2** | Byzantine faults (adversarial nodes written in the DSL), systematic exploration of interleavings, trace export |
 
@@ -483,14 +502,14 @@ end
 
 ---
 
-## Appendix B — Implementation status (v0.2)
+## Appendix B — Implementation status (v0.3)
 
 ### Implemented
 
 - The full DSL of §5.2, including `condition` and `exists` guards, comprehensions, maps and the ASCII syntax.
 - The static checks of §5.6.
 - The parametric timing model of §3 with its five presets, violation policies (`next-round` is covered by `deliver-late` with emulated rounds), lockstep and emulated rounds, GST with the DLS constraint.
-- Deterministic engine with activity trace; scheduled crashes; disabled links; per-link loss and delay.
+- Deterministic engine with activity trace; crashes and recoveries; link failures and partitions over time; disabled links; per-link loss and delay.
 - The whole UI of §7 except side-by-side comparison, in English.
 
 ### Differences from the specification
@@ -502,14 +521,13 @@ end
 | Periodic snapshots for time travel | the whole run is computed first and then replayed; state recorded at every step that changes it | equivalent thanks to determinism, and simpler |
 | Explicit `stack` in the scenario | automatic binding: for each `uses X`, the first algorithm implementing `X` | less configuration |
 | Standard library in `.dalg` files | algorithms live in the examples; `PerfectLinks` in the ◇P example is a direct link, perfect only with zero loss | stubborn links retransmit forever and make traces grow too much |
-| Recovery with `stable` variables | the keyword is accepted, recovery is not simulated yet | v1.1 |
-| Scheduled partitions | links can only be disabled for the whole run | v1.1 |
 | Global invariants | local `assert` only, with an optional halt | v1.1 |
-| Per-node process parameters, GC pauses | global `step` distribution only | v1.1 |
+| Per-node process parameters, GC pauses, `pauses` | global `step` distribution only | v1.1 |
+| Omission failures of a process | omissions come from channel loss only | v1.1 |
 
 ### Suggested next steps
 
-1. Recovery and scheduled partitions, both injectable at the cursor like crashes.
+1. Node pauses, send and receive omissions, one-way link failures.
 2. Global invariants (agreement, validity) checked at every step and shown on the timeline.
 3. Explicit stack in the scenario and a separate standard library.
 4. Engine in a Web Worker and faster rendering for large traces.

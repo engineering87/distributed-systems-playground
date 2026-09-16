@@ -40,7 +40,13 @@ function upperBound(arr, t, f) { let lo = 0, hi = arr.length; while (lo < hi) { 
 function lowerBound(arr, t, f) { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (f(arr[m]) < t) lo = m + 1; else hi = m; } return lo; }
 function lastAtOrBefore(arr, t, f) { const i = upperBound(arr, t, f) - 1; return i >= 0 ? arr[i] : null; }
 function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + '…' : s; }
-function fmtDurInput(us) { return (us / 1000).toFixed(3).replace(/\.?0+$/, '') + 'ms'; }
+// shortest exact text for a time in microseconds, e.g. 2s, 9.993526s, 40ms, 1.5ms
+function fmtDurInput(us) {
+  us = Math.round(us);
+  if (us % 1000000 === 0) return (us / 1e6) + 's';
+  if (us >= 1e6) return (us / 1e6).toFixed(6).replace(/0+$/, '') + 's';
+  return (us / 1000).toFixed(3).replace(/\.?0+$/, '') + 'ms';
+}
 function pct(x) { return (x * 100).toFixed(1) + '%'; }
 function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function ease(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
@@ -104,7 +110,13 @@ function ensureScenario(s) {
     a: +l.a, b: +l.b, directed: !!l.directed, enabled: l.enabled !== false,
     loss: l.loss === null || l.loss === undefined ? '' : String(l.loss), delay: l.delay || ''
   }));
-  out.faults = (out.faults || []).map(f => ({ type: 'crash', node: +f.node, at: String(f.at) }));
+  out.faults = (out.faults || []).map(f => {
+    const type = f.type || 'crash';
+    const str = v => (v === null || v === undefined ? '' : String(v));
+    if (type === 'link') return { type, a: +f.a, b: +f.b, from: str(f.from), to: str(f.to) };
+    if (type === 'partition') return { type, groups: Array.isArray(f.groups) ? f.groups.map(g => [].concat(g).join(' ')).join(' | ') : str(f.groups), from: str(f.from), to: str(f.to) };
+    return { type, node: +f.node, at: str(f.at) };
+  });
   if (out.preset !== 'custom' && !EX.PRESETS[out.preset]) out.preset = 'custom';
   return out;
 }
@@ -437,6 +449,26 @@ function msgGeom(m) {
   const hasFwd = S.scn.links.some(l => l.a === m.from && l.b === m.to && l.directed);
   return linkGeom(a, b, hasFwd && isCurved(m.from, m.to));
 }
+// is process id down at time t in the last run?
+function downAt(id, t) {
+  const d = S.res && S.res.downs[id];
+  if (!d) return null;
+  for (const x of d) if (t >= x.from && (x.to === null || t < x.to)) return x;
+  return null;
+}
+// is the channel between a and b interrupted at time t in the last run?
+function cutAtUI(a, b, t) {
+  const nf = S.res && S.res.netFaults;
+  if (!nf) return null;
+  for (const l of nf.links)
+    if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+  for (const p of nf.partitions) {
+    if (t < p.from || (p.to !== null && t >= p.to)) continue;
+    const g = id => { const i = p.groups.findIndex(x => x.includes(id)); return i; };
+    if (g(a) !== g(b)) return 'partition';
+  }
+  return null;
+}
 function lastOutput(id, t) { return lastAtOrBefore(S.outIdx[id] || [], t, o => o.t); }
 function snapAt(id, t) { return S.res ? lastAtOrBefore(S.res.snaps[id] || [], t, s => s.t) : null; }
 function packetLabel(m) {
@@ -454,19 +486,23 @@ function renderTopo() {
     const g = linkGeom(a, b, l.directed && isCurved(l.a, l.b));
     const sel = S.selected && S.selected.type === 'link' && S.selected.idx === i;
     const d = geomPath(g);
-    const p = sv('path', { d, class: 'lk' + (l.enabled ? '' : ' off') + (sel ? ' sel' : '') });
+    const cut = S.res ? cutAtUI(l.a, l.b, S.cursor) : null;
+    const p = sv('path', { d, class: 'lk' + (l.enabled ? '' : ' off') + (cut ? ' cut' : '') + (sel ? ' sel' : '') });
     if (l.directed) p.setAttribute('marker-end', sel ? 'url(#arrow-sel)' : 'url(#arrow)');
     gL.append(p);
     const hit = sv('path', { d, class: 'lk-hit', 'data-link': i });
-    hit.append(sv('title', {}, 'p' + l.a + (l.directed ? ' → ' : ' — ') + 'p' + l.b + (l.enabled ? '' : ' (disabled)')));
+    hit.append(sv('title', {}, 'p' + l.a + (l.directed ? ' → ' : ' — ') + 'p' + l.b + (l.enabled ? '' : ' (disabled)') + (cut ? ' (' + cut + ')' : '')));
     gL.append(hit);
+    if (cut) {
+      const [mx, my] = geomAt(g, 0.5);
+      gL.append(sv('text', { x: mx, y: my, class: 'cut-mark' }, '✂'));
+    }
   });
   const t = S.cursor;
   const busy = busyAt(t);
   for (const n of S.scn.nodes) {
     const g = sv('g', { class: 'nd', 'data-node': n.id, transform: 'translate(' + n.x + ' ' + n.y + ')', tabindex: 0, role: 'button', 'aria-label': 'Process p' + n.id });
-    const ca = S.res ? S.res.crashes[n.id] : undefined;
-    const crashed = ca !== undefined && ca <= t;
+    const crashed = !!downAt(n.id, t);
     const b = busy.get(n.id);
     if (crashed) g.classList.add('crashed');
     if (S.selected && S.selected.type === 'node' && S.selected.id === n.id) g.classList.add('sel');
@@ -531,6 +567,7 @@ function renderAnim() {
   for (let i = lo; i < hi; i++) {
     const m = S.msgsBySend[i];
     if (m.status === 'dropped-link' || m.recvT === null) continue;
+    if (m.status === 'dropped-cut' && m.recvT === m.sendT) continue;
     const self = m.from === m.to;
     const inFlight = m.recvT > t && m.recvT > m.sendT;
     if (inFlight && !self && packets < 400) {
@@ -539,7 +576,7 @@ function renderAnim() {
       let f = (t - m.sendT) / (m.recvT - m.sendT);
       if (m.status === 'dropped-loss') f *= 0.5;
       if (labels) f = 0.14 + 0.72 * f;
-      const cls = m.violation ? 'late' : m.status === 'dropped-loss' ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
+      const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
       gF.append(sv('path', { d: geomPrefix(g, f), class: 'trail ' + cls }));
       const [x, y] = geomAt(g, f);
       const pg = sv('g', { class: 'pk ' + cls + (m.dup ? ' dup' : '') + (sel === m.id ? ' sel' : ''), transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')', 'data-msg': m.id });
@@ -573,7 +610,7 @@ function renderAnim() {
       if (m.status === 'dropped-loss' && g) [x, y] = geomAt(g, 0.5);
       else if (g) [x, y] = geomAt(g, 1);
       else { x = to.x; y = to.y; }
-      const cls = m.status === 'dropped-loss' ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
+      const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
       const s = 5 + 4 * k;
       gT.append(sv('path', {
         d: `M${x - s} ${y - s}L${x + s} ${y + s}M${x + s} ${y - s}L${x - s} ${y + s}`,
@@ -599,13 +636,19 @@ function renderAnim() {
     g.append(sv('text', { y: -12 }, txt));
     gT.append(g);
   }
-  // crash flashes
-  for (const id in S.res.crashes) {
+  // crash and recovery flashes
+  for (const id in S.res.downs) {
     const n = nodeById(+id);
-    const age = t - S.res.crashes[id];
-    if (!n || age < 0 || age > 2 * W) continue;
-    const k = age / Math.max(1, 2 * W);
-    gF.append(sv('circle', { cx: n.x, cy: n.y, r: (R_NODE + 6 + 22 * k).toFixed(1), class: 'crashring', opacity: (1 - k).toFixed(2) }));
+    if (!n) continue;
+    for (const d of S.res.downs[id]) {
+      for (const [at, cls] of [[d.from, 'crashring'], [d.to, 'recoverring']]) {
+        if (at === null) continue;
+        const age = t - at;
+        if (age < 0 || age > 2 * W) continue;
+        const k = age / Math.max(1, 2 * W);
+        gF.append(sv('circle', { cx: n.x, cy: n.y, r: (R_NODE + 6 + 22 * k).toFixed(1), class: cls, opacity: (1 - k).toFixed(2) }));
+      }
+    }
   }
 }
 
@@ -690,21 +733,71 @@ function addLink(a, b) {
 function deleteNode(id) {
   S.scn.nodes = S.scn.nodes.filter(n => n.id !== id);
   S.scn.links = S.scn.links.filter(l => l.a !== id && l.b !== id);
-  S.scn.faults = S.scn.faults.filter(f => f.node !== id);
+  S.scn.faults = S.scn.faults.filter(f => !faultMentions(f, id)).concat(
+    S.scn.faults.filter(f => f.type === 'partition' && faultMentions(f, id)).map(f => withoutFromPartition(f, id)).filter(Boolean));
   S.selected = null;
   renderFaults();
   topologyChanged();
 }
 function deleteLink(i) { S.scn.links.splice(i, 1); S.selected = null; topologyChanged(); }
-function setCrash(id, at) {
-  if (at && validate('dur', at)) { toast('Invalid time: use a duration such as 1.5s'); return false; }
-  S.scn.faults = S.scn.faults.filter(f => f.node !== id);
-  if (at) S.scn.faults.push({ type: 'crash', node: id, at });
-  renderFaults(); markStale();
+function groupsOf(f) { try { return C.parseGroups(f.groups); } catch (e) { return []; } }
+function faultMentions(f, id) {
+  if (f.type === 'link') return f.a === id || f.b === id;
+  if (f.type === 'partition') return groupsOf(f).some(g => g.includes(id));
+  return f.node === id;
+}
+function withoutFromPartition(f, id) {
+  const groups = groupsOf(f).map(g => g.filter(x => x !== id)).filter(g => g.length);
+  return groups.length ? Object.assign({}, f, { groups: groups.map(g => g.join(' ')).join(' | ') }) : null;
+}
+function describeFault(f) {
+  const until = f.to ? ' until ' + f.to : ' onwards';
+  switch (f.type) {
+    case 'crash': return 'p' + f.node + ' crashes at ' + f.at;
+    case 'recover': return 'p' + f.node + ' recovers at ' + f.at;
+    case 'link': return 'link p' + f.a + '–p' + f.b + ' down from ' + f.from + until;
+    case 'partition': {
+      const groups = groupsOf(f);
+      const listed = new Set(groups.flat());
+      const rest = S.scn.nodes.map(n => n.id).filter(id => !listed.has(id));
+      const all = rest.length ? groups.concat([rest]) : groups;
+      return 'partition ' + all.map(g => '{' + g.map(id => 'p' + id).join(', ') + '}').join(' | ') + ' from ' + f.from + until;
+    }
+  }
+  return f.type;
+}
+// validate and add a fault; returns true on success
+function addFault(f) {
+  try { C.normalizeFault(f); }
+  catch (e) { const m = e.message.replace(/^Fault \d*: /, ''); toast(m.charAt(0).toUpperCase() + m.slice(1) + '.'); return false; }
+  const ids = f.type === 'link' ? [f.a, f.b] : f.type === 'partition' ? groupsOf(f).flat() : [f.node];
+  const missing = ids.filter(id => !nodeById(id));
+  if (missing.length) { toast('No such process: ' + missing.map(id => 'p' + id).join(', ')); return false; }
+  S.scn.faults.push(f);
+  renderFaults();
+  markStale();
   return true;
+}
+// add a fault that starts at the cursor and continue the run from there
+// build receives the cursor time as text; the cursor is rounded up to a whole microsecond
+// so that, after the re-run, the fault is already in effect at the cursor
+function faultHere(build, describe) {
+  const resume = S.playing;
+  S.cursor = Math.ceil(S.cursor);
+  const f = build(fmtDurInput(S.cursor));
+  if (!addFault(f)) return;
+  run(true, resume);
+  toast(describe + ' at ' + C.fmtDuration(S.cursor) + '.');
+}
+function untilFrom(input) {
+  const v = input.value.trim();
+  if (!v || v === 'forever') return '';
+  const d = C.parseDuration(v);
+  return d === null ? '' : fmtDurInput(S.cursor + d);
 }
 // add an external event at the cursor and re-run, keeping the cursor (what-if)
 function injectEvent(id, ev, args) {
+  S.cursor = Math.ceil(S.cursor);
   const line = fmtDurInput(S.cursor) + ' ' + id + ' ' + ev + (args ? ' | ' + args : '');
   try { C.parseInputs(line); } catch (e) { toast(e.message.replace(/^Input line 1: /, '')); return; }
   const text = S.scn.inputs.replace(/\s+$/, '');
@@ -734,14 +827,12 @@ function renderProps() {
   if (sel.type === 'node') {
     const n = nodeById(sel.id);
     if (!n) return;
-    const f = S.scn.faults.find(x => x.node === n.id);
-    const inp = el('input', { class: 'narrow', value: f ? f.at : '', placeholder: 'never', 'aria-label': 'Crash time' });
-    inp.addEventListener('change', () => { if (!setCrash(n.id, inp.value.trim())) inp.value = f ? f.at : ''; });
     const nb = neighborsOf(n.id);
+    const own = S.scn.faults.filter(f => faultMentions(f, n.id));
     box.append(
       el('b', {}, 'p' + n.id),
       el('span', {}, nb.length ? 'neighbors: ' + nb.map(x => 'p' + x).join(', ') : 'no neighbors'),
-      el('label', { class: 'field' }, el('span', {}, 'Crash at'), inp),
+      el('span', { class: 'hint', style: 'margin:0' }, own.length ? own.length + (own.length === 1 ? ' fault' : ' faults') + ' scheduled' : 'no faults scheduled'),
       el('button', { type: 'button', class: 'ghost', onclick: () => deleteNode(n.id) }, 'Delete')
     );
     if (S.res) {
@@ -757,7 +848,17 @@ function renderProps() {
         args.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
         row.append(evSel, args, el('button', { type: 'button', class: 'primary small', onclick: go }, 'Inject event'));
       }
-      row.append(el('button', { type: 'button', class: 'ghost small', onclick: () => { if (setCrash(n.id, fmtDurInput(S.cursor))) run(true, S.playing); } }, 'Crash here'));
+      if (downAt(n.id, S.cursor)) {
+        row.append(el('button', { type: 'button', class: 'ghost small', 'data-down': '1',
+          onclick: () => faultHere(at => ({ type: 'recover', node: n.id, at }), 'p' + n.id + ' recovers') }, 'Recover here'));
+      } else {
+        row.append(el('button', { type: 'button', class: 'ghost small', 'data-down': '0',
+          onclick: () => faultHere(at => ({ type: 'crash', node: n.id, at }), 'p' + n.id + ' crashes') }, 'Crash here'));
+      }
+      const iso = el('input', { class: 'narrow', value: '2s', placeholder: 'forever', 'aria-label': 'Isolation duration', title: 'Duration, empty for forever' });
+      row.append(el('span', { class: 'sep' }), iso, el('button', { type: 'button', class: 'ghost small',
+        onclick: () => faultHere(at => ({ type: 'partition', groups: String(n.id), from: at, to: untilFrom(iso) }),
+          'p' + n.id + ' is isolated') }, 'Isolate here'));
       box.append(row);
     }
     return;
@@ -782,13 +883,24 @@ function renderProps() {
     delay.setAttribute('aria-invalid', err ? 'true' : 'false'); delay.title = err || '';
     if (!err) { l.delay = v; markStale(); }
   });
+  let cutRow = null;
+  if (S.res) {
+    const dur = el('input', { class: 'narrow', value: '1s', placeholder: 'forever', 'aria-label': 'Link failure duration', title: 'Duration, empty for forever' });
+    cutRow = el('div', { class: 'inject' },
+      el('span', { class: 'lbl' }, 'At ' + C.fmtDuration(S.cursor) + ':'),
+      el('span', {}, 'take the link down for'), dur,
+      el('button', { type: 'button', class: 'ghost small',
+        onclick: () => faultHere(at => ({ type: 'link', a: l.a, b: l.b, from: at, to: untilFrom(dur) }),
+          'Link p' + l.a + '–p' + l.b + ' goes down') }, 'Cut here'));
+  }
   box.append(
     el('b', {}, 'p' + l.a + (l.directed ? ' → ' : ' — ') + 'p' + l.b),
-    el('label', { class: 'check' }, en, 'Enabled'),
+    el('label', { class: 'check', title: 'Unchecked: the link is down for the whole run' }, en, 'Enabled'),
     el('label', { class: 'check' }, dir, 'Directed'),
     el('label', { class: 'field' }, el('span', {}, 'Loss'), loss),
     el('label', { class: 'field' }, el('span', {}, 'Delay'), delay),
-    el('button', { type: 'button', class: 'ghost', onclick: () => deleteLink(sel.idx) }, 'Delete')
+    el('button', { type: 'button', class: 'ghost', onclick: () => deleteLink(sel.idx) }, 'Delete'),
+    cutRow
   );
 }
 function renderMsgProps(box, id) {
@@ -868,7 +980,10 @@ function generate(kind, n) {
   }
   S.scn.nodes = nodes; S.scn.links = links;
   const valid = new Set(ids);
-  S.scn.faults = S.scn.faults.filter(f => valid.has(f.node));
+  S.scn.faults = S.scn.faults.filter(f =>
+    f.type === 'link' ? valid.has(f.a) && valid.has(f.b)
+    : f.type === 'partition' ? groupsOf(f).flat().every(id => valid.has(id))
+    : valid.has(f.node));
   S.selected = null;
   renderFaults(); fitView(); topologyChanged();
 }
@@ -876,7 +991,7 @@ function renderFaults() {
   const ul = $('#faults'); ul.textContent = '';
   if (!S.scn.faults.length) ul.append(el('li', {}, el('span', { class: 'hint' }, 'No faults scheduled.')));
   S.scn.faults.forEach((f, i) => ul.append(el('li', {},
-    el('span', {}, 'p' + f.node + ' crashes at ' + f.at),
+    el('span', { class: 'ft-' + f.type }, describeFault(f)),
     el('button', { type: 'button', class: 'ghost small', onclick: () => { S.scn.faults.splice(i, 1); renderFaults(); markStale(); renderProps(); } }, 'Remove'))));
 }
 
@@ -922,7 +1037,7 @@ function focusEnd(r) {
   let f = 0;
   for (const m of r.msgs) f = Math.max(f, m.recvT === null ? m.sendT : Math.min(m.recvT, r.endT));
   for (const o of r.outputs) f = Math.max(f, o.t);
-  for (const k in r.crashes) f = Math.max(f, r.crashes[k]);
+  for (const k in r.downs) for (const d of r.downs[k]) f = Math.max(f, d.from, d.to || 0);
   for (const e of r.log) if (e.kind !== 'warn') f = Math.max(f, e.t);
   if (f <= 0) return r.endT;
   return Math.min(r.endT, Math.max(f * 1.08, f + 1000));
@@ -1064,20 +1179,55 @@ function drawDiagram() {
       }
     }
   }
-  // process lines
+  // network faults: partitions shade the whole diagram, link failures shade the rows between the two processes
+  if (r && r.netFaults) {
+    const horizon = ghost ? Infinity : t;
+    const band = (from, to, y1, y2, label) => {
+      if (from > horizon) return;
+      const x1 = X(from), x2 = X(Math.min(to === null ? Infinity : to, horizon, v.start + v.span));
+      if (x2 <= x1) return;
+      ctx.fillStyle = col.red; ctx.globalAlpha = 0.08;
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = col.red; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1, y2); ctx.stroke(); ctx.setLineDash([]);
+      if (label && x2 - x1 > 60) { ctx.fillStyle = col.red; ctx.font = '700 11px ' + UIF; ctx.textAlign = 'left'; ctx.fillText(label, x1 + 4, y1 + 9); }
+    };
+    for (const p of r.netFaults.partitions) band(p.from, p.to, TOP - 8, H, 'partition');
+    for (const l of r.netFaults.links) {
+      const ya = rowY.get(l.a), yb = rowY.get(l.b);
+      if (ya === undefined || yb === undefined) continue;
+      band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' down');
+    }
+  }
+  // process lines: solid while running, dashed from a crash to the recovery (or to the end)
   for (const n of nodes) {
     const y = rowY.get(n.id);
-    const ca = r ? r.crashes[n.id] : undefined;
-    const x0 = Math.max(LEFT, X(0));
-    const xc = ca !== undefined ? X(ca) : W;
-    ctx.strokeStyle = col.ink; ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(Math.min(xc, W), y); ctx.stroke();
-    if (ca !== undefined && (ca <= t || ghost)) {
-      ctx.strokeStyle = col.violet; ctx.setLineDash([2, 4]);
-      ctx.beginPath(); ctx.moveTo(xc, y); ctx.lineTo(W, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.moveTo(xc - 6, y - 6); ctx.lineTo(xc + 6, y + 6); ctx.moveTo(xc + 6, y - 6); ctx.lineTo(xc - 6, y + 6); ctx.stroke();
+    const downs = r ? (r.downs[n.id] || []) : [];
+    const seg = (xa, xb, down) => {
+      xa = Math.max(xa, LEFT); xb = Math.min(xb, W);
+      if (xb <= xa) return;
+      ctx.strokeStyle = down ? col.violet : col.ink; ctx.lineWidth = 1.4;
+      ctx.setLineDash(down ? [2, 4] : []);
+      ctx.beginPath(); ctx.moveTo(xa, y); ctx.lineTo(xb, y); ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    let from = X(0);
+    for (const d of downs) {
+      if (d.from > t && !ghost) break;               // later crashes are not shown yet
+      const xa = X(d.from);
+      seg(from, xa, false);
+      const recoveryShown = d.to !== null && (d.to <= t || ghost);
+      const xb = recoveryShown ? X(d.to) : W;
+      seg(xa, xb, true);
+      ctx.strokeStyle = col.violet; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(xa - 6, y - 6); ctx.lineTo(xa + 6, y + 6); ctx.moveTo(xa + 6, y - 6); ctx.lineTo(xa - 6, y + 6); ctx.stroke();
+      if (!recoveryShown) { from = W; break; }
+      ctx.strokeStyle = col.green; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(xb, y, 5, 0, Math.PI * 2); ctx.stroke();
+      from = xb;
     }
+    seg(from, W, false);
   }
   if (r) {
     // processing steps as short bars on the process lines
@@ -1153,8 +1303,7 @@ function drawDiagram() {
   ctx.beginPath(); ctx.moveTo(LEFT - 0.5, 0); ctx.lineTo(LEFT - 0.5, H); ctx.stroke();
   ctx.font = '700 12px ' + UIF; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   for (const n of nodes) {
-    const ca = r ? r.crashes[n.id] : undefined;
-    ctx.fillStyle = ca !== undefined && ca <= t ? col.muted : col.ink;
+    ctx.fillStyle = r && downAt(n.id, t) ? col.muted : col.ink;
     ctx.fillText('p' + n.id, 10, rowY.get(n.id));
   }
   if (!r) {
@@ -1170,7 +1319,7 @@ function drawMsg(ctx, m, alpha, tcut, X, rowY, selected) {
   if (y1 === undefined) return;
   const x1 = X(m.sendT);
   ctx.globalAlpha = alpha;
-  if (m.status === 'dropped-link' || y2 === undefined) {
+  if (m.status === 'dropped-link' || y2 === undefined || (m.status === 'dropped-cut' && m.recvT === m.sendT)) {
     ctx.strokeStyle = col.amber; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(x1 - 3, y1 - 3); ctx.lineTo(x1 + 3, y1 + 3); ctx.moveTo(x1 + 3, y1 - 3); ctx.lineTo(x1 - 3, y1 + 3); ctx.stroke();
     ctx.globalAlpha = 1;
@@ -1178,10 +1327,10 @@ function drawMsg(ctx, m, alpha, tcut, X, rowY, selected) {
   }
   let color = m.violation ? col.red : col.blue;
   let dash = [];
-  if (m.status === 'dropped-loss') { color = col.amber; dash = [4, 3]; }
+  if (m.status === 'dropped-loss' || m.status === 'dropped-cut') { color = col.amber; dash = [4, 3]; }
   else if (m.status === 'lost-crash') { color = col.muted; dash = [2, 3]; }
   else if (m.status === 'dropped-late') dash = [4, 3];
-  const lost = m.status === 'dropped-loss' || m.status === 'dropped-late' || m.status === 'lost-crash';
+  const lost = m.status === 'dropped-loss' || m.status === 'dropped-late' || m.status === 'lost-crash' || m.status === 'dropped-cut';
   let tt = m.recvT, ty = y2;
   if (m.status === 'dropped-loss') { tt = (m.sendT + m.recvT) / 2; ty = (y1 + y2) / 2; }
   let frac = 1;
@@ -1224,7 +1373,8 @@ function distSeg(px, py, s) {
 }
 const STATUS_TEXT = {
   delivered: 'delivered', pending: 'still in transit when the run ended', 'dropped-loss': 'lost by the network',
-  'dropped-late': 'discarded because late', 'lost-crash': 'recipient crashed', 'dropped-link': 'no link'
+  'dropped-late': 'discarded because late', 'lost-crash': 'recipient crashed', 'dropped-link': 'no link',
+  'dropped-cut': 'dropped by a link failure or a partition'
 };
 function nearestSeg(x, y) {
   let best = null, bd = 7;
@@ -1332,9 +1482,15 @@ function setCursor(t) {
   }
   renderTopo(); drawDiagram(); updateTransport(); updateLogCursor();
   if (S.tab === 'state') renderInspector();
-  if (S.selected && S.selected.type === 'node' && S.res) {
+  if (S.selected && (S.selected.type === 'node' || S.selected.type === 'link') && S.res) {
     const lbl = $('#props .inject .lbl');
     if (lbl) lbl.textContent = 'At ' + C.fmtDuration(S.cursor) + ':';
+    if (S.selected.type === 'node') {
+      const down = !!downAt(S.selected.id, S.cursor);
+      const shown = !!$('#props .inject button[data-down="1"]');
+      const hasBtn = !!$('#props .inject button[data-down]');
+      if (hasBtn && down !== shown) renderProps();
+    }
   }
 }
 function updateTransport() {
@@ -1404,7 +1560,7 @@ function bindTransport() {
 
 // ============================================================ event log
 const LOG_MAX = 3000;
-const KIND_LABEL = { output: 'output', violation: 'violation', drop: 'loss', warn: 'warning', error: 'error', assert: 'assertion failed', input: 'input', log: 'log' };
+const KIND_LABEL = { fault: 'fault', output: 'output', violation: 'violation', drop: 'dropped', warn: 'warning', error: 'error', assert: 'assertion failed', input: 'input', log: 'log' };
 function renderLog() {
   const ol = $('#log'); ol.textContent = '';
   S.logRows = []; S.logCur = -1;
@@ -1467,9 +1623,12 @@ function renderInspector() {
   const snaps = r.snaps[id] || [];
   const i = upperBound(snaps, S.cursor, s => s.t) - 1;
   const cur = i >= 0 ? snaps[i] : null, prev = i > 0 ? snaps[i - 1] : null;
-  const ca = r.crashes[id];
+  const down = downAt(id, S.cursor);
+  const past = (r.downs[id] || []).filter(d => d.to !== null && d.to <= S.cursor);
+  const status = down ? 'crashed at ' + C.fmtDuration(down.from)
+    : past.length ? 'running, recovered at ' + C.fmtDuration(past[past.length - 1].to) : 'running';
   wrap.append(el('div', { class: 'meta' },
-    el('span', {}, 'status ', el('b', {}, ca !== undefined && ca <= S.cursor ? 'crashed at ' + C.fmtDuration(ca) : 'running')),
+    el('span', {}, 'status ', el('b', {}, status)),
     el('span', {}, 'local clock ', el('b', {}, C.fmtDuration(Math.round(info.offset + (1 + info.rho) * S.cursor)))),
     el('span', {}, 'offset ', el('b', {}, C.fmtDuration(info.offset))),
     el('span', {}, 'drift ', el('b', {}, info.rho === 0 ? '0' : info.rho.toExponential(2))),
@@ -1720,13 +1879,19 @@ function bindHeader() {
   });
   $$('.tabs [data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
   $('#log-filter').addEventListener('change', renderLog);
+  const syncFaultForm = () => {
+    const type = $('#fault-type').value;
+    $$('[data-ft]').forEach(e => { e.hidden = !e.dataset.ft.split(' ').includes(type); });
+  };
+  $('#fault-type').addEventListener('change', syncFaultForm);
+  syncFaultForm();
   $('#btn-add-fault').addEventListener('click', () => {
-    const id = parseInt($('#fault-node').value, 10);
-    const at = $('#fault-at').value.trim();
-    if (!nodeById(id)) { toast('Process p' + (isNaN(id) ? '?' : id) + ' does not exist.'); return; }
-    if (validate('dur', at)) { toast('Invalid time: use a duration such as 1.5s'); return; }
-    setCrash(id, at);
-    renderProps();
+    const type = $('#fault-type').value;
+    const v = id => $(id).value.trim();
+    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to') }
+      : type === 'partition' ? { type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to') }
+      : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
+    if (addFault(f)) { renderProps(); toast('Fault added: ' + describeFault(f) + '.'); }
   });
 }
 function bindKeys() {

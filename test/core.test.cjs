@@ -120,7 +120,7 @@ test('channel loss and crashes are recorded', () => {
   s.faults = [{ type: 'crash', node: 6, at: '10ms' }];
   const r = C.runSimulation(s);
   assert.ok(r.msgs.some(m => m.status === 'dropped-loss'));
-  assert.equal(r.crashes[6], 10000);
+  assert.deepEqual(r.downs[6], [{ from: 10000, to: null }]);
   assert.ok(!r.outputs.some(o => o.node === 6 && o.t > 10000));
 });
 
@@ -161,4 +161,101 @@ test('FloodSet agrees on a generated complete graph', () => {
   s.links = complete([1, 2, 3, 4, 5]);
   const r = C.runSimulation(s);
   assert.equal(decisions(r).size, 1);
+});
+
+const suspectedAt = (r, id, t) => {
+  const snaps = r.snaps[id].filter(x => x.t <= t);
+  return C.fmt(snaps[snaps.length - 1].states.epfd.suspected);
+};
+
+test('a partition makes each side suspect the other, and healing restores them', () => {
+  const r = C.runSimulation(byKey('epfd-partition'));
+  assert.equal(r.error, null);
+  assert.equal(suspectedAt(r, 1, 6.9e6), '{3, 4, 5}');
+  assert.equal(suspectedAt(r, 3, 6.9e6), '{1, 2}');
+  assert.equal(suspectedAt(r, 1, 10.5e6), '{5}');
+  for (const id of [1, 2, 3, 4, 5]) assert.equal(suspectedAt(r, id, 14e6), '∅', `p${id}`);
+});
+
+test('messages across a partition are dropped, messages inside a group are not', () => {
+  const r = C.runSimulation(byKey('epfd-partition'));
+  const side = id => (id <= 2 ? 0 : 1);
+  const during = m => m.sendT >= 4e6 && m.sendT < 7e6 && m.recvT < 7e6;
+  const across = r.msgs.filter(m => during(m) && side(m.from) !== side(m.to));
+  const inside = r.msgs.filter(m => during(m) && side(m.from) === side(m.to) && m.from !== m.to);
+  assert.ok(across.length > 0 && across.every(m => m.status === 'dropped-cut'));
+  assert.ok(inside.length > 0 && inside.every(m => m.status === 'delivered'));
+});
+
+test('recovery resets volatile state, keeps stable state and restarts the process', () => {
+  const code = `interface Counter
+  request Tick()
+  indication Count(volatile, durable)
+end
+algorithm C
+  implements Counter as c
+  uses Net as net
+  state
+    v := 0
+    stable d := 0
+  upon event ⟨c, Tick⟩ do
+    v := v + 1
+    d := d + 1
+    trigger ⟨c, Count | v, d⟩
+  end
+  upon event ⟨c, Recovery⟩ do
+    log "back"
+  end
+end`;
+  const s = Object.assign(byKey('chang-roberts'), {
+    code, top: 'C', inputs: '0ms 1 Tick\n10ms 1 Tick\n30ms 1 Tick\n50ms 1 Tick',
+    faults: [{ type: 'crash', node: 1, at: '20ms' }, { type: 'recover', node: 1, at: '40ms' }]
+  });
+  const r = C.runSimulation(s);
+  assert.equal(r.error, null);
+  const counts = r.outputs.filter(o => o.node === 1).map(o => o.text);
+  // the tick at 30ms is lost while p1 is down; after recovery v restarts from 0, d keeps counting
+  assert.deepEqual(counts, ['Count | 1, 1', 'Count | 2, 2', 'Count | 1, 3']);
+  assert.deepEqual(r.downs[1], [{ from: 20000, to: 40000 }]);
+  assert.ok(r.log.some(e => e.kind === 'log' && e.text === 'back'));
+});
+
+test('without a Recovery handler a recovered process runs Init again', () => {
+  const s = byKey('epfd');
+  s.faults = [{ type: 'crash', node: 2, at: '4s' }, { type: 'recover', node: 2, at: '5s' }];
+  const r = C.runSimulation(s);
+  const after = r.msgs.filter(m => m.from === 2 && m.sendT > 5e6);
+  assert.ok(after.length > 0, 'p2 sends heartbeats again after recovery');
+});
+
+test('a link failure drops messages only while the link is down', () => {
+  const s = byKey('flooding');
+  s.faults = [{ type: 'link', a: 1, b: 2, from: '0ms', to: '100ms' }];
+  const r = C.runSimulation(s);
+  const on12 = r.msgs.filter(m => (m.from === 1 && m.to === 2) || (m.from === 2 && m.to === 1));
+  const whileDown = on12.filter(m => m.sendT < 100000);
+  const afterwards = on12.filter(m => m.sendT >= 100000);
+  assert.ok(whileDown.length > 0 && whileDown.every(m => m.status === 'dropped-cut'));
+  assert.ok(afterwards.length > 0 && afterwards.every(m => m.status === 'delivered'));
+  assert.ok(r.log.some(e => e.kind === 'fault' && e.text === 'link p1–p2 goes down'));
+});
+
+test('injecting a partition later leaves the earlier trace unchanged', () => {
+  const base = byKey('epfd');
+  const a = C.runSimulation(base);
+  const b = C.runSimulation(Object.assign(clone(base), {
+    faults: base.faults.concat([{ type: 'partition', groups: '1', from: '5s', to: '' }])
+  }));
+  const before = r => r.msgs.filter(m => m.recvT !== null && m.recvT < 5e6).map(m => [m.from, m.to, m.sendT, m.recvT, m.status]);
+  assert.deepEqual(before(b), before(a));
+  assert.ok(b.msgs.some(m => m.status === 'dropped-cut'));
+});
+
+test('fault definitions are validated', () => {
+  assert.deepEqual(C.normalizeFault({ type: 'partition', groups: 'p1 2 | 3', from: '1s', to: '' }),
+    { type: 'partition', groups: [[1, 2], [3]], from: 1000000, to: null });
+  assert.throws(() => C.normalizeFault({ type: 'link', a: 1, b: 1, from: '0ms' }), /two different/);
+  assert.throws(() => C.normalizeFault({ type: 'partition', groups: '1 2 | 2 3', from: '0ms' }), /more than one/);
+  assert.throws(() => C.normalizeFault({ type: 'link', a: 1, b: 2, from: '2s', to: '1s' }), /after the start/);
+  assert.throws(() => C.normalizeFault({ type: 'recover', node: 'x', at: '1s' }), /process number/);
 });
