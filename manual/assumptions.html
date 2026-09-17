@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assumptions and simplifications · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: Assumptions and simplifications.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html" aria-current="page">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="assumptions-and-simplifications">Assumptions and simplifications<a class="anchor" href="#assumptions-and-simplifications" aria-label="Link to this section">#</a></h1>
+<p>A simulator is a model, and every model leaves things out. This page lists what Distributed Systems Playground assumes about processes, time, networks and failures, where it simplifies the textbook algorithms, and where its analysis tools approximate. The other pages link here instead of repeating these points.</p>
+<p>If a result in the playground surprises you, check this page first. Many surprises come from one of the choices below rather than from the algorithm.</p>
+<h2 id="the-system">The system<a class="anchor" href="#the-system" aria-label="Link to this section">#</a></h2>
+<p><strong>The set of processes is fixed and known.</strong> Processes are numbered 1, 2, 3 and so on. Every process knows the whole set <code>Π</code> from the start, even processes it has no link to. There are no joins, leaves or membership changes.</p>
+<p><strong>The topology is static.</strong> Links can fail and recover (see <a href="#failures">Failures</a>), but they are never created or removed during a run.</p>
+<p><strong>A process handles one event at a time.</strong> Handling an event is a <em>step</em>. A step starts when the event is taken from the queue and lasts a duration sampled from the <em>step duration</em> distribution. While a process is busy, new events for it wait. The duration does not depend on what the handler does: a handler that sends a thousand messages takes as long as one that does nothing.</p>
+<p><strong>Everything inside a step is atomic.</strong> The handler runs to completion. Events a module triggers for another module of the same process (a request going down, an indication going up) are handled in the same step, in the order they were triggered, and take no extra time. Guards (<code>upon condition</code>, <code>upon exists</code>) are checked after every step, and a guard that fires runs inside that same step.</p>
+<p><strong>Messages sent during a step leave at the end of the step.</strong> Output events are also stamped with the end of the step.</p>
+<p><strong>Resources are unlimited.</strong> There is no limit on memory, message size, queue length or bandwidth, and no cost for large state.</p>
+<p><strong>All processes run the same program.</strong> Behavior can differ only through <code>self</code>, the topology, the inputs and randomness.</p>
+<h2 id="time-and-clocks">Time and clocks<a class="anchor" href="#time-and-clocks" aria-label="Link to this section">#</a></h2>
+<p><strong>Time is discrete.</strong> The simulator counts integer microseconds. Two events can happen at the same instant; their order is then fixed by the rules in <a href="engine.html#ordering-events">How the engine works</a>.</p>
+<p><strong>The simulator has a global clock; the algorithm does not.</strong> Global time drives the simulation and appears on the screen. An algorithm can only read its local clock through <code>now()</code>.</p>
+<p><strong>Local clocks are linear.</strong> Process <em>i</em> reads <code>offset_i + (1 + drift_i) · t</code> at global time <em>t</em>. The offset and the drift are sampled once per process when the run starts and never change. There is no clock synchronization protocol, no clock jumps and no leap seconds. A drift below -0.5 is clamped to -0.5.</p>
+<p><strong>Timers use local time.</strong> <code>starttimer(t, 100ms)</code> fires after 100 ms of the process's own clock, which is <code>100ms / (1 + drift)</code> of global time. A timer always lasts at least one microsecond.</p>
+<h2 id="the-network">The network<a class="anchor" href="#the-network" aria-label="Link to this section">#</a></h2>
+<p><strong>Channels are point to point.</strong> There is one channel for each ordered pair of processes connected by a link. An undirected link gives two channels, a directed link one.</p>
+<p><strong>There is no routing.</strong> A process can only send to its neighbors. A message to any other process is dropped at once and marked <em>no link</em>. The only exception is a process sending to itself, which always works and needs no link. Outside lockstep rounds it arrives with zero delay; in lockstep rounds it arrives in the round's delivery window like any other message.</p>
+<p><strong>Delays are independent.</strong> Each message draws its delay from the distribution of its link, independently of every other message. There is no congestion, no queueing inside the network, no correlation between links and no relation between message size and delay.</p>
+<p><strong>Spikes are added on top.</strong> With probability <em>spike probability</em>, a message gets the <em>spike delay</em> added to its sampled delay.</p>
+<p><strong>The upper bound truncates.</strong> If an upper bound is set, delays above it are cut to the bound. Before GST the bound does not apply, with one exception described under <a href="#partial-synchrony">partial synchrony</a>.</p>
+<p><strong>FIFO channels delay later messages.</strong> When a channel is FIFO, a message that would overtake an earlier one on the same channel is held back until the earlier one has arrived. This is head-of-line blocking, not a model of TCP: there are no acknowledgements, windows or retransmissions underneath.</p>
+<p><strong>Loss is independent.</strong> Each message is lost with the configured probability, regardless of what happened to the previous one. There are no bursts of loss.</p>
+<p><strong>Duplication creates one copy.</strong> With the configured probability, a message is delivered twice. The copy gets its own delay. A message is never duplicated more than once, and a lost message is never duplicated.</p>
+<p><strong>Messages are never corrupted, forged or reordered by the network</strong> beyond what independent delays produce.</p>
+<p><strong>Per-link settings replace the global ones.</strong> A link can have its own loss and delay distribution. Spikes, duplication, FIFO and the bound are global.</p>
+<h2 id="synchrony-models">Synchrony models<a class="anchor" href="#synchrony-models" aria-label="Link to this section">#</a></h2>
+<p>The <em>assumed</em> model is what the algorithm may rely on. The <em>actual</em> model is what the simulator does. They are configured separately on purpose. The playground never forces the actual model to respect the assumed one; it records a <em>violation</em> when it does not.</p>
+<h3 id="asynchronous">Asynchronous<a class="anchor" href="#asynchronous" aria-label="Link to this section">#</a></h3>
+<p>The algorithm may not use <code>DELTA</code>, <code>PHI</code> or <code>RHO</code>. No violation is ever recorded, because nothing was promised.</p>
+<h3 id="timed-synchronous">Timed synchronous<a class="anchor" href="#timed-synchronous" aria-label="Link to this section">#</a></h3>
+<p>A message whose delay exceeds <code>DELTA</code> is a violation.</p>
+<p>Two checks apply in every model where the value is known to the algorithm, not only in this one: a step longer than <code>PHI</code> is a violation (except in lockstep rounds, where steps take no time), and a process whose drift exceeds <code>RHO</code> in absolute value is reported once, at time 0. Nothing else is checked.</p>
+<h3 id="partial-synchrony">Partial synchrony<a class="anchor" href="#partial-synchrony" aria-label="Link to this section">#</a></h3>
+<p>This is the variant of the Dwork, Lynch and Stockmeyer model with a Global Stabilization Time:</p>
+<ul><li>Before GST, delays come from the <em>delay before GST</em> distribution, if one is set.</li><li>After GST, delays come from the regular distribution and respect the upper bound.</li><li>If an upper bound is set, a message sent before GST still arrives by GST plus the bound. Without an upper bound, messages sent before GST can take as long as their distribution says.</li><li>If <code>DELTA</code> is known to the algorithm, only messages sent at or after GST are checked against it. If no GST is set, all messages are checked.</li></ul>
+<p>In the textbook model the bound is unknown to the algorithm. Setting <code>DELTA</code> to a value in this mode gives a different, stronger model, and the checker will let the code use it.</p>
+<h3 id="synchronous-rounds-lockstep">Synchronous rounds, lockstep<a class="anchor" href="#synchronous-rounds-lockstep" aria-label="Link to this section">#</a></h3>
+<p>Lockstep rounds are an idealization and ignore most of the actual model:</p>
+<ul><li>Round <em>r</em> starts at <code>(r - 1) · R</code>, where <em>R</em> is the <em>round length on screen</em>. This length only affects the drawing.</li><li>Messages sent in the first 20% of the round are delivered in the same round, at a random point between 25% and 75% of it. Messages sent later are delivered in the next round.</li><li>The delay distribution, spikes, the bound, FIFO and duplication are <strong>not</strong> used. Loss is.</li><li>Steps take no time, and <code>now()</code> and timers are not available.</li><li><code>RoundEnd</code> is delivered at 90% of the round.</li></ul>
+<h3 id="synchronous-rounds-emulated">Synchronous rounds, emulated<a class="anchor" href="#synchronous-rounds-emulated" aria-label="Link to this section">#</a></h3>
+<p>Emulated rounds show what happens when the lockstep abstraction is built on real clocks:</p>
+<ul><li>The round length is <code>R = DELTA + PHI</code>, so both must be known.</li><li>Each process opens round <em>r</em> when its local clock reads <code>r · R</code>, and closes it just before <code>(r + 1) · R</code>.</li><li>A message sent in round <em>r</em> uses the regular delay (with spikes and the bound). If it arrives before the recipient has opened round <em>r</em>, it waits. If it arrives after the recipient has closed round <em>r</em>, it is a violation.</li><li>On a violation, <em>discard</em> drops the message, <em>deliver late</em> delivers it in whatever round the recipient is in, and <em>stop</em> ends the run.</li><li>FIFO and duplication are not applied to round messages.</li><li><code>Deliver</code> does not say which round a message belongs to. An algorithm that needs it must put the round number in the message.</li></ul>
+<h2 id="failures">Failures<a class="anchor" href="#failures" aria-label="Link to this section">#</a></h2>
+<p><strong>Crash.</strong> A crashed process stops at the given instant. Events queued for it are discarded, its timers never fire, and messages that arrive while it is down are lost. A crash takes effect between steps. A step that has already started always completes, so a process can never crash halfway through a broadcast loop. To show a partially completed broadcast, combine a crash with message loss, as the reliable broadcast example does.</p>
+<p><strong>Recovery.</strong> A recovered process keeps the values of variables declared <code>stable</code> and resets every other variable to its initial value. Its timers are cleared. Each module then receives <code>Recovery</code> if it has a handler for it, and <code>Init</code> otherwise, from the bottom of the stack up. Nothing else survives a crash: there is no log and no disk. A recovery for a process that is running is ignored with a warning.</p>
+<p><strong>Link failures and partitions are symmetric.</strong> Both directions of a channel fail together. A message is dropped if its channel is interrupted when it is sent or when it would arrive, so a partition that starts while a message is in flight drops that message.</p>
+<p><strong>Processes outside a partition's groups form one extra group.</strong> <code>3</code> alone isolates p3 from everybody else.</p>
+<p><strong>Not modeled:</strong> Byzantine behavior, omission failures of a process (a process that skips some sends or receives), pauses of a running process, one-way link failures, message corruption.</p>
+<h2 id="the-language">The language<a class="anchor" href="#the-language" aria-label="Link to this section">#</a></h2>
+<p><strong>Values are immutable.</strong> Assigning to <code>m[k]</code> builds a new map. This keeps snapshots cheap and has no visible effect on programs.</p>
+<p><strong>Iteration order is deterministic.</strong> <code>forall</code> visits sets in sorted order, <code>choose(S)</code> returns the smallest element, and <code>upon exists</code> picks the first match in that order. Real systems do not give these guarantees; an algorithm that works only because of this order may fail elsewhere.</p>
+<p><strong>Guards are fair only in a weak sense.</strong> When several guards of a module are enabled, they run in round-robin order within a step. A guard that stays true forever is an error.</p>
+<p><strong>Randomness is reproducible.</strong> <code>random</code> and <code>pick</code> draw from a stream seeded per process. The same seed gives the same choices.</p>
+<p><strong>Division between integers truncates.</strong> <code>5 / 2</code> is <code>2</code>. If either operand is not an integer, the result is exact.</p>
+<p><strong>Durations are plain numbers.</strong> <code>50ms</code> is the number 50000. The language does not stop you from adding a duration to a count.</p>
+<p><strong>Inputs run in the main algorithm.</strong> The arguments of an input line are evaluated on the target process, in the context of the main algorithm, with a random stream shared by all inputs.</p>
+<h2 id="the-module-library">The module library<a class="anchor" href="#the-module-library" aria-label="Link to this section">#</a></h2>
+<p>The modules follow algorithms from Cachin, Guerraoui and Rodrigues, <em>Introduction to Reliable and Secure Distributed Programming</em>, with these differences:</p>
+<ul><li><strong>RetransmitLinks</strong> resends each message a fixed number of times (5 by default, every 100 ms) instead of forever. The book's version never stops, which makes every run grow without end. With a lossy network and few retransmissions, a message can be lost for good.</li><li><strong>EliminateDuplicates</strong> assumes that every message is unique, as the book does. Sending the same payload twice to the same process delivers it once.</li><li><strong>AckLinks</strong> is not from the book. It numbers messages and retransmits until an acknowledgement arrives. It keeps retransmitting to a crashed process until the end of the run, and it has no flow control or congestion control.</li><li><strong>Broadcast modules send to every process in <code>Π</code>.</strong> On a topology that is not complete, messages to non-neighbors are dropped by the network. Use a complete graph, or gossip.</li><li><strong>EagerGossip</strong> uses <code>neighbors</code>, so it works on any topology. It stops forwarding after <code>ROUNDS</code> hops and does not retry.</li><li><strong>MajorityAckURB</strong> needs a majority of correct processes. With a majority crashed it stops delivering, as it should.</li><li><strong>WaitingCausalBroadcast</strong> keeps every pending message forever if a dependency never arrives, and never garbage-collects vector clocks.</li><li><strong>Message identifiers</strong> are per-process sequence numbers. They restart from zero after a recovery unless the module declares them <code>stable</code>, which the library modules do not.</li></ul>
+<h2 id="analysis-and-visualization">Analysis and visualization<a class="anchor" href="#analysis-and-visualization" aria-label="Link to this section">#</a></h2>
+<p><strong>Violations</strong> are recorded only for the quantities listed under <a href="#synchrony-models">Synchrony models</a>. A violation marks a broken promise; it does not mean the algorithm misbehaved.</p>
+<p><strong>The causal cone</strong> is computed from messages that were delivered. Lost or discarded messages create no causal link. The cone works at the level of processing steps: all events inside a step share its start time, and the analysis does not distinguish which module inside the process was involved. The counts shown refer to processing steps, not to individual local events.</p>
+<p><strong>The stack view</strong> shows events between modules within a short animation window, plus the latest group of events of the process. It is a view of what happened, not a trace of every intermediate state.</p>
+<p><strong>Layer colors</strong> show the module that <em>started</em> a chain of requests. A retransmission by the link layer is colored as link-layer traffic even if it carries an application message.</p>
+<p><strong>The animation</strong> draws at most 400 packets in flight. With more than 120 packets, labels are hidden; with more than 200, trails are hidden.</p>
+<p><strong>Playback stops where the action ends.</strong> When a run keeps going because of timers or rounds, playback stops shortly after the last message, output, fault or log entry. The <em>End</em> button and the <em>All</em> view still reach the real end of the run.</p>
+<p><strong>The log shows the first 3,000 entries</strong> that match the filter.</p>
+<h2 id="hard-limits">Hard limits<a class="anchor" href="#hard-limits" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Limit</th><th>Value</th><th>What happens</th></tr></thead><tbody><tr><td>Events in a run</td><td>150,000</td><td>the run stops and the status says so</td></tr><tr><td>Recorded events between modules</td><td>200,000</td><td>the stack view says the trace was cut</td></tr><tr><td>Statements in one step</td><td>200,000</td><td>runtime error</td></tr><tr><td>Internal events in one step</td><td>20,000</td><td>runtime error</td></tr><tr><td>Iterations of one <code>while</code> loop</td><td>100,000</td><td>runtime error</td></tr><tr><td>Nested function calls</td><td>200</td><td>runtime error</td></tr><tr><td><code>range(a, b)</code> length</td><td>100,000</td><td>runtime error</td></tr><tr><td>Processes from a generator</td><td>40</td><td>larger numbers are clamped</td></tr><tr><td>Packets drawn at once</td><td>400</td><td>the rest is not drawn</td></tr></tbody></table></div>
+<h2 id="what-the-playground-is-not">What the playground is not<a class="anchor" href="#what-the-playground-is-not" aria-label="Link to this section">#</a></h2>
+<p><strong>It is not a model checker.</strong> Each run is one execution out of many possible ones. A run can reveal a bug; it cannot prove that there is none. Changing the seed, or choosing <em>random order</em> for simultaneous events, explores more executions, but never all of them.</p>
+<p><strong>It is not a network emulator.</strong> Delay and loss distributions are illustrative. They are not calibrated on real networks, and they do not reproduce TCP, congestion or packet sizes.</p>
+<p><strong>It is not a benchmark.</strong> Message counts and run lengths are useful to compare two algorithms on the same scenario, not to predict production performance.</p>
+<nav class="pager"><a href="engine.html"><small>Previous</small>How the engine works</a><a href="troubleshooting.html" style="text-align:right"><small>Next</small>Troubleshooting</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/assumptions.md" target="_blank" rel="noopener">docs/assumptions.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#the-system">The system</a><a class="l2" href="#time-and-clocks">Time and clocks</a><a class="l2" href="#the-network">The network</a><a class="l2" href="#synchrony-models">Synchrony models</a><a class="l3" href="#asynchronous">Asynchronous</a><a class="l3" href="#timed-synchronous">Timed synchronous</a><a class="l3" href="#partial-synchrony">Partial synchrony</a><a class="l3" href="#synchronous-rounds-lockstep">Synchronous rounds, lockstep</a><a class="l3" href="#synchronous-rounds-emulated">Synchronous rounds, emulated</a><a class="l2" href="#failures">Failures</a><a class="l2" href="#the-language">The language</a><a class="l2" href="#the-module-library">The module library</a><a class="l2" href="#analysis-and-visualization">Analysis and visualization</a><a class="l2" href="#hard-limits">Hard limits</a><a class="l2" href="#what-the-playground-is-not">What the playground is not</a></aside>
+</div>
+</body>
+</html>

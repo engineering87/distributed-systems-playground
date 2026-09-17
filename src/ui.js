@@ -1,6 +1,6 @@
 (function () {
 'use strict';
-const C = window.SimCore, EX = window.SimExamples;
+const C = window.SimCore, EX = window.SimExamples, LIB = window.SimLibrary;
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -402,6 +402,38 @@ function bindEditor() {
   });
   $$('.symbols button').forEach(b => b.addEventListener('click', () => insertText(b.dataset.ins)));
   $('#top').addEventListener('change', e => { S.scn.top = e.target.value; updateTopReqs(); markStale(); });
+  const addSel = $('#add-module');
+  const groups = {};
+  for (const m of LIB.MODULES) {
+    if (!groups[m.group]) { groups[m.group] = el('optgroup', { label: m.group }); addSel.append(groups[m.group]); }
+    groups[m.group].append(el('option', { value: m.key }, m.name + ' (' + m.implements + ')'));
+  }
+  addSel.addEventListener('change', () => {
+    const k = addSel.value;
+    addSel.value = '';
+    if (k) insertModule(k);
+  });
+}
+function insertModule(key) {
+  let prog;
+  try { prog = C.parseProgram(S.scn.code); }
+  catch (e) { toast('Fix the syntax errors in the code before adding a module.'); return; }
+  const m = LIB.byKey.get(key);
+  if (prog.algorithms.some(a => a.name === m.name)) { toast(m.name + ' is already in the code.'); return; }
+  const plan = LIB.plan(key, prog.algorithms.map(a => a.implType), [...prog.interfaces.keys()]);
+  const parts = plan.interfaces.map(i => LIB.IFACES[i]).concat(plan.modules.filter(x => !prog.algorithms.some(a => a.name === x.name)).map(x => x.source));
+  const ta = $('#code');
+  const text = ta.value.replace(/\s*$/, '') + '\n\n' + parts.join('\n\n') + '\n';
+  ta.value = text;
+  S.scn.code = text;
+  S.runtimeErr = null;
+  refreshCode(); checkCode(); markStale();
+  ta.scrollTop = ta.scrollHeight; syncScroll();
+  const added = plan.modules.map(x => x.name);
+  toast('Added ' + added.join(', ') + '. Use it with "uses ' + m.implements + ' as …".');
+  const info = $('#module-info');
+  info.hidden = false;
+  info.textContent = m.name + ': ' + m.summary + ' Guarantees: ' + m.properties;
 }
 
 // ============================================================ topology
@@ -579,7 +611,13 @@ function renderTopo() {
     const crashed = !!downAt(id, t);
     const b = crashed ? null : busy.get(id);
     const base = 'nd' + (S.selected && S.selected.type === 'node' && S.selected.id === id ? ' sel' : '') + (S.linkFrom === id ? ' from' : '');
-    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : ''));
+    let coneCls = '';
+    if (S.cone) {
+      if (id === S.cone.node) coneCls = ' origin';
+      else if (t >= S.cone.future[id]) coneCls = ' influenced';
+      else if (t <= S.cone.past[id]) coneCls = ' cause';
+    }
+    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : '') + coneCls);
     setIf(R, 'cross', R.cross, 'display', crashed ? 'inline' : 'none');
     if (b) {
       setIf(R, 'glow', R.glow, 'display', 'inline');
@@ -679,6 +717,7 @@ function renderAnim() {
     // with many packets on screen, labels and trails only add clutter and cost
     const crowd = S.lastInFlight || 0;
     const labels = $('#labels').checked && crowd <= 120;
+    const layers = layersOn();
     const withTrails = crowd <= 200;
     const sel = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
     const hi = upperBound(S.msgsBySend, t, m => m.sendT);
@@ -695,19 +734,23 @@ function renderAnim() {
         const g = msgGeom(m);
         if (!g) continue;
         let f = (t - m.sendT) / (m.recvT - m.sendT);
+        f = 1 - Math.pow(1 - f, 1.6);
         if (m.status === 'dropped-loss') f *= 0.5;
         if (labels) f = 0.14 + 0.72 * f;
         const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
+        const tint = layers && cls === 'ok' ? layerColor(m.origin) : '';
         if (withTrails) {
           const tr = trails.take();
           tr.root.setAttribute('d', geomPrefix(g, f));
           tr.root.setAttribute('class', 'trail ' + cls);
+          tr.root.style.stroke = tint;
         }
         const [x, y] = geomAt(g, f);
         const P = packets.take();
         P.root.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
         const pcls = 'pk ' + cls + (m.dup ? ' dup' : '') + (sel === m.id ? ' sel' : '');
         if (P.s.cls !== pcls) { P.root.setAttribute('class', pcls); P.s.cls = pcls; }
+        if (P.s.tint !== tint) { P.s.tint = tint; P.rect.style.fill = tint; P.rect.style.stroke = tint; P.dot.style.fill = tint; P.dot.style.stroke = tint; }
         if (P.s.id !== m.id || P.s.labels !== labels) {
           P.s.id = m.id; P.s.labels = labels;
           P.root.setAttribute('data-msg', m.id);
@@ -802,6 +845,7 @@ function select(sel) {
   S.selected = sel;
   renderTopo(); renderProps();
   if (S.tab === 'state') renderInspector();
+  if (S.tab === 'stack') renderStack(true);
 }
 function setMode(m) {
   S.mode = m; S.linkFrom = null;
@@ -842,6 +886,10 @@ function bindTopo() {
     const pEl = e.target.closest('[data-msg]');
     if (!pEl) return;
     e.stopPropagation();
+    // a process under the pointer wins over a packet drawn on top of it
+    const pt = svgPoint(e);
+    const hit = S.scn.nodes.find(n => Math.hypot(n.x - pt.x, n.y - pt.y) <= R_NODE + 2);
+    if (hit) { select({ type: 'node', id: hit.id }); return; }
     stopPlay();
     select({ type: 'msg', id: +pEl.dataset.msg });
   });
@@ -1211,8 +1259,39 @@ function prepareResults() {
   S.playEnd = r ? focusEnd(r) : 0;
   S.view = { start: 0, span: r ? S.playEnd * 1.03 : 1e6 };
   S.logSorted = r ? r.log.map((e, i) => Object.assign({ i }, e)).sort((a, b) => a.t - b.t || a.i - b.i) : [];
+  S.localByNode = {};
+  if (r) {
+    r.localEvents.forEach((e, i) => { e.i = i; (S.localByNode[e.node] = S.localByNode[e.node] || []).push(e); });
+    for (const k in S.localByNode) S.localByNode[k].sort((a, b) => a.t - b.t || a.i - b.i);
+  }
+  S.cone = null;
+  S.stackKey = '';
+  renderConeInfo();
   if (S.selected && S.selected.type === 'msg' && !S.msgById.has(S.selected.id)) S.selected = null;
   updatePulse();
+}
+// color of the module that originated a message (depth in the stack picks the hue)
+function layerColor(specId) {
+  const spec = S.res && S.res.specs[specId];
+  const pal = S.colors.layers || [];
+  if (!spec || !pal.length) return S.colors.blue;
+  return pal[spec.id % pal.length];
+}
+function layersOn() { return !!(S.res && $('#layers').checked); }
+function renderLayerLegend() {
+  const box = $('#layer-legend');
+  const on = layersOn();
+  box.hidden = !on;
+  $('#status-legend').hidden = on;
+  if (!on) return;
+  box.textContent = '';
+  box.append(el('b', {}, 'Originated by'));
+  for (const sp of S.res.specs) {
+    if (!S.res.msgs.some(m => m.origin === sp.id)) continue;
+    const sw = el('i', { class: 'sw' });
+    sw.style.background = layerColor(sp.id);
+    box.append(el('span', {}, sw, sp.algo));
+  }
 }
 // the last moment where something visible happens (messages, outputs, crashes, log entries);
 // rounds and timers can keep a run going long after the algorithm has finished
@@ -1264,7 +1343,7 @@ function run(keepCursor, resume) {
     if (play) startPlay();
   }, 20);
 }
-function renderResultViews() { renderChips(); renderLog(); renderProps(); setCursor(S.cursor); }
+function renderResultViews() { renderChips(); renderLog(); renderProps(); renderLayerLegend(); setCursor(S.cursor); }
 
 function renderChips() {
   const box = $('#chips'); box.textContent = '';
@@ -1283,11 +1362,17 @@ function renderChips() {
 }
 
 // ============================================================ space-time diagram
-const ROW = 26, TOP = 26, LEFT = 52, RIGHT = 14;
+let ROW = 26, TOP = 26;
+const LEFT = 52, RIGHT = 14;
+let PathCtor = window.Path2D;
+// font helper: sizes grow in presentation mode
+function fnt(size, family, weight) { return (weight ? weight + ' ' : '') + Math.round(size * (S.fontScale || 1)) + 'px ' + family; }
+const T = s => (window.SimI18n ? window.SimI18n.t(s) : s);
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
   for (const k of ['paper', 'surface', 'grid', 'grid-strong', 'rule', 'ink', 'muted', 'blue', 'red', 'amber', 'green', 'violet'])
     S.colors[k] = cs.getPropertyValue('--' + k).trim();
+  S.colors.layers = [0, 1, 2, 3, 4, 5].map(i => cs.getPropertyValue('--layer-' + i).trim());
 }
 function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1))));
@@ -1297,18 +1382,36 @@ function niceStep(raw) {
 function plotWidth(W) { return Math.max(10, W - LEFT - RIGHT); }
 function xToT(x, W) { return S.view.start + (x - LEFT) / plotWidth(W) * S.view.span; }
 
-function drawDiagram() {
+// target (optional): { ctx, W, Path2D } to draw somewhere else than the on-screen canvas
+function diagramHeight() { return Math.max(120, TOP + S.scn.nodes.length * ROW + 14); }
+function drawDiagram(target) {
   if (!S.scn) return;
+  // event handlers and observers pass their own arguments: only an object with a context is a target
+  if (!(target && target.ctx)) target = null;
   const wrap = $('#st-wrap'), cv = $('#st');
   const nodes = S.scn.nodes.slice().sort((a, b) => a.id - b.id);
-  const W = wrap.clientWidth || 600;
-  const H = Math.max(120, TOP + nodes.length * ROW + 14);
-  const dpr = window.devicePixelRatio || 1;
-  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px';
+  const W = target ? target.W : (wrap.clientWidth || 600);
+  const H = diagramHeight();
+  let ctx;
+  const savedSegs = S.segs;
+  if (target) {
+    ctx = target.ctx;
+    PathCtor = target.Path2D || window.Path2D;
+  } else {
+    const dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px';
+    }
+    ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  const ctx = cv.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  try { drawDiagramInto(ctx, nodes, W, H); }
+  finally {
+    PathCtor = window.Path2D;
+    if (target) S.segs = savedSegs;
+  }
+}
+function drawDiagramInto(ctx, nodes, W, H) {
   const col = S.colors;
   ctx.fillStyle = col.surface; ctx.fillRect(0, 0, W, H);
   const rowY = new Map(nodes.map((n, i) => [n.id, TOP + i * ROW + ROW / 2]));
@@ -1319,7 +1422,7 @@ function drawDiagram() {
   // time grid
   const step = niceStep(v.span / Math.max(2, pw / 95));
   ctx.lineWidth = 1; ctx.strokeStyle = col.grid; ctx.fillStyle = col.muted;
-  ctx.font = '11px ' + MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = fnt(11, MONO); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (let t = Math.max(0, Math.ceil(v.start / step) * step); t <= v.start + v.span; t += step) {
     const x = Math.round(X(t)) + 0.5;
     if (x < LEFT + 12) continue;
@@ -1335,14 +1438,14 @@ function drawDiagram() {
       const x = X(r.cfg.gst);
       ctx.strokeStyle = col.amber; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(x, TOP - 8); ctx.lineTo(x, H); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = col.amber; ctx.textAlign = 'left'; ctx.font = '700 11px ' + UIF;
-      ctx.fillText('GST', x + 4, TOP - 4);
+      ctx.fillStyle = col.amber; ctx.textAlign = 'left'; ctx.font = fnt(11, UIF, 700);
+      ctx.fillText(T('GST'), x + 4, TOP - 4);
     }
     if (r.rounds) {
       const R = r.rounds.R;
       if (r.rounds.lockstep) {
         ctx.strokeStyle = col.rule; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
-        ctx.fillStyle = col.muted; ctx.font = '11px ' + UIF; ctx.textAlign = 'left';
+        ctx.fillStyle = col.muted; ctx.font = fnt(11, UIF); ctx.textAlign = 'left';
         for (let k = Math.max(0, Math.floor(v.start / R)); k * R <= v.start + v.span; k++) {
           const x = X(k * R);
           ctx.beginPath(); ctx.moveTo(x, TOP - 8); ctx.lineTo(x, H); ctx.stroke();
@@ -1374,13 +1477,32 @@ function drawDiagram() {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = col.red; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1, y2); ctx.stroke(); ctx.setLineDash([]);
-      if (label && x2 - x1 > 60) { ctx.fillStyle = col.red; ctx.font = '700 11px ' + UIF; ctx.textAlign = 'left'; ctx.fillText(label, x1 + 4, y1 + 9); }
+      if (label && x2 - x1 > 60) { ctx.fillStyle = col.red; ctx.font = fnt(11, UIF, 700); ctx.textAlign = 'left'; ctx.fillText(label, x1 + 4, y1 + 9); }
     };
-    for (const p of r.netFaults.partitions) band(p.from, p.to, TOP - 8, H, 'partition');
+    for (const p of r.netFaults.partitions) band(p.from, p.to, TOP - 8, H, T('partition'));
     for (const l of r.netFaults.links) {
       const ya = rowY.get(l.a), yb = rowY.get(l.b);
       if (ya === undefined || yb === undefined) continue;
-      band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' down');
+      band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' ' + T('down'));
+    }
+  }
+  // causal cone: the part of each process line that can affect the origin, and the part it can affect
+  if (r && S.cone) {
+    const c = S.cone;
+    for (const n of nodes) {
+      const y = rowY.get(n.id);
+      const pst = c.past[n.id], fut = c.future[n.id];
+      if (pst > -Infinity) {
+        ctx.fillStyle = col.blue; ctx.globalAlpha = 0.13;
+        const x2 = Math.min(X(pst), W);
+        ctx.fillRect(LEFT, y - 9, Math.max(0, x2 - LEFT), 18);
+      }
+      if (fut < Infinity) {
+        ctx.fillStyle = col.amber; ctx.globalAlpha = 0.16;
+        const x1 = Math.max(X(fut), LEFT);
+        ctx.fillRect(x1, y - 9, Math.max(0, W - x1), 18);
+      }
+      ctx.globalAlpha = 1;
     }
   }
   // process lines: solid while running, dashed from a crash to the recovery (or to the end)
@@ -1416,7 +1538,7 @@ function drawDiagram() {
     // processing steps as short bars on the process lines
     const aHi = upperBound(S.activity, Math.min(t, v.start + v.span), a => a.t);
     const aLo = lowerBound(S.activity, v.start - S.maxBusy, a => a.t);
-    const bars = new Path2D();
+    const bars = new PathCtor();
     let lastX = {};
     for (let i = aLo; i < aHi; i++) {
       const a = S.activity[i];
@@ -1436,14 +1558,22 @@ function drawDiagram() {
     let drawn = 0;
     const selId = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
     const batches = msgBatches();
+    const layers = layersOn();
     const last = ghost ? hi : Math.min(hi, upperBound(S.msgsBySend, t, m => m.sendT));
     for (let i = lo; i < last && drawn < 30000; i++) {
       const m = S.msgsBySend[i];
-      if (m.sendT > t) { drawMsg(batches, m, 0.16, Infinity, X, rowY, false); continue; }
-      drawMsg(batches, m, 1, t, X, rowY, m.id === selId);
+      if (m.sendT > t) { drawMsg(batches, m, 0.16, Infinity, X, rowY, false, layers); continue; }
+      drawMsg(batches, m, inCone(m) ? 1 : 0.25, t, X, rowY, m.id === selId, layers);
       drawn++;
     }
     batches.flush(ctx);
+    if (S.cone) {
+      const c = S.cone, y = rowY.get(c.node);
+      if (y !== undefined) {
+        ctx.strokeStyle = col.ink; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(X(c.t), y, 7, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
     // violations, assertions, errors
     const logHi = upperBound(S.logSorted, ghost ? v.start + v.span : Math.min(t, v.start + v.span), e => e.t);
     const logLo = lowerBound(S.logSorted, v.start, e => e.t);
@@ -1462,7 +1592,7 @@ function drawDiagram() {
       ctx.globalAlpha = 1;
     }
     // outputs
-    ctx.font = '11px ' + UIF; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = fnt(11, UIF); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     const lastLabel = {};
     for (const o of r.outputs) {
       if (o.t < v.start || o.t > v.start + v.span) continue;
@@ -1492,14 +1622,14 @@ function drawDiagram() {
   ctx.fillStyle = col.surface; ctx.fillRect(0, 0, LEFT, H);
   ctx.strokeStyle = col.rule; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(LEFT - 0.5, 0); ctx.lineTo(LEFT - 0.5, H); ctx.stroke();
-  ctx.font = '700 12px ' + UIF; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.font = fnt(12, UIF, 700); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   for (const n of nodes) {
     ctx.fillStyle = r && downAt(n.id, t) ? col.muted : col.ink;
     ctx.fillText('p' + n.id, 10, rowY.get(n.id));
   }
   if (!r) {
-    ctx.fillStyle = col.muted; ctx.font = '13px ' + UIF; ctx.textAlign = 'center';
-    ctx.fillText(nodes.length ? 'Press Run to see the space-time diagram.' : 'Add some processes to get started.', LEFT + pw / 2, Math.min(H - 20, TOP + 30));
+    ctx.fillStyle = col.muted; ctx.font = fnt(13, UIF); ctx.textAlign = 'center';
+    ctx.fillText(T(nodes.length ? 'Press Run to see the space-time diagram.' : 'Add some processes to get started.'), LEFT + pw / 2, Math.min(H - 20, TOP + 30));
   }
 }
 
@@ -1510,7 +1640,7 @@ function msgBatches() {
     get(color, width, dash, alpha) {
       const k = color + '|' + width + '|' + dash.join(',') + '|' + alpha;
       let b = map.get(k);
-      if (!b) { b = { color, width, dash, alpha, line: new Path2D(), mark: new Path2D(), fill: new Path2D() }; map.set(k, b); }
+      if (!b) { b = { color, width, dash, alpha, line: new PathCtor(), mark: new PathCtor(), fill: new PathCtor() }; map.set(k, b); }
       return b;
     },
     flush(ctx) {
@@ -1527,7 +1657,7 @@ function msgBatches() {
     }
   };
 }
-function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
+function drawMsg(B, m, alpha, tcut, X, rowY, selected, layers) {
   const col = S.colors;
   const y1 = rowY.get(m.from);
   const y2 = rowY.get(m.to);
@@ -1538,7 +1668,7 @@ function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
     b.mark.moveTo(x1 - 3, y1 - 3); b.mark.lineTo(x1 + 3, y1 + 3); b.mark.moveTo(x1 + 3, y1 - 3); b.mark.lineTo(x1 - 3, y1 + 3);
     return;
   }
-  let color = m.violation ? col.red : col.blue;
+  let color = m.violation ? col.red : layers ? layerColor(m.origin) : col.blue;
   let dash = [];
   if (m.status === 'dropped-loss' || m.status === 'dropped-cut') { color = col.amber; dash = [4, 3]; }
   else if (m.status === 'lost-crash') { color = col.muted; dash = [2, 3]; }
@@ -1569,7 +1699,13 @@ function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
     b.fill.moveTo(xe + 3.2, ye);
     b.fill.arc(xe, ye, 3.2, 0, Math.PI * 2);
   }
-  if (alpha === 1) S.segs.push({ x1, y1, x2: xe, y2: ye, m });
+  if (alpha > 0.2) S.segs.push({ x1, y1, x2: xe, y2: ye, m });
+}
+function inCone(m) {
+  const c = S.cone;
+  if (!c) return true;
+  if (m.status === 'delivered' && m.recvT <= c.past[m.to]) return true;
+  return m.sendT >= c.future[m.from];
 }
 function distSeg(px, py, s) {
   const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
@@ -1635,7 +1771,8 @@ function bindDiagram() {
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
       const best = nearestSeg(x, y);
       stopPlay();
-      if (best) select({ type: 'msg', id: best.m.id });
+      if ($('#cone-mode').checked && x > LEFT) setCone(y, xToT(x, rect.width));
+      else if (best) select({ type: 'msg', id: best.m.id });
       else if (x > LEFT) setCursor(xToT(x, rect.width));
     }
     drag = null; cv.classList.remove('dragging');
@@ -1654,8 +1791,43 @@ function bindDiagram() {
   $('#zoom-all').addEventListener('click', () => { S.view = { start: 0, span: (S.res ? S.res.endT : 1e6) * 1.03 }; drawDiagram(); });
   $('#zoom-fit').addEventListener('click', () => { S.view = { start: 0, span: (S.res ? S.playEnd : 1e6) * 1.03 }; drawDiagram(); });
   $('#ghost').addEventListener('change', drawDiagram);
+  $('#cone-mode').addEventListener('change', () => {
+    document.body.classList.toggle('cone-mode', $('#cone-mode').checked);
+    if (!$('#cone-mode').checked) clearCone();
+    else toast('Click an event on the diagram to see its causal past and future.');
+  });
+  $('#layers').addEventListener('change', () => { renderLayerLegend(); renderAnim(); drawDiagram(); });
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => drawDiagram()).observe(wrap);
   else window.addEventListener('resize', drawDiagram);
+}
+// pick the event of the clicked process nearest to the clicked time and compute its causal cone
+function setCone(y, t) {
+  const nodes = S.scn.nodes.slice().sort((a, b) => a.id - b.id);
+  const row = Math.floor((y - TOP) / ROW);
+  const n = nodes[row];
+  if (!n || !S.res) return;
+  const acts = S.activity.filter(a => a.node === n.id);
+  if (!acts.length) { toast('p' + n.id + ' has no events in this run.'); return; }
+  let best = acts[0];
+  for (const a of acts) if (Math.abs(a.t - t) < Math.abs(best.t - t)) best = a;
+  S.cone = C.causalCone(S.res, n.id, best.t);
+  renderConeInfo();
+  setCursor(best.t);
+}
+function clearCone() { S.cone = null; renderConeInfo(); renderTopo(); drawDiagram(); }
+function renderConeInfo() {
+  const box = $('#cone-info');
+  if (!box) return;
+  box.textContent = '';
+  box.hidden = !S.cone;
+  if (!S.cone) return;
+  const c = S.cone;
+  box.append(
+    el('span', {}, 'Event of ', el('b', {}, 'p' + c.node), ' at ' + C.fmtDuration(c.t) + ':'),
+    el('span', { class: 'past' }, c.counts.past + ' events could have caused it'),
+    el('span', { class: 'future' }, c.counts.future + ' events it could affect'),
+    el('span', {}, c.counts.concurrent + ' concurrent'),
+    el('button', { type: 'button', class: 'ghost small', onclick: clearCone }, 'Clear'));
 }
 function zoomAt(tc, factor) {
   const v = S.view;
@@ -1689,6 +1861,7 @@ function setCursor(t) {
   }
   renderTopo(); drawDiagram(); updateTransport(); updateLogCursor();
   if (S.tab === 'state') renderInspector();
+  if (S.tab === 'stack') renderStack();
   if (S.selected && (S.selected.type === 'node' || S.selected.type === 'link') && S.res) {
     const lbl = $('#props .inject .lbl');
     if (lbl) lbl.textContent = 'At ' + C.fmtDuration(S.cursor) + ':';
@@ -1856,7 +2029,7 @@ function renderInspector(force) {
     for (const path of Object.keys(cur.states)) {
       const st = cur.states[path], ps = prev ? prev.states[path] : null;
       const spec = r.specs.find(s => s.path === path);
-      wrap.append(el('h4', {}, path + (spec ? ' : ' + spec.algo : '')));
+      wrap.append(el('h4', { class: 'path' }, path + (spec ? ' : ' + spec.algo : '')));
       const names = Object.keys(st);
       if (!names.length) { wrap.append(el('p', { class: 'hint' }, 'No state variables.')); continue; }
       const tb = el('table');
@@ -1872,6 +2045,126 @@ function renderInspector(force) {
   wrap.append(el('h4', {}, 'Latest outputs'));
   if (outs.length) wrap.append(el('ol', { class: 'outs' }, ...outs.map(o => el('li', {}, C.fmtDuration(o.t) + '  ' + o.text))));
   else wrap.append(el('p', { class: 'hint' }, 'None.'));
+}
+
+// ============================================================ stack view
+function stackNode() {
+  if (S.selected && S.selected.type === 'node') return S.selected.id;
+  return S.stackNode || (S.scn.nodes[0] && S.scn.nodes[0].id);
+}
+function renderStack(force) {
+  const box = $('#stack-view');
+  if (!box || !S.scn) return;
+  const id = stackNode();
+  const W = S.pulse;
+  const key = [S.resVer, id, Math.floor(S.cursor / Math.max(1, W / 6)), box.clientWidth].join('|');
+  if (!force && key === S.stackKey) return;
+  S.stackKey = key;
+  box.textContent = '';
+  const wrap = el('div', { class: 'stack' });
+  box.append(wrap);
+  if (!S.res) { wrap.append(el('p', { class: 'empty' }, 'Run the simulation to see how events move through the module stack.')); return; }
+  const sel = el('select', { 'aria-label': 'Process' });
+  for (const n of S.scn.nodes.slice().sort((a, b) => a.id - b.id)) sel.append(el('option', { value: n.id }, 'p' + n.id));
+  sel.value = id;
+  sel.addEventListener('change', () => { S.stackNode = +sel.value; select({ type: 'node', id: +sel.value }); renderStack(true); });
+  wrap.append(el('div', { class: 'pick' }, el('label', { class: 'field inline' }, el('span', {}, 'Process'), sel),
+    el('span', { class: 'hint', style: 'margin:0' }, 'at t = ' + C.fmtDuration(S.cursor) + '. Requests go down (blue), indications come up (green).')));
+  const specs = S.res.specs;
+  // layout: a tree of modules, the application on top and the network at the bottom
+  const children = {};
+  specs.forEach(sp => { if (sp.parent !== null) (children[sp.parent] = children[sp.parent] || []).push(sp.id); });
+  const col = {};
+  let leaf = 0;
+  const place = idx => {
+    const ch = children[idx] || [];
+    if (!ch.length) { col[idx] = leaf++; return; }
+    ch.forEach(place);
+    col[idx] = (col[ch[0]] + col[ch[ch.length - 1]]) / 2;
+  };
+  place(0);
+  const cols = Math.max(1, leaf);
+  const maxDepth = Math.max(...specs.map(sp => sp.depth));
+  const Wd = Math.max(280, box.clientWidth - 4);
+  const boxW = Math.min(230, Wd / cols - 16), boxH = 42, gap = 44;
+  const cx = c => (c + 0.5) * Wd / cols;
+  const yOf = d => 14 + (d + 1) * (boxH + gap);
+  const H = yOf(maxDepth + 1) + boxH + 14;
+  const svgEl = sv('svg', { viewBox: `0 0 ${Wd} ${H}`, role: 'img', 'aria-label': 'Module stack of p' + id });
+  svgEl.style.height = H + 'px';
+  const pos = {};
+  pos.app = { x: cx(col[0]), y: 14 };
+  specs.forEach(sp => { pos[sp.id] = { x: cx(col[sp.id]), y: yOf(sp.depth) }; });
+  const netUsers = specs.filter(sp => sp.builtins.length);
+  const netX = netUsers.length ? netUsers.reduce((a, sp) => a + pos[sp.id].x, 0) / netUsers.length : Wd / 2;
+  pos.net = { x: netX, y: yOf(maxDepth + 1) };
+  // counts of events handled so far
+  const evs = S.localByNode[id] || [];
+  const hi = upperBound(evs, S.cursor, e => e.t);
+  const handled = {};
+  for (let i = 0; i < hi; i++) { const e = evs[i]; handled[e.to] = (handled[e.to] || 0) + 1; }
+  // static edges
+  const edge = (a, b) => svgEl.append(sv('line', { x1: pos[a].x, y1: pos[a].y + boxH, x2: pos[b].x, y2: pos[b].y, class: 'edge' }));
+  edge('app', 0);
+  specs.forEach(sp => { if (sp.parent !== null) edge(sp.parent, sp.id); });
+  netUsers.forEach(sp => edge(sp.id, 'net'));
+  // recent flows within the animation window
+  // the latest group of events of this process is always shown; older ones only within the animation window
+  const recent = new Map();
+  const lastT = hi ? evs[hi - 1].t : -Infinity;
+  const since = Math.min(lastT, S.cursor - Math.max(W, 1));
+  for (let i = hi - 1; i >= 0; i--) {
+    const e = evs[i];
+    if (e.t < since) break;
+    const k = e.from + '>' + e.to;
+    if (!recent.has(k)) recent.set(k, e);
+  }
+  const labels = sv('g', {});
+  for (const [k, e] of recent) {
+    if (e.from === 'timer') continue;
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) continue;
+    const down = e.from === 'app' || (typeof e.from === 'number' && (e.to === 'net' || (typeof e.to === 'number' && specs[e.to].parent === e.from)));
+    const age = e.t === lastT ? Math.min(0.6, (S.cursor - e.t) / Math.max(W, 1) * 0.3) : Math.min(1, (S.cursor - e.t) / Math.max(W, 1));
+    const off = down ? -9 : 9;
+    const [x1, y1, x2, y2] = down ? [a.x + off, a.y + boxH, b.x + off, b.y] : [a.x + off, a.y, b.x + off, b.y + boxH];
+    const line = sv('line', { x1, y1, x2, y2, class: 'flow ' + (down ? 'down' : 'up'), opacity: (1 - 0.7 * age).toFixed(2), 'marker-end': 'url(#arrow)' });
+    svgEl.append(line);
+    const txt = e.ev + (e.args ? ' | ' + truncate(e.args, 26) : '');
+    const lx = (x1 + x2) / 2 + (down ? -6 : 6), ly = (y1 + y2) / 2 + 4;
+    const t = sv('text', { x: lx, y: ly, class: 'flow-label ' + (down ? 'down' : 'up'), 'text-anchor': down ? 'end' : 'start', opacity: (1 - 0.6 * age).toFixed(2) }, txt);
+    labels.append(t);
+  }
+  // boxes
+  const hot = new Set([...recent.values()].flatMap(e => [e.from, e.to]).map(String));
+  const drawBox = (k, title, sub, ext) => {
+    const P = pos[k];
+    const g = sv('g', { class: 'box' + (ext ? ' ext' : '') + (hot.has(String(k)) ? ' hot' : ''), transform: `translate(${P.x - boxW / 2} ${P.y})` });
+    const rect = sv('rect', { width: boxW, height: boxH });
+    if (typeof k === 'number') rect.style.stroke = layerColor(k);
+    g.append(rect, sv('text', { x: 8, y: 17, class: 't1' }, truncate(title, Math.floor(boxW / 7.5))),
+      sv('text', { x: 8, y: 33, class: 't2' }, truncate(sub, Math.floor(boxW / 6.8))));
+    if (handled[k]) g.append(sv('text', { x: boxW - 7, y: 17, class: 'cnt' }, String(handled[k])));
+    svgEl.append(g);
+  };
+  drawBox('app', 'Application', 'inputs and outputs', true);
+  specs.forEach(sp => drawBox(sp.id, sp.algo, sp.alias + ' : ' + sp.iface, false));
+  drawBox('net', netUsers.some(sp => sp.builtins.includes('Rounds')) ? 'Rounds' : 'Network', 'provided by the simulator', true);
+  svgEl.append(labels);
+  wrap.append(svgEl);
+  // recent events as text
+  wrap.append(el('h4', {}, 'Latest events on p' + id));
+  const list = el('ol', { class: 'recent' });
+  const name = k => k === 'app' ? 'app' : k === 'net' ? 'net' : k === 'timer' ? 'timer' : specs[k].alias;
+  for (let i = hi - 1; i >= Math.max(0, hi - 14); i--) {
+    const e = evs[i];
+    const dir = e.from === 'timer' ? 'timer' : (e.to === 'app' || e.from === 'net' || (typeof e.from === 'number' && typeof e.to === 'number' && specs[e.from].parent === e.to)) ? 'up' : 'down';
+    list.append(el('li', {}, el('span', { class: 't' }, C.fmtDuration(e.t)),
+      el('span', { class: 'd-' + dir }, name(e.from) + (dir === 'up' ? ' ↑ ' : dir === 'down' ? ' ↓ ' : ' ⏱ ') + name(e.to) + '  ' + e.ev + (e.args ? ' | ' + e.args : ''))));
+  }
+  if (!hi) list.append(el('li', {}, el('span', {}, ''), el('span', { class: 'hint' }, 'Nothing has happened on this process yet.')));
+  wrap.append(list);
+  if (S.res.localTruncated) wrap.append(el('p', { class: 'hint' }, 'The run is long: only its first 200,000 local events were recorded.'));
 }
 
 // ============================================================ delay preview
@@ -1939,6 +2232,7 @@ function setTab(t) {
   $$('.tabs [data-tab]').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
   $$('.tab-body').forEach(d => { d.hidden = d.dataset.body !== t; });
   if (t === 'state') renderInspector(true);
+  if (t === 'stack') renderStack(true);
   if (t === 'time') drawPreview();
   if (t === 'code') refreshCode();
 }
@@ -1980,13 +2274,14 @@ async function copyText(text, msgEl) {
   try { await navigator.clipboard.writeText(text); msgEl.textContent = 'Copied to the clipboard.'; }
   catch (e) { msgEl.textContent = 'Copying is not allowed here: select the text and copy it manually.'; }
 }
-async function saveFile(name, text) {
-  const msg = $('#export-msg');
+async function saveFile(name, text, mime, msgEl) {
+  const msg = msgEl || $('#export-msg');
+  mime = mime || 'application/json';
   try {
     if (window.claude && typeof window.claude.use === 'function') {
       msg.textContent = 'Preparing the file…';
       const dl = await window.claude.use('downloads');
-      if (!dl) { msg.textContent = 'Saving files is not available here: use Copy JSON.'; return; }
+      if (!dl) { msg.textContent = mime === 'application/json' ? 'Saving files is not available here: use Copy JSON.' : 'Saving files is not available here.'; return; }
       try {
         await dl.save({ filename: name, data: text });
         msg.textContent = 'Saved ' + name + '.';
@@ -1994,12 +2289,12 @@ async function saveFile(name, text) {
         const code = e && e.code;
         msg.textContent = code === 'declined' ? 'Save cancelled.'
           : code === 'rate_limited' ? 'A save request is already open.'
-          : 'Saving files is not available here: use Copy JSON.';
+          : (mime === 'application/json' ? 'Saving files is not available here: use Copy JSON.' : 'Saving files is not available here.');
       }
       return;
     }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.href = URL.createObjectURL(text instanceof Blob ? text : new Blob([text], { type: mime }));
     a.download = name;
     document.body.append(a);
     a.click();
@@ -2123,6 +2418,12 @@ function bindHeader() {
 function bindKeys() {
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(false); return; }
+    if (tourStep >= 0) {
+      if (e.key === 'Escape') { e.preventDefault(); endTour(); }
+      else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); $('#tour-next').click(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); $('#tour-back').click(); }
+      return;
+    }
     const tg = e.target || {};
     const tag = (tg.tagName || '').toLowerCase();
     const type = (tg.type || '').toLowerCase();
@@ -2131,14 +2432,20 @@ function bindKeys() {
     if (textLike) return;
     // checkboxes and sliders keep Space and the arrow keys for themselves
     if (tag === 'input' && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End')) return;
-    if ($('#dlg-export').open || $('#dlg-import').open) return;
+    if (document.querySelector('dialog[open]')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     switch (e.key) {
       case ' ':
         if (tag === 'button') return;
         e.preventDefault(); togglePlay(); break;
-      case 'ArrowRight': e.preventDefault(); stepEvent(1); break;
-      case 'ArrowLeft': e.preventDefault(); stepEvent(-1); break;
+      case 'ArrowRight': case 'PageDown': e.preventDefault(); stepEvent(1); break;
+      case 'ArrowLeft': case 'PageUp': e.preventDefault(); stepEvent(-1); break;
+      case '?': e.preventDefault(); $('#dlg-shortcuts').showModal(); break;
+      case 'p': case 'P': togglePresentation(); break;
+      case 'f': case 'F':
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+        break;
       case 'Home': stopPlay(); setCursor(0); break;
       case 'End': stopPlay(); if (S.res) setCursor(S.res.endT); break;
       case 'Delete': case 'Backspace':
@@ -2148,6 +2455,7 @@ function bindKeys() {
         }
         break;
       case 'Escape':
+        if (document.body.classList.contains('present')) { togglePresentation(false); break; }
         if (S.linkFrom !== null) { S.linkFrom = null; renderTopo(); renderProps(); }
         else select(null);
         break;
@@ -2159,13 +2467,293 @@ function bindKeys() {
   });
 }
 
+// ============================================================ images
+// A recorder with the subset of the Canvas 2D API used by the diagram, producing SVG.
+class SvgPath {
+  constructor() { this.d = ''; }
+  moveTo(x, y) { this.d += 'M' + r2(x) + ' ' + r2(y); }
+  lineTo(x, y) { this.d += 'L' + r2(x) + ' ' + r2(y); }
+  quadraticCurveTo(cx, cy, x, y) { this.d += 'Q' + r2(cx) + ' ' + r2(cy) + ' ' + r2(x) + ' ' + r2(y); }
+  closePath() { this.d += 'Z'; }
+  rect(x, y, w, h) { this.d += 'M' + r2(x) + ' ' + r2(y) + 'h' + r2(w) + 'v' + r2(h) + 'h' + r2(-w) + 'Z'; }
+  arc(x, y, r) { this.d += 'M' + r2(x + r) + ' ' + r2(y) + 'A' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(x - r) + ' ' + r2(y) + 'A' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(x + r) + ' ' + r2(y); }
+}
+function r2(v) { return Math.round(v * 100) / 100; }
+function xmlEsc(v) { return String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+class SvgCtx {
+  constructor() {
+    this.out = []; this.path = new SvgPath(); this.stack = []; this.clipN = 0; this.open = 0;
+    this.fillStyle = '#000'; this.strokeStyle = '#000'; this.lineWidth = 1; this.globalAlpha = 1;
+    this.font = '11px sans-serif'; this.textAlign = 'start'; this.textBaseline = 'alphabetic'; this.dash = [];
+    this.measure = document.createElement('canvas').getContext('2d');
+  }
+  setTransform() {}
+  setLineDash(d) { this.dash = d.slice(); }
+  save() { this.stack.push({ f: this.fillStyle, s: this.strokeStyle, w: this.lineWidth, a: this.globalAlpha, font: this.font, ta: this.textAlign, tb: this.textBaseline, d: this.dash, open: this.open }); }
+  restore() {
+    const st = this.stack.pop();
+    if (!st) return;
+    while (this.open > st.open) { this.out.push('</g>'); this.open--; }
+    this.fillStyle = st.f; this.strokeStyle = st.s; this.lineWidth = st.w; this.globalAlpha = st.a;
+    this.font = st.font; this.textAlign = st.ta; this.textBaseline = st.tb; this.dash = st.d;
+  }
+  beginPath() { this.path = new SvgPath(); }
+  moveTo(x, y) { this.path.moveTo(x, y); }
+  lineTo(x, y) { this.path.lineTo(x, y); }
+  quadraticCurveTo(a, b, c, d) { this.path.quadraticCurveTo(a, b, c, d); }
+  closePath() { this.path.closePath(); }
+  rect(x, y, w, h) { this.path.rect(x, y, w, h); }
+  arc(x, y, r) { this.path.arc(x, y, r); }
+  clip() {
+    const id = 'c' + (++this.clipN);
+    this.out.push('<clipPath id="' + id + '"><path d="' + this.path.d + '"/></clipPath><g clip-path="url(#' + id + ')">');
+    this.open++;
+  }
+  alpha() { return this.globalAlpha < 1 ? ' opacity="' + r2(this.globalAlpha) + '"' : ''; }
+  stroke(p) {
+    const d = (p || this.path).d;
+    if (!d) return;
+    this.out.push('<path d="' + d + '" fill="none" stroke="' + this.strokeStyle + '" stroke-width="' + r2(this.lineWidth) + '"' +
+      (this.dash.length ? ' stroke-dasharray="' + this.dash.join(' ') + '"' : '') + ' stroke-linecap="round"' + this.alpha() + '/>');
+  }
+  fill(p) {
+    const d = (p || this.path).d;
+    if (d) this.out.push('<path d="' + d + '" fill="' + this.fillStyle + '"' + this.alpha() + '/>');
+  }
+  fillRect(x, y, w, h) {
+    this.out.push('<rect x="' + r2(x) + '" y="' + r2(y) + '" width="' + r2(w) + '" height="' + r2(h) + '" fill="' + this.fillStyle + '"' + this.alpha() + '/>');
+  }
+  measureText(t) { this.measure.font = this.font; return this.measure.measureText(t); }
+  fillText(t, x, y) {
+    const m = /^(?:(\d+)\s+)?([\d.]+)px\s+(.*)$/.exec(this.font) || [];
+    const anchor = { center: 'middle', right: 'end', end: 'end' }[this.textAlign] || 'start';
+    const base = this.textBaseline === 'middle' ? ' dominant-baseline="central"' : '';
+    this.out.push('<text x="' + r2(x) + '" y="' + r2(y) + '" fill="' + this.fillStyle + '" font-size="' + (m[2] || 11) + '"' +
+      (m[1] ? ' font-weight="' + m[1] + '"' : '') + ' font-family="' + xmlEsc(m[3] || 'sans-serif') + '" text-anchor="' + anchor + '"' + base + this.alpha() + '>' + xmlEsc(t) + '</text>');
+  }
+  svg(W, H) {
+    while (this.open > 0) { this.out.push('</g>'); this.open--; }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + this.out.join('') + '</svg>';
+  }
+}
+function diagramWidth() { return Math.max(600, $('#st-wrap').clientWidth || 900); }
+function exportName(ext, what) {
+  const base = (S.scn.top || 'scenario').replace(/[^A-Za-z0-9_-]+/g, '-').toLowerCase();
+  return base + '-' + what + '-seed' + S.scn.seed + '.' + ext;
+}
+function diagramSvg() {
+  const W = diagramWidth();
+  const c = new SvgCtx();
+  drawDiagram({ ctx: c, W, Path2D: SvgPath });
+  return c.svg(W, diagramHeight());
+}
+function diagramPng() {
+  const W = diagramWidth(), H = diagramHeight(), k = 2;
+  const cv = document.createElement('canvas');
+  cv.width = W * k; cv.height = H * k;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  drawDiagram({ ctx, W });
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+// the graph: both SVG layers merged, with computed styles written inline
+function graphSvg() {
+  const src = [$('#topo'), $('#topo-fx')];
+  const vb = src[0].getAttribute('viewBox') || '0 0 700 460';
+  const [, , w, h] = vb.split(/\s+/).map(Number);
+  const props = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'opacity',
+    'font-family', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline'];
+  const out = document.createElementNS(SVGNS, 'svg');
+  out.setAttribute('xmlns', SVGNS);
+  out.setAttribute('viewBox', vb);
+  out.setAttribute('width', Math.round(w));
+  out.setAttribute('height', Math.round(h));
+  const [vx, vy] = vb.split(/\s+/).map(Number);
+  const bg = document.createElementNS(SVGNS, 'rect');
+  bg.setAttribute('x', vx); bg.setAttribute('y', vy); bg.setAttribute('width', w); bg.setAttribute('height', h);
+  bg.setAttribute('fill', S.colors.paper || '#ffffff');
+  out.append(bg);
+  const copy = (node, parent) => {
+    if (node.nodeType === 3) { parent.append(node.textContent); return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'title' || tag === 'pattern' || node.id === 'topo-bg' || node.classList.contains('lk-hit')) return;
+    const cs = getComputedStyle(node);
+    if (cs.display === 'none' || node.getAttribute('display') === 'none') return;
+    const el2 = document.createElementNS(SVGNS, tag);
+    for (const a of node.attributes) if (!['class', 'style', 'tabindex', 'role', 'data-node', 'data-link', 'data-msg', 'aria-label'].includes(a.name)) el2.setAttribute(a.name, a.value);
+    if (tag !== 'g' && tag !== 'svg' && tag !== 'defs' && tag !== 'marker') {
+      for (const pr of props) {
+        const v = cs.getPropertyValue(pr);
+        if (v && v !== 'none' || pr === 'fill') el2.setAttribute(pr, v);
+      }
+    }
+    parent.append(el2);
+    for (const ch of node.childNodes) copy(ch, el2);
+  };
+  for (const s of src) for (const ch of s.childNodes) copy(ch, out);
+  return new XMLSerializer().serializeToString(out);
+}
+async function exportImage(kind) {
+  const msg = $('#export-msg');
+  if (!S.res && kind !== 'graph-svg') { msg.textContent = T('Run the simulation first.'); return; }
+  try {
+    if (kind === 'diagram-svg') await saveFile(exportName('svg', 'diagram'), new Blob([diagramSvg()], { type: 'image/svg+xml' }), 'image/svg+xml', msg);
+    else if (kind === 'diagram-png') await saveFile(exportName('png', 'diagram'), await diagramPng(), 'image/png', msg);
+    else await saveFile(exportName('svg', 'graph'), new Blob([graphSvg()], { type: 'image/svg+xml' }), 'image/svg+xml', msg);
+  } catch (e) { msg.textContent = 'Could not create the image: ' + e.message; }
+}
+
+// ============================================================ settings
+const SETTINGS_KEY = 'ds-playground:settings';
+const SET = Object.assign({ theme: 'system', palette: 'standard', lang: 'en' }, (() => {
+  try { return JSON.parse(store.get(SETTINGS_KEY) || '{}'); } catch (e) { return {}; }
+})());
+function applySettings() {
+  const root = document.documentElement;
+  if (SET.theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', SET.theme);
+  if (SET.palette === 'cvd') root.setAttribute('data-palette', 'cvd'); else root.removeAttribute('data-palette');
+  root.setAttribute('lang', SET.lang);
+  if (window.SimI18n) window.SimI18n.setLang(SET.lang);
+  readColors();
+  if (S.scn) { renderTopo(); drawDiagram(); drawPreview(); renderLayerLegend(); if (S.tab === 'stack') renderStack(true); }
+}
+function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(SET)); }
+function bindSettings() {
+  const dlg = $('#dlg-settings');
+  $('#btn-settings').addEventListener('click', () => {
+    $('#set-theme').value = SET.theme; $('#set-palette').value = SET.palette; $('#set-lang').value = SET.lang;
+    dlg.showModal();
+  });
+  for (const [id, key] of [['#set-theme', 'theme'], ['#set-palette', 'palette'], ['#set-lang', 'lang']]) {
+    $(id).addEventListener('change', e => { SET[key] = e.target.value; saveSettings(); applySettings(); });
+  }
+  const docs = dlg.querySelector('a.btn-link');
+  if (location.protocol === 'file:' || /github\.io$/.test(location.hostname)) { docs.href = 'manual/index.html'; docs.removeAttribute('target'); }
+  $('#btn-open-present').addEventListener('click', () => { dlg.close(); togglePresentation(true); });
+  $('#btn-open-shortcuts').addEventListener('click', () => { dlg.close(); $('#dlg-shortcuts').showModal(); });
+  $('#btn-open-tour').addEventListener('click', () => { dlg.close(); startTour(); });
+  $('#btn-shortcuts').addEventListener('click', () => $('#dlg-shortcuts').showModal());
+  $('#btn-present-exit').addEventListener('click', () => togglePresentation(false));
+}
+
+// ============================================================ presentation mode
+function togglePresentation(on) {
+  const body = document.body;
+  on = on === undefined ? !body.classList.contains('present') : on;
+  body.classList.toggle('present', on);
+  $('#btn-present-exit').hidden = !on;
+  S.fontScale = on ? 1.35 : 1;
+  ROW = on ? 36 : 26; TOP = on ? 32 : 26;
+  if (on) {
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {});
+    toast(T('Presentation mode: arrows or a clicker step through events, P or Esc to leave.'));
+  } else if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  setTimeout(() => { fitView(); renderTopo(); drawDiagram(); }, 60);
+}
+
+// ============================================================ welcome tour
+const TOUR = [
+  { sel: '.topo', title: 'The graph', text: 'Processes and the links between them. Messages travel along the links as packets. Click a process or a packet to inspect it.' },
+  { sel: '[data-tab=code]', title: 'The algorithm', text: 'Algorithms are written in Upon, the event-driven pseudocode of the textbooks. Errors appear under the editor as you type.' },
+  { sel: '[data-tab=time]', title: 'The timing model', text: 'Choose what the algorithm assumes and how the network really behaves. When reality breaks the assumption, the message turns red.' },
+  { sel: '[data-tab=scen]', title: 'Inputs and faults', text: 'Tell processes what to do, and schedule crashes, recoveries, link failures and partitions.' },
+  { sel: '#btn-run', title: 'Run', text: 'Simulate the scenario. The same seed always gives the same run.' },
+  { sel: '.transport', title: 'Playback', text: 'Play, pause and step. "Event by event" is the easiest speed to follow an algorithm.' },
+  { sel: '#st-wrap', title: 'The space-time diagram', text: 'One line per process, one arrow per message. Tick Causality and click an event to see what caused it.' },
+  { sel: '#btn-gallery', title: 'Examples', text: 'Start from a classic algorithm. Each example comes with experiments to try. The ⚙ menu brings this tour back.' }
+];
+const TOUR_KEY = 'ds-playground:toured';
+let tourStep = -1;
+function startTour() { tourStep = 0; $('#tour').hidden = false; showTourStep(); }
+function endTour() { tourStep = -1; $('#tour').hidden = true; store.set(TOUR_KEY, '1'); }
+function showTourStep() {
+  const step = TOUR[tourStep];
+  const target = $(step.sel);
+  if (!target) { endTour(); return; }
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const r = target.getBoundingClientRect();
+  const ring = $('#tour .tour-ring'), card = $('#tour .tour-card');
+  const pad = 6;
+  Object.assign(ring.style, { left: (r.left - pad) + 'px', top: (r.top - pad) + 'px', width: (r.width + 2 * pad) + 'px', height: (r.height + 2 * pad) + 'px' });
+  $('#tour-title').textContent = T(step.title);
+  $('#tour-text').textContent = T(step.text);
+  $('#tour-count').textContent = (tourStep + 1) + ' / ' + TOUR.length;
+  $('#tour-back').disabled = tourStep === 0;
+  $('#tour-next').textContent = T(tourStep === TOUR.length - 1 ? 'Done' : 'Next');
+  const cw = Math.min(340, window.innerWidth - 20);
+  card.style.width = cw + 'px';
+  const ch = card.offsetHeight || 150;
+  let top = r.bottom + pad + 10;
+  if (top + ch > window.innerHeight - 10) top = Math.max(10, r.top - pad - 10 - ch);
+  if (top + ch > window.innerHeight - 10) top = Math.max(10, window.innerHeight - ch - 10);
+  const left = Math.max(10, Math.min(r.left, window.innerWidth - cw - 10));
+  Object.assign(card.style, { top: top + 'px', left: left + 'px' });
+  $('#tour-next').focus();
+}
+function bindTour() {
+  $('#tour-next').addEventListener('click', () => { if (tourStep >= TOUR.length - 1) endTour(); else { tourStep++; showTourStep(); } });
+  $('#tour-back').addEventListener('click', () => { if (tourStep > 0) { tourStep--; showTourStep(); } });
+  $('#tour-skip').addEventListener('click', endTour);
+  window.addEventListener('resize', () => { if (tourStep >= 0) showTourStep(); });
+}
+
+// ============================================================ gallery
+function thumbnail(scn) {
+  const ns = scn.nodes;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of ns) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+  const W = 160, H = 96, pad = 12;
+  const k = Math.min((W - 2 * pad) / Math.max(1, x1 - x0), (H - 2 * pad) / Math.max(1, y1 - y0));
+  const px = n => pad + (n.x - x0) * k + ((W - 2 * pad) - (x1 - x0) * k) / 2;
+  const py = n => pad + (n.y - y0) * k + ((H - 2 * pad) - (y1 - y0) * k) / 2;
+  const byId = new Map(ns.map(n => [+n.id, n]));
+  const g = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'thumb', 'aria-hidden': 'true' });
+  for (const l of scn.links || []) {
+    const a = byId.get(+l.a), b = byId.get(+l.b);
+    if (a && b) g.append(sv('line', { x1: px(a), y1: py(a), x2: px(b), y2: py(b) }));
+  }
+  for (const n of ns) g.append(sv('circle', { cx: px(n), cy: py(n), r: ns.length > 10 ? 3.5 : 5 }));
+  return g;
+}
+const MODEL_NAMES = { 'asynchronous': 'asynchronous', 'partial': 'partially synchronous', 'synchronous-rounds': 'synchronous rounds', 'synchronous-timed': 'timed synchronous' };
+function renderGallery(filter) {
+  const grid = $('#gallery-grid'); grid.textContent = '';
+  const cats = ['All'].concat([...new Set(EX.EXAMPLES.map(e => e.category))]);
+  const bar = $('#gallery-filter'); bar.textContent = '';
+  for (const c of cats) bar.append(el('button', { type: 'button', class: 'chip-btn' + (c === filter ? ' on' : ''), onclick: () => renderGallery(c) }, T(c)));
+  const items = EX.EXAMPLES.filter(e => filter === 'All' || e.category === filter);
+  for (const ex of items) {
+    const card = el('button', { type: 'button', class: 'card', onclick: () => { $('#dlg-gallery').close(); loadScenario(ex.scenario, T('Loaded:') + ' ' + T(ex.title) + '.'); } },
+      thumbnail(ex.scenario),
+      el('span', { class: 'card-title' }, T(ex.title)),
+      el('span', { class: 'card-text' }, T(ex.summary || '')),
+      el('span', { class: 'card-tags' }, el('span', { class: 'tag' }, T(ex.category || '')), el('span', { class: 'tag' }, T(MODEL_NAMES[ex.scenario.assumed.timing] || ''))));
+    grid.append(card);
+  }
+  const blank = el('button', { type: 'button', class: 'card', onclick: () => { $('#dlg-gallery').close(); loadScenario(blankScenario(), T('Loaded the empty scenario.')); } },
+    thumbnail(blankScenario()), el('span', { class: 'card-title' }, T('Empty scenario')),
+    el('span', { class: 'card-text' }, T('A small ring and a starter program to write your own algorithm.')),
+    el('span', { class: 'card-tags' }, el('span', { class: 'tag' }, T('Getting started'))));
+  if (filter === 'All') grid.append(blank);
+}
+function bindGallery() {
+  $('#btn-gallery').addEventListener('click', () => { renderGallery('All'); $('#dlg-gallery').showModal(); });
+  $('#btn-img-diagram-svg').addEventListener('click', () => exportImage('diagram-svg'));
+  $('#btn-img-diagram-png').addEventListener('click', () => exportImage('diagram-png'));
+  $('#btn-img-graph-svg').addEventListener('click', () => exportImage('graph-svg'));
+}
+
 async function init() {
   readColors();
   try {
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); drawDiagram(); drawPreview(); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); renderTopo(); drawDiagram(); drawPreview(); });
   } catch (e) { /* older browsers */ }
   $('#toast').setAttribute('role', 'status');
+  applySettings();
   bindHeader(); bindForms(); bindEditor(); bindTopo(); bindDiagram(); bindTransport(); bindDialogs(); bindKeys();
+  bindSettings(); bindTour(); bindGallery();
   window.addEventListener('resize', () => { if (S.tab === 'time') drawPreview(); });
   window.addEventListener('hashchange', async () => {
     try { const shared = await fromHash(); if (shared) loadScenario(shared, 'Opened the shared scenario.'); }
@@ -2183,6 +2771,8 @@ async function init() {
   setMode('move');
   setTab('code');
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { drawDiagram(); refreshCode(); });
+  // the tour opens once, on the first visit (not under automated browsers)
+  if (!store.get(TOUR_KEY) && !navigator.webdriver && !/[?&]notour\b/.test(location.search)) setTimeout(startTour, 900);
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Distributed Systems Playground</title>
+<meta name="description" content="Write distributed algorithms in textbook pseudocode and watch them run on a simulated network with configurable timing and faults.">
+<meta name="theme-color" content="#17283a">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22 role=%22img%22 aria-label=%22Distributed Systems Playground%22%3E  %3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2317283a%22/%3E  %3Cg stroke=%22%23dbe5ee%22 stroke-width=%223%22 stroke-linecap=%22round%22%3E    %3Cline x1=%2212%22 y1=%2218%22 x2=%2252%22 y2=%2218%22/%3E    %3Cline x1=%2212%22 y1=%2232%22 x2=%2252%22 y2=%2232%22/%3E    %3Cline x1=%2212%22 y1=%2246%22 x2=%2252%22 y2=%2246%22/%3E  %3C/g%3E  %3Cg stroke-width=%222.6%22 stroke-linecap=%22round%22 fill=%22none%22%3E    %3Cpath d=%22M18 18 L28 32%22 stroke=%22%2386aef0%22/%3E    %3Cpath d=%22M28 32 L38 46%22 stroke=%22%234cc2a5%22/%3E    %3Cpath d=%22M30 18 L47 46%22 stroke=%22%23f06a78%22 stroke-dasharray=%223.5 3%22/%3E  %3C/g%3E  %3Cg fill=%22%23ffffff%22%3E    %3Ccircle cx=%2218%22 cy=%2218%22 r=%223.2%22/%3E    %3Ccircle cx=%2228%22 cy=%2232%22 r=%223.2%22/%3E    %3Ccircle cx=%2238%22 cy=%2246%22 r=%223.2%22/%3E  %3C/g%3E  %3Ccircle cx=%2230%22 cy=%2218%22 r=%223.2%22 fill=%22%23f06a78%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -14,9 +17,24 @@
 <body data-timing="asynchronous">
 <header class="topbar">
   <div class="brand">
-    <svg class="logo" viewBox="0 0 40 28" aria-hidden="true">
-      <line x1="4" y1="7" x2="36" y2="7"/><line x1="4" y1="21" x2="36" y2="21"/>
-      <line class="msg" x1="10" y1="7" x2="22" y2="21"/><line class="msg late" x1="20" y1="7" x2="34" y2="21"/>
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#17283a"/>
+      <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+        <line x1="12" y1="18" x2="52" y2="18"/>
+        <line x1="12" y1="32" x2="52" y2="32"/>
+        <line x1="12" y1="46" x2="52" y2="46"/>
+      </g>
+      <g stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M18 18 L28 32" stroke="#86aef0"/>
+        <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+        <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+      </g>
+      <g fill="#ffffff">
+        <circle cx="18" cy="18" r="3.2"/>
+        <circle cx="28" cy="32" r="3.2"/>
+        <circle cx="38" cy="46" r="3.2"/>
+      </g>
+      <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
     </svg>
     <h1>Distributed Systems Playground</h1>
   </div>
@@ -24,6 +42,7 @@
     <label class="field inline ex-field"><span>Example</span>
       <select id="example"><option value="">Choose…</option></select>
     </label>
+    <button id="btn-gallery" class="ghost" type="button" title="Browse the examples">Gallery</button>
     <label class="field inline"><span>Seed</span>
       <input id="seed" type="number" min="0" step="1" data-bind="seed" class="narrow">
     </label>
@@ -31,6 +50,8 @@
     <button id="btn-run" class="primary" type="button" title="Run (Ctrl+Enter)">Run</button>
     <button id="btn-export" class="ghost" type="button">Export</button>
     <button id="btn-import" class="ghost" type="button">Import</button>
+    <button id="btn-shortcuts" class="ghost icon" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+    <button id="btn-settings" class="ghost icon" type="button" title="Settings" aria-label="Settings">⚙</button>
   </div>
 </header>
 
@@ -59,6 +80,7 @@
       <button id="btn-fit" type="button" class="ghost" title="Fit to view">Fit</button>
       <span class="sep"></span>
       <label class="check" title="Show the message type on packets in flight"><input type="checkbox" id="labels" checked> Labels</label>
+      <label class="check" title="Color messages by the module that originated them"><input type="checkbox" id="layers"> Layers</label>
     </div>
     <div class="canvas-wrap">
       <svg id="topo" role="img" aria-label="Process graph">
@@ -73,7 +95,8 @@
       </svg>
       <svg id="topo-fx" aria-hidden="true"><g id="g-fx"></g><g id="g-msgs"></g><g id="g-top"></g></svg>
       <div id="stale" class="stale" hidden>The scenario has changed. <button type="button" id="btn-rerun" class="link">Run again</button></div>
-      <div class="topo-legend" aria-hidden="true">
+      <div id="layer-legend" class="topo-legend layer-legend" aria-hidden="true" hidden></div>
+      <div class="topo-legend" id="status-legend" aria-hidden="true">
         <span><i class="pk-dot ok"></i>in transit</span>
         <span><i class="pk-dot late"></i>violation</span>
         <span><i class="pk-dot lossy"></i>will be lost</span>
@@ -90,12 +113,15 @@
       <button role="tab" data-tab="time" type="button">Timing</button>
       <button role="tab" data-tab="scen" type="button">Scenario</button>
       <button role="tab" data-tab="state" type="button">State</button>
+      <button role="tab" data-tab="stack" type="button">Stack</button>
     </div>
 
     <div class="tab-body" data-body="code">
       <div class="row">
         <label class="field grow"><span>Main algorithm</span><select id="top"></select></label>
+        <label class="field grow"><span>Add module</span><select id="add-module"><option value="">Choose…</option></select></label>
       </div>
+      <p id="module-info" class="hint" hidden></p>
       <div class="symbols" aria-label="Insert symbol">
         <button type="button" data-ins="⟨">⟨</button><button type="button" data-ins="⟩">⟩</button>
         <button type="button" data-ins="∪">∪</button><button type="button" data-ins="∩">∩</button>
@@ -115,7 +141,7 @@
       <ul id="diag" class="diag"></ul>
       <details class="guide">
         <summary>Language quick reference</summary>
-        <div class="guide-body">
+        <div class="guide-body" data-i18n-block="guide">
           <p>A program contains <b>interfaces</b> and <b>algorithms</b>. An algorithm implements one interface and uses others: <code>Net</code> (network) and <code>Rounds</code> (synchronous rounds) are provided by the simulator; the rest you write yourself, and they are wired together automatically.</p>
 <pre>upon event ⟨instance, Event | pattern⟩ where condition do … end
 upon condition expression do … end
@@ -125,8 +151,11 @@ forall q in neighbors where q ≠ p do … end
 if … then … elif … then … else … end
 starttimer(t, 100ms)   canceltimer(t)
 ⟨timer, Timeout | t⟩   assert cond, "msg"   log x</pre>
+<pre>function name(a, b) … return value … end      call name(x, y)
+uses PerfectLinks as pl via AckLinks</pre>
+          <p>Functions live inside an algorithm, see its state and parameters, and may trigger events; use them in expressions, or with <code>call</code> as a statement. <code>via</code> picks which algorithm implements a used interface when there are several.</p>
           <p>Indications go up, requests go down. Undeclared all-caps words (<code>HEARTBEAT</code>) are atoms. In patterns, a new name captures the value; an atom or a known name must match.</p>
-          <p>Built-ins: <code>self</code>, <code>Π</code>, <code>N</code>, <code>neighbors</code>, <code>round</code>, <code>now()</code>, <code>DELTA</code> <code>PHI</code> <code>RHO</code> (only when known in the assumed model), <code>min max choose size keys values map() random(a,b) append toset str abs</code>. Tuples are 0-indexed; <code>#S</code> is the cardinality. Durations (<code>50ms</code>) are numbers in microseconds.</p>
+          <p>Built-ins: <code>self</code>, <code>Π</code>, <code>N</code>, <code>neighbors</code>, <code>round</code>, <code>now()</code>, <code>DELTA</code> <code>PHI</code> <code>RHO</code> (only when known in the assumed model), <code>min max choose size keys values map() get(m,k,default) remove(c,x) random(a,b) pick(S) append head tail last sort reverse slice range sum mean argmin argmax toset str abs sqrt ln exp pow floor ceil round</code>. Tuples are 0-indexed; <code>#S</code> is the cardinality. Durations (<code>50ms</code>) are numbers in microseconds.</p>
           <p>ASCII equivalents: <code>&lt; &gt;</code> for ⟨ ⟩, <code>union inter minus in notin subseteq</code>, <code>!= &lt;= &gt;=</code>, <code>and or not</code>, <code>Procs</code> for Π, <code>{}</code> for ∅. Inside an ASCII <code>trigger</code>, wrap comparisons in parentheses.</p>
         </div>
       </details>
@@ -150,7 +179,7 @@ starttimer(t, 100ms)   canceltimer(t)
             <label class="field"><span>PHI</span><input data-bind="assumed.PHI" data-kind="dur-unknown" placeholder="unknown"></label>
             <label class="field"><span>RHO</span><input data-bind="assumed.RHO" data-kind="num-unknown" placeholder="unknown"></label>
           </div>
-          <p class="hint">Write <code>unknown</code> for a bound that exists but the algorithm does not know. DELTA: maximum delay; PHI: maximum step duration; RHO: maximum clock drift.</p>
+          <p class="hint" data-i18n-block="hint-unknown">Write <code>unknown</code> for a bound that exists but the algorithm does not know. DELTA: maximum delay; PHI: maximum step duration; RHO: maximum clock drift.</p>
           <div class="only-rounds">
             <label class="field"><span>Round execution</span>
               <select data-bind="actual.roundMode">
@@ -187,7 +216,7 @@ starttimer(t, 100ms)   canceltimer(t)
             <label class="field"><span>GST</span><input data-bind="actual.gst" data-kind="dur-opt" placeholder="none"></label>
             <label class="field"><span>Delay before GST</span><input data-bind="actual.preGstDelay" data-kind="dist-opt" placeholder="same as above"></label>
           </div>
-          <p class="hint">Distributions: <code>const(d)</code> <code>uniform(a, b)</code> <code>exp(mean)</code> <code>normal(μ, σ)</code> <code>lognormal(μ, σ)</code> (μ, σ in log ms) <code>pareto(xm, α)</code> <code>empirical(a, b, …)</code>. Unitless numbers are ms. Messages sent before GST still arrive by GST + bound.</p>
+          <p class="hint" data-i18n-block="hint-dist">Distributions: <code>const(d)</code> <code>uniform(a, b)</code> <code>exp(mean)</code> <code>normal(μ, σ)</code> <code>lognormal(μ, σ)</code> (μ, σ in log ms) <code>pareto(xm, α)</code> <code>empirical(a, b, …)</code>. Unitless numbers are ms. Messages sent before GST still arrive by GST + bound.</p>
           <label class="field"><span>Simultaneous events</span>
             <select data-bind="tieBreak">
               <option value="stable">Stable order by process</option>
@@ -200,7 +229,7 @@ starttimer(t, 100ms)   canceltimer(t)
     <div class="tab-body" data-body="scen" hidden>
       <label class="field"><span>External inputs</span>
         <textarea id="inputs" data-bind="inputs" rows="5" spellcheck="false" class="mono"></textarea></label>
-      <p class="hint">One event per line: <code>TIME NODE Event | arguments</code>, where <code>*</code> means every process. Examples: <code>0ms 1 Broadcast | "hello"</code>, <code>0ms * Propose | random(1, 9)</code>. Events must be requests of the main algorithm. You can also select a process during playback and inject an event at the current time.</p>
+      <p class="hint" data-i18n-block="hint-inputs">One event per line: <code>TIME NODE Event | arguments</code>, where <code>*</code> means every process. Examples: <code>0ms 1 Broadcast | "hello"</code>, <code>0ms * Propose | random(1, 9)</code>. Events must be requests of the main algorithm. You can also select a process during playback and inject an event at the current time.</p>
       <h3>Faults</h3>
       <ul id="faults" class="faults"></ul>
       <div class="row fault-form">
@@ -220,7 +249,7 @@ starttimer(t, 100ms)   canceltimer(t)
         <label class="field" data-ft="link partition"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
       </div>
-      <p class="hint">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
+      <p class="hint" data-i18n-block="hint-faults">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
       <h3>Run</h3>
       <div class="row">
         <label class="field"><span>Simulated duration</span><input data-bind="stopAt" data-kind="dur" class="narrow"></label>
@@ -230,6 +259,10 @@ starttimer(t, 100ms)   canceltimer(t)
 
     <div class="tab-body" data-body="state" hidden>
       <div id="inspector"></div>
+    </div>
+
+    <div class="tab-body" data-body="stack" hidden>
+      <div id="stack-view"></div>
     </div>
   </section>
 
@@ -260,6 +293,7 @@ starttimer(t, 100ms)   canceltimer(t)
         <div class="st-bar">
           <span id="status" class="status"></span>
           <span class="grow"></span>
+          <label class="check" title="Click an event on the diagram to see what caused it and what it caused"><input type="checkbox" id="cone-mode"> Causality</label>
           <label class="check" title="Show events after the cursor, faded"><input type="checkbox" id="ghost"> Future</label>
           <label class="check" title="Scroll the diagram to keep the cursor in view"><input type="checkbox" id="follow" checked> Follow</label>
           <span class="zoom" role="group" aria-label="Zoom">
@@ -269,6 +303,7 @@ starttimer(t, 100ms)   canceltimer(t)
             <button type="button" id="zoom-all" class="ghost small" title="Show the whole run">All</button>
           </span>
         </div>
+        <div id="cone-info" class="cone-info" hidden></div>
         <div id="st-wrap" class="st-wrap"><canvas id="st"></canvas><div id="tip" class="tip" hidden></div></div>
         <div class="legend">
           <span><i class="lg deliver"></i>delivered</span>
@@ -308,6 +343,13 @@ starttimer(t, 100ms)   canceltimer(t)
     <p class="hint">The JSON file holds topology, code, timing model, inputs, faults and seed: opening it again reproduces the same run.</p>
     <textarea id="export-text" rows="12" class="mono" readonly></textarea>
     <label class="field"><span>Shareable link</span><input id="export-link" readonly></label>
+    <div class="field"><span>Images of the current view</span>
+      <div class="row">
+        <button type="button" id="btn-img-diagram-svg" class="ghost">Diagram as SVG</button>
+        <button type="button" id="btn-img-diagram-png" class="ghost">Diagram as PNG</button>
+        <button type="button" id="btn-img-graph-svg" class="ghost">Graph as SVG</button>
+      </div>
+    </div>
     <p id="export-msg" class="hint" role="status"></p>
     <div class="row end">
       <button type="button" id="btn-copy-json" class="ghost">Copy JSON</button>
@@ -331,10 +373,84 @@ starttimer(t, 100ms)   canceltimer(t)
   </form>
 </dialog>
 
+<dialog id="dlg-settings">
+  <form method="dialog">
+    <h2>Settings</h2>
+    <div class="grid2">
+      <label class="field"><span>Theme</span>
+        <select id="set-theme"><option value="system">Follow the system</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      <label class="field"><span>Colors</span>
+        <select id="set-palette"><option value="standard">Standard</option><option value="cvd">Easier to tell apart (color vision deficiency)</option></select></label>
+      <label class="field"><span>Language</span>
+        <select id="set-lang"><option value="en">English</option><option value="it">Italiano</option></select></label>
+    </div>
+    <p class="hint">The language setting translates the interface. Code, diagnostics from the checker and the documentation stay in English.</p>
+    <div class="row">
+      <button type="button" id="btn-open-present" class="ghost">Presentation mode</button>
+      <button type="button" id="btn-open-shortcuts" class="ghost">Keyboard shortcuts</button>
+      <button type="button" id="btn-open-tour" class="ghost">Welcome tour</button>
+      <a class="btn-link" href="https://github.com/engineering87/distributed-systems-playground/tree/main/docs" target="_blank" rel="noopener">Documentation</a>
+    </div>
+    <div class="row end"><button value="close" class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-shortcuts">
+  <form method="dialog">
+    <h2>Keyboard shortcuts</h2>
+    <table class="keys">
+      <tr><td><kbd>Ctrl</kbd> / <kbd>Cmd</kbd> + <kbd>Enter</kbd></td><td>Run</td></tr>
+      <tr><td><kbd>Space</kbd></td><td>Play or pause</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd> or <kbd>Page Up</kbd> <kbd>Page Down</kbd></td><td>Previous or next event</td></tr>
+      <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>Start or end of the run</td></tr>
+      <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>L</kbd> <kbd>D</kbd></td><td>Select, Node, Link, Delete tools</td></tr>
+      <tr><td><kbd>Delete</kbd></td><td>Delete the selected process or link</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Clear the selection, or leave presentation mode</td></tr>
+      <tr><td><kbd>P</kbd></td><td>Presentation mode</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+      <tr><td><kbd>?</kbd></td><td>This list</td></tr>
+      <tr><td><kbd>Ctrl</kbd> + wheel</td><td>Zoom the diagram</td></tr>
+    </table>
+    <p class="hint">Shortcuts work everywhere except while typing in a text field.</p>
+    <div class="row end"><button value="close" class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-gallery" class="wide">
+  <form method="dialog">
+    <h2>Examples</h2>
+    <div id="gallery-filter" class="chips-row" role="group" aria-label="Topic"></div>
+    <div id="gallery-grid" class="gallery"></div>
+    <div class="row end"><button value="close" class="ghost">Close</button></div>
+  </form>
+</dialog>
+
+<div id="tour" class="tour" hidden>
+  <div class="tour-shade"></div>
+  <div class="tour-ring"></div>
+  <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <div class="tour-head"><b id="tour-title"></b><span id="tour-count" class="hint"></span></div>
+    <p id="tour-text"></p>
+    <div class="row end">
+      <button type="button" id="tour-skip" class="link">Skip</button>
+      <button type="button" id="tour-back" class="ghost">Back</button>
+      <button type="button" id="tour-next" class="primary">Next</button>
+    </div>
+  </div>
+</div>
+
+<button id="btn-present-exit" class="present-exit" type="button" hidden>Exit presentation</button>
+
 <div id="toast" class="toast" hidden></div>
 
 <script id="core-src">
 /*__CORE__*/
+</script>
+<script>
+/*__LIBRARY__*/
+</script>
+<script>
+/*__I18N__*/
 </script>
 <script>
 /*__EXAMPLES__*/

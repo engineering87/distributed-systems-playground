@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" role="img" aria-label="Distributed Systems Playground: watch distributed algorithms run, message by message">
+  <rect width="1280" height="300" rx="20" fill="#151f29"/>
+  <g opacity="0.55" stroke="#3a4f63" stroke-width="2">
+    <line x1="820" y1="80" x2="1220" y2="80"/>
+    <line x1="820" y1="150" x2="1220" y2="150"/>
+    <line x1="820" y1="220" x2="1220" y2="220"/>
+  </g>
+  <g stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M860 80 L940 150" stroke="#4f86d9"/>
+    <path d="M940 150 L1030 220" stroke="#2a9d84"/>
+    <path d="M940 150 L1010 80" stroke="#4f86d9"/>
+    <path d="M1060 80 L1180 220" stroke="#e05566" stroke-dasharray="9 7"/>
+    <path d="M1030 220 L1120 150" stroke="#2a9d84"/>
+  </g>
+  <g fill="#e2eaf1">
+    <circle cx="860" cy="80" r="7"/><circle cx="940" cy="150" r="7"/><circle cx="1030" cy="220" r="7"/>
+    <circle cx="1010" cy="80" r="7"/><circle cx="1120" cy="150" r="7"/>
+  </g>
+  <circle cx="1060" cy="80" r="7" fill="#e05566"/>
+  <g transform="translate(70 86) scale(2)">
+    <rect width="64" height="64" rx="14" fill="#17283a"/>
+    <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+      <line x1="12" y1="18" x2="52" y2="18"/><line x1="12" y1="32" x2="52" y2="32"/><line x1="12" y1="46" x2="52" y2="46"/>
+    </g>
+    <g stroke-width="2.6" stroke-linecap="round" fill="none">
+      <path d="M18 18 L28 32" stroke="#86aef0"/><path d="M28 32 L38 46" stroke="#4cc2a5"/>
+      <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+    </g>
+    <g fill="#ffffff"><circle cx="18" cy="18" r="3.2"/><circle cx="28" cy="32" r="3.2"/><circle cx="38" cy="46" r="3.2"/></g>
+    <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+  </g>
+  <text x="230" y="138" font-family="'Atkinson Hyperlegible', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="50" font-weight="700" fill="#e2eaf1">Distributed Systems</text>
+  <text x="230" y="194" font-family="'Atkinson Hyperlegible', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="50" font-weight="700" fill="#e2eaf1">Playground</text>
+  <text x="232" y="236" font-family="'Atkinson Hyperlegible', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" fill="#93a4b3">Watch distributed algorithms run, message by message.</text>
+</svg>

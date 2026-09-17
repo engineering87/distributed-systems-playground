@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
+  <img src="docs/assets/banner-light.svg" alt="Distributed Systems Playground: watch distributed algorithms run, message by message" width="100%">
+</picture>
+
 # Distributed Systems Playground
 
 **Watch distributed algorithms run, message by message, on the network you actually have.**
@@ -9,7 +14,7 @@
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 [![Live demo](https://img.shields.io/badge/demo-GitHub%20Pages-2350a3.svg)](https://engineering87.github.io/distributed-systems-playground/)
 
-[Live demo](https://engineering87.github.io/distributed-systems-playground/) · [Specification](docs/SPEC.md) · [Guided tour](#a-guided-tour) · [Language reference](#the-upon-language)
+[Live demo](https://engineering87.github.io/distributed-systems-playground/) · [Documentation site](https://engineering87.github.io/distributed-systems-playground/manual/) · [Getting started](docs/getting-started.md) · [Assumptions](docs/assumptions.md) · [Changelog](CHANGELOG.md)
 
 <img src="docs/demo.gif" alt="A flooding broadcast on a 3×4 grid: labeled packets travel along the links while the space-time diagram below fills in" width="100%">
 
@@ -20,6 +25,17 @@ Distributed Systems Playground is a browser-based environment for writing, runni
 Its distinguishing idea is that the timing model the algorithm *assumes* and the way the network *actually behaves* are configured separately. Most algorithms are proved correct under assumptions that real networks do not honor. Here you can hold the assumptions fixed, change the network underneath, and see the exact message that breaks the algorithm.
 
 Everything runs in the browser from a single HTML file. There is no server to deploy and nothing to install.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/stack.png" alt="The stack view of a process during a reliable broadcast"><br><sub><b>Stack view.</b> Requests go down, indications come up, messages are colored by the module that sent them.</sub></td>
+    <td width="50%"><img src="docs/causality.png" alt="Causality mode on the space-time diagram"><br><sub><b>Causality.</b> Click an event to shade what could have caused it and what it could affect.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/presentation.png" alt="Presentation mode with a large graph and diagram"><br><sub><b>Presentation mode.</b> Large text, no side panel, a clicker steps through events.</sub></td>
+    <td width="50%"><img src="docs/assets/gallery.png" alt="The example gallery with thumbnails"><br><sub><b>Example gallery.</b> Classic algorithms, each with experiments to try.</sub></td>
+  </tr>
+</table>
 
 ## Table of contents
 
@@ -32,14 +48,18 @@ Everything runs in the browser from a single HTML file. There is no server to de
 - [What the playground is for](#what-the-playground-is-for)
 - [Features](#features)
 - [Quick start](#quick-start)
+- [Documentation](#documentation)
 - [A guided tour](#a-guided-tour)
   - [1. Flooding on a grid](#1-flooding-on-a-grid)
   - [2. When synchrony is only an assumption](#2-when-synchrony-is-only-an-assumption)
   - [3. Detecting failures without a clock you can trust](#3-detecting-failures-without-a-clock-you-can-trust)
   - [4. Splitting the network](#4-splitting-the-network)
   - [5. Changing what happened](#5-changing-what-happened)
+  - [6. Following events through the stack](#6-following-events-through-the-stack)
+  - [7. Asking what caused what](#7-asking-what-caused-what)
 - [Core concepts](#core-concepts)
 - [The Upon language](#the-upon-language)
+- [The module library](#the-module-library)
 - [Timing model reference](#timing-model-reference)
 - [Faults](#faults)
 - [Scenarios](#scenarios)
@@ -47,7 +67,7 @@ Everything runs in the browser from a single HTML file. There is no server to de
 - [Included examples](#included-examples)
 - [How it works](#how-it-works)
 - [Development](#development)
-- [Limitations](#limitations)
+- [Assumptions and limitations](#assumptions-and-limitations)
 - [Roadmap](#roadmap)
 - [Related tools](#related-tools)
 - [FAQ](#faq)
@@ -124,7 +144,9 @@ This project exists to make that gap visible.
 
 **Executable pseudocode**
 - *Upon*, a language that follows the event-driven notation of the textbooks, with a Unicode syntax and an ASCII equivalent.
-- Modules implement and use interfaces and are wired together automatically.
+- Modules implement and use interfaces and are wired together automatically, or explicitly with `via`.
+- Functions inside algorithms, and a set of built-ins for tuples, sets, maps and arithmetic.
+- A library of communication abstractions (stubborn, perfect and FIFO links; best-effort, reliable, uniform, FIFO, causal and probabilistic broadcast) that can be added to any program with one click.
 - A static checker that knows the timing model, the direction of events and their arity.
 - An editor with syntax highlighting, inline diagnostics and a symbol palette.
 
@@ -140,6 +162,9 @@ This project exists to make that gap visible.
 
 **Analysis**
 - A synchronized space-time diagram with processing bars, violations, outputs, rounds and GST.
+- A causality mode: click an event to shade everything that could have caused it and everything it could affect.
+- A stack view that shows requests going down and indications coming up through the modules of a process.
+- Messages colored by the module that originated them: the application, a broadcast relaying, or the links acknowledging and retransmitting.
 - A state inspector for every process and every module instance at any point in time.
 - A filterable event log linked to the timeline.
 
@@ -153,8 +178,15 @@ This project exists to make that gap visible.
 - Deterministic runs: the same scenario and seed always give the same trace.
 - Scenarios saved in the browser, exported as JSON, or shared as a link.
 
+**Classroom and sharing**
+- Presentation mode with large text, full screen and clicker support.
+- A welcome tour on the first visit, and a list of keyboard shortcuts behind `?`.
+- Export of the space-time diagram as SVG or PNG, and of the graph as SVG, for slides and handouts.
+- An example gallery with thumbnails and topics.
+
 **Practicalities**
-- A single static HTML file, no dependencies, light and dark themes.
+- A single static HTML file, no dependencies, light and dark themes (automatic or chosen), and a palette for color vision deficiencies.
+- Interface in English or Italian.
 - Layouts for phones, tablets, laptops and large monitors: on desktop the app fills the window, on narrow screens it becomes one column with the graph first.
 - Touch support: larger controls, dragging processes with a finger, and page scrolling over the empty graph and the diagram.
 - Smooth playback on large runs: the graph is redrawn in place, animations reuse their elements, and the diagram batches its drawing.
@@ -177,6 +209,10 @@ Shortcuts work everywhere except while typing in a text field.
 
 | Key | Action |
 |---|---|
+| `?` | Show all shortcuts |
+| `P` | Presentation mode |
+| `F` | Full screen |
+| `Page Up` / `Page Down` | Previous or next event (works with presentation clickers) |
 | `Ctrl` / `Cmd` + `Enter` | Run the simulation |
 | `Space` | Play or pause |
 | `←` `→` | Previous or next event |
@@ -185,6 +221,27 @@ Shortcuts work everywhere except while typing in a text field.
 | `Delete` | Remove the selected process or link |
 | `Esc` | Clear the selection |
 | `Ctrl` + mouse wheel on the diagram | Zoom the timeline |
+
+## Documentation
+
+The documentation goes further than this page. Read it on the [documentation site](https://engineering87.github.io/distributed-systems-playground/manual/), with navigation and search, or as Markdown in [`docs/`](docs/README.md):
+
+| Page | What you will find |
+|---|---|
+| [Getting started](docs/getting-started.md) | a twenty-minute walkthrough: write an algorithm, break it, fix it |
+| [Concepts](docs/concepts.md) | the theory behind the playground, with a glossary |
+| [Examples](docs/examples.md) | every example, what to watch and what to try |
+| [The interface](docs/interface.md) | every control and every mark on the screen |
+| [The Upon language](docs/language.md) | the complete language reference |
+| [The module library](docs/library.md) | each module, its messages, guarantees and costs |
+| [The timing model](docs/timing-model.md) | assumed and actual models in detail |
+| [Faults](docs/faults.md) | crashes, recoveries, link failures and partitions |
+| [How the engine works](docs/engine.md) | event ordering, steps, determinism |
+| [Assumptions and simplifications](docs/assumptions.md) | what the simulator leaves out, in one place |
+| [Teaching with the playground](docs/teaching.md) | lesson advice and exercises |
+| [Troubleshooting](docs/troubleshooting.md) | symptoms, causes and fixes |
+
+The Upon programs in the documentation are compiled by the test suite, and the results quoted come from real runs with the stated seeds.
 
 ## A guided tour
 
@@ -199,15 +256,15 @@ Load **Flooding broadcast** from the *Example* menu. Twelve processes sit on a g
 
 ### 2. When synchrony is only an assumption
 
-Load **FloodSet consensus**. Five processes propose random values, exchange everything they know for f + 1 = 2 rounds, and decide the minimum.
+Load **FloodSet consensus**. Four processes propose random values, exchange everything they know for f + 1 = 2 rounds, and decide the minimum.
 
 With the **Ideal synchronous** preset, rounds are executed in lockstep: every message of round *r* arrives in round *r*, and every process decides the same value. The dashed vertical lines on the diagram are round boundaries.
 
-Switch to **Realistic synchronous** and run with seed 3. The algorithm still believes in rounds, but now each process opens its rounds according to its own drifting clock, and delays follow a long-tailed distribution. Messages that arrive after the recipient closed the round are discarded, as the policy says, and drawn as dashed red lines.
+Switch to **Realistic synchronous** and run with the same seed (5). The algorithm still believes in rounds, but now each process opens its rounds according to its own drifting clock, and delays follow a long-tailed distribution. Messages that arrive after the recipient closed the round are discarded, as the policy says, and drawn as dashed red lines.
 
-<img src="docs/violations.gif" alt="FloodSet under realistic timing: late messages are drawn as dashed red lines and process p3 decides 2 while the others decide 1" width="100%">
+<img src="docs/violations.gif" alt="FloodSet under realistic timing: late messages are drawn as dashed red lines and one process decides differently from the others" width="100%">
 
-At the end of the run, p3 decides 2 while every other process decides 1. Nothing in the code is wrong. The algorithm was proved for a model the network did not follow, and the omissions caused by late messages exceed what FloodSet tolerates. The **Timing** tab shows the delay histogram and the percentage of messages that exceed `DELTA`, which makes the risk visible before running anything.
+At the end of the run, p2 decides 7 while every other process decides 3. Nothing in the code is wrong. The algorithm was proved for a model the network did not follow, and the omissions caused by late messages exceed what FloodSet tolerates. The **Timing** tab shows the delay histogram and the percentage of messages that exceed `DELTA`, which makes the risk visible before running anything.
 
 ### 3. Detecting failures without a clock you can trust
 
@@ -246,6 +303,27 @@ Pause any run, select a process or a link and use the controls in the bar under 
 
 The simulation is recomputed and playback resumes from the same instant. Because every source of randomness is seeded per link and per process, everything before the cursor stays exactly as it was, and you can compare the two futures.
 
+### 6. Following events through the stack
+
+Load **Reliable broadcast when the sender crashes**. The program is a small newsroom on top of a stack of library modules: eager reliable broadcast, best-effort broadcast and perfect links with acknowledgements. The network loses 40% of the messages, and p1 crashes 40 ms after publishing.
+
+- Tick **Layers** above the graph. Packets now take the color of the module that originated them: the application's broadcast, the relays of the reliable broadcast, and the acknowledgements and retransmissions of the links. The legend on the graph lists them.
+- Open the **Stack** tab and select p2. Each box is a module instance; blue arrows are requests going down, green arrows are indications coming up, and the numbers count the events each module has handled.
+- Step through the run with **Event by event**. You can follow a `Deliver` from the network up to the application, and the `Broadcast` that the reliable broadcast sends back down to relay the news.
+- Every correct process reads the news, even though p1 crashed before its retransmissions reached p3, p4 and p5. Now edit the first algorithm, replace `uses ReliableBroadcast` with `uses BestEffortBroadcast`, and run again with the same seed: only p2 reads it.
+
+<img src="docs/stack.png" alt="The stack view of process p2 during a reliable broadcast, with messages colored by the module that originated them" width="100%">
+
+### 7. Asking what caused what
+
+Load **Causal order broadcast: questions before answers**. p1 posts a question, p2 answers as soon as it reads it, and the channels do not preserve order.
+
+- With causal order broadcast, every process reads the question before the answer.
+- Replace `uses CausalOrderBroadcast` with `uses ReliableBroadcast` and run again with the same seed: p4 and p5 read the answer first.
+- Tick **Causality** above the diagram and click an event, for example p2 reading the question. Blue shading marks the part of every process's history that could have caused it, amber shading the part it could affect, and unrelated messages fade out. During playback the graph marks the processes that the event has already reached.
+
+<img src="docs/causality.png" alt="Causality mode: the causal past of an event is shaded in blue and its causal future in amber" width="100%">
+
 ## Core concepts
 
 **Processes and topology.** Each process has an integer identifier, shown as p1, p2 and so on. Links define `neighbors`, and a message can only be sent over an existing, enabled link (a process can always send to itself).
@@ -264,7 +342,7 @@ The simulation is recomputed and playback resumes from the same instant. Because
 
 Upon programs are made of **interfaces** and **algorithms**. An interface lists the events a module accepts from above (`request`) and emits upwards (`indication`). An algorithm implements one interface and may use others.
 
-```
+```upon
 interface PerfectLinks
   request Send(q, m)
   indication Deliver(p, m)
@@ -284,7 +362,7 @@ algorithm DirectLinks
 end
 ```
 
-When an algorithm declares `uses PerfectLinks as pl`, the playground instantiates the first algorithm that implements `PerfectLinks` and connects it. The **Main algorithm** selector in the *Code* tab chooses the top of the stack.
+When an algorithm declares `uses PerfectLinks as pl`, the playground instantiates an algorithm that implements `PerfectLinks` and connects it. If several algorithms implement the same interface, `uses PerfectLinks as pl via AckLinks` picks one explicitly. The **Main algorithm** selector in the *Code* tab chooses the top of the stack.
 
 ### Structure of an algorithm
 
@@ -298,10 +376,16 @@ algorithm Name
     W := ∅                        // per-process variables
     stable log := []              // survives recovery (recovery is on the roadmap)
 
+  function quorum(S)               // functions see state and parameters
+    return #S > N / 2
+  end
+
   upon event ⟨alias, Init⟩ do … end
   …handlers…
 end
 ```
+
+Functions can have local variables, loops and conditions, can update the state and trigger events, and can call each other recursively. Use them inside expressions, or as a statement with `call name(args)`.
 
 ### Handlers
 
@@ -325,6 +409,7 @@ forall q in neighbors where q ≠ p do … end
 while c do … end
 starttimer(t, 100ms)            canceltimer(t)
 assert cond, "message"          log "text", value
+call name(args)                 return value      // return only inside functions
 skip
 ```
 
@@ -351,8 +436,11 @@ Operators: `∪ ∩ \ ∈ ∉ ⊆`, `= ≠ < ≤ > ≥`, `and or not`, `+ - * / 
 | `now()` | the process's local clock |
 | `DELTA`, `PHI`, `RHO` | synchrony constants, only when known in the assumed model |
 | `min`, `max`, `choose`, `size` | on sets, tuples and maps; `choose` is deterministic |
-| `random(a, b)` | integer from the process's seeded stream |
-| `append`, `toset`, `str`, `abs` | helpers |
+| `head`, `last`, `tail`, `sort`, `reverse`, `slice(t, a, b)`, `range(a, b)`, `append` | sequences |
+| `get(m, k, default)`, `remove(c, x)`, `keys`, `values`, `argmin`, `argmax` | maps and collections |
+| `sum`, `mean`, `abs`, `sqrt`, `ln`, `exp`, `pow`, `floor`, `ceil`, `round` | arithmetic |
+| `random(a, b)`, `pick(S)` | random integer, random element, from the process's seeded stream |
+| `toset`, `str` | conversions |
 
 ### Provided modules
 
@@ -367,7 +455,8 @@ Operators: `∪ ∩ \ ∈ ∉ ⊆`, `= ≠ < ≤ > ≥`, `and or not`, `+ - * / 
 - Constants unavailable in the assumed model, such as `DELTA` in an asynchronous system.
 - `Rounds` used outside the rounds model, or `Net` inside it.
 - Indications sent downwards or requests sent upwards, and wrong numbers of arguments.
-- Undeclared variables, assignments to parameters or built-ins, unknown functions.
+- Undeclared variables, assignments to parameters or built-ins, unknown functions and wrong numbers of arguments, `return` outside a function.
+- `via` naming an algorithm that does not exist or implements a different interface.
 - Warnings for indications that no handler receives and timers that are never started.
 
 ### ASCII syntax
@@ -380,6 +469,25 @@ Operators: `∪ ∩ \ ∈ ∉ ⊆`, `= ≠ < ≤ > ≥`, `and or not`, `+ - * / 
 | `Π` | `Procs` | | `⊆` | `subseteq` |
 
 Inside an ASCII `trigger`, wrap comparisons in parentheses, because `>` closes the event. The complete grammar is in [section 5.2 of the specification](docs/SPEC.md#52-grammar-ebnf).
+
+## The module library
+
+The *Add module* menu in the *Code* tab appends a module to the program, together with the interfaces it needs and, when nothing in the program provides them yet, the modules it depends on.
+
+| Module | Implements | Built on | Guarantees |
+|---|---|---|---|
+| `RetransmitLinks` | StubbornLinks | the network | each message is sent again a bounded number of times |
+| `EliminateDuplicates` | PerfectLinks | StubbornLinks | reliable delivery, no duplication (messages assumed unique) |
+| `AckLinks` | PerfectLinks | the network | reliable delivery to correct processes, no duplication; sequence numbers and acknowledgements |
+| `SequencedFifoLinks` | FifoPerfectLinks | PerfectLinks | perfect links delivering in sending order |
+| `BasicBroadcast` | BestEffortBroadcast | PerfectLinks | delivery to all if the sender stays correct |
+| `EagerReliableBroadcast` | ReliableBroadcast | BestEffortBroadcast | agreement among correct processes, even if the sender crashes |
+| `MajorityAckURB` | UniformReliableBroadcast | BestEffortBroadcast | uniform agreement, with a correct majority |
+| `BroadcastWithSequenceNumber` | FifoReliableBroadcast | ReliableBroadcast | reliable broadcast with FIFO order per sender |
+| `WaitingCausalBroadcast` | CausalOrderBroadcast | ReliableBroadcast | reliable broadcast with causal order, using vector clocks |
+| `EagerGossip` | ProbabilisticBroadcast | the network | most processes deliver with high probability, no duplication |
+
+Most modules follow the algorithms of Cachin, Guerraoui and Rodrigues. The library code is ordinary Upon: it can be read, modified and stepped through like any other part of the program, and every module is covered by a test that checks its guarantee under loss, reordering or crashes.
 
 ## Timing model reference
 
@@ -470,7 +578,7 @@ The node can be a number or `*` for every process, and the arguments are Upon ex
 
 ```json
 {
-  "seed": 3,
+  "seed": 5,
   "nodes": [{ "id": 1, "x": 330, "y": 70 }, { "id": 2, "x": 482, "y": 181 }],
   "links": [{ "a": 1, "b": 2, "directed": false, "enabled": true }],
   "code": "interface Consensus …",
@@ -503,8 +611,9 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Timing tab | presets, assumed and actual models, delay histogram |
 | Scenario tab | inputs, the list of faults with a form to add crashes, recoveries, link failures and partitions, duration |
 | State tab | local clock, round and variables of the selected process at the cursor |
+| Stack tab | the module stack of a process, with the latest requests and indications between its modules |
 | Transport | play controls, speed, autoplay, time scrubber, run summary |
-| Diagram | space-time view with pan, zoom, "Action" and "All" views |
+| Diagram | space-time view with pan, zoom, "Action" and "All" views, and the causality mode |
 | Events | the log, filterable by faults, outputs, inputs, violations, dropped messages, warnings and assertions |
 
 ## Included examples
@@ -513,9 +622,12 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 |---|---|---|---|
 | Flooding broadcast | asynchronous | 3×4 grid | Raise the loss rate and see which processes never deliver. |
 | Chang-Roberts leader election | asynchronous | directed ring of 8 | Give one link a slow delay distribution and follow the election around it. |
-| FloodSet consensus | synchronous rounds | complete graph of 5 | Switch to *Realistic synchronous* with seed 3 and watch p3 disagree. |
+| FloodSet consensus | synchronous rounds | complete graph of 4 | Switch to *Realistic synchronous* with seed 5 and watch p2 disagree. |
 | Failure detector ◇P | partially synchronous | complete graph of 4 | Move GST later and count the wrong suspicions. |
 | Failure detector across a partition and a recovery | partially synchronous | complete graph of 5 | Make the partition permanent and see which suspicions never go away. |
+| Reliable broadcast when the sender crashes | asynchronous, 40% loss | complete graph of 5 | Switch to best-effort broadcast and compare who reads the news. |
+| Causal order broadcast | asynchronous, no FIFO | complete graph of 5 | Switch to reliable broadcast and find the answers read before their questions. |
+| Gossip | asynchronous | 16 processes, 4 neighbors each | Change `FANOUT` and `ROUNDS` and compare reach and cost. |
 
 The *Example* menu also offers an empty scenario to start from.
 
@@ -543,15 +655,19 @@ Randomness comes from `xoshiro128**`, with a separate stream derived via `splitm
 
 ```
 src/
-  core.js          lexer, parser, checker, interpreter, engine (no DOM)
+  core.js          lexer, parser, checker, interpreter, engine, causal cone (no DOM)
+  library.js       communication modules written in Upon
+  i18n.js          Italian translation of the interface
   examples.js      example scenarios and timing presets
   ui.js            interface and animation
   style.css        light and dark themes
   template.html    page structure
 scripts/build.mjs  bundles src/ into index.html
+scripts/build-docs.mjs  generates the documentation site in manual/
 test/              tests for the language and the engine (node:test)
 docs/              specification and README media
 index.html         generated, self-contained application
+manual/            generated documentation site
 ```
 
 ### Commands
@@ -560,41 +676,56 @@ Requires Node.js 18 or later. There are no dependencies to install.
 
 ```sh
 npm test         # run the test suite
-npm run build    # rebuild index.html from src/
-npm run check    # fail if index.html is out of date
+npm run build    # rebuild index.html and the documentation site
+npm run check    # fail if index.html or manual/ is out of date
 ```
 
-`index.html` is a build output, but it is committed so that GitHub Pages can serve the repository root directly. Rebuild it before committing changes to `src/`.
+`index.html` and `manual/` are build outputs, but they are committed so that GitHub Pages can serve the repository root directly: the playground at `/` and the documentation at `/manual/`. Rebuild them before committing changes to `src/` or `docs/`.
 
 ### Tests
 
-The suite covers every example, the determinism of traces, the correctness properties of each example (for instance, Chang-Roberts elects the highest identifier and ◇P ends up suspecting exactly the crashed process), the static checks, the ASCII syntax, crash-recovery with `stable` state, link failures and partitions, fault validation, and the guarantee that injecting an event or a fault does not alter earlier history.
+The suite covers the language (including functions, `via` and the built-ins), every library module under loss, reordering and crashes, every example, the determinism of traces, the correctness properties of each example (for instance, Chang-Roberts elects the highest identifier and ◇P ends up suspecting exactly the crashed process), the static checks, the ASCII syntax, crash-recovery with `stable` state, link failures and partitions, fault validation, and the guarantee that injecting an event or a fault does not alter earlier history.
 
 ### Continuous integration and deployment
 
 The GitHub Actions workflow runs the tests and verifies that `index.html` matches the sources. To publish the demo, enable GitHub Pages under *Settings → Pages → Deploy from a branch → main / root*.
 
-## Limitations
+## Assumptions and limitations
+
+Every simulator simplifies. The most important choices here are:
+
+- **Processes** handle one event at a time, and a step is never interrupted: a crash happens between steps, never in the middle of a sequence of sends.
+- **Time** is discrete, in microseconds. Local clocks have a fixed offset and a constant drift.
+- **Channels** are point to point, with no routing. Each message draws its delay and its loss independently; there is no congestion and no bandwidth.
+- **Lockstep rounds** ignore the delay distribution entirely; emulated rounds use it.
+- **Partial synchrony** follows the Dwork, Lynch and Stockmeyer model with a GST; messages sent before GST arrive by GST plus the bound.
+- **Failures** are crash-stop and crash-recovery, symmetric link failures and partitions. Byzantine behavior and omissions of a process are not modeled.
+- **Sets** are iterated in sorted order, which real systems do not guarantee.
+- **Distributions** are illustrative, not measurements of real networks.
+
+The full list, with the exact rules, is in [Assumptions and simplifications](docs/assumptions.md). Practical limits:
 
 - The engine runs on the browser's main thread and stops after 150,000 events. Scenarios for teaching stay well below that, but long runs with many timers can reach it.
 - The topology animation draws at most 400 messages in flight at once. With more than 120 in flight, packets are drawn as dots without labels, and with more than 200 without trails.
 - Link failures and partitions are symmetric: a link cannot yet fail in one direction only.
 - A process cannot yet pause (for example for garbage collection) or omit messages on its own; omissions come from the channels.
 - Correctness properties are checked with local `assert` statements; global invariants such as agreement are not yet evaluated automatically.
+- `RetransmitLinks` stops after a fixed number of retransmissions, unlike the textbook version that retransmits forever, so that runs stay short. `AckLinks` retransmits to a crashed process until the run ends.
+- The causal cone is computed from the messages delivered in the run, at the granularity of processing steps.
 - Byzantine behavior is not modeled.
 - The playground explores one execution at a time. It is not a model checker and does not prove anything.
 
 ## Roadmap
 
-- Process pauses, send and receive omissions, one-way link failures
+- More failure detectors (P, ◇P ping-pong, Ω, φ-accrual, a simplified SWIM) with a suspicion matrix and quality metrics
+- A catalog of algorithms: logical clocks and clock synchronization, snapshots, elections, mutual exclusion, consensus (Paxos, Ben-Or, simplified Raft), replication, two-phase commit
 - Global invariants checked at every step and marked on the timeline
-- Failure detector oracles (P, ◇P, Ω) as provided modules
-- An explicit module stack in scenarios and a separate standard library
+- Process pauses, send and receive omissions, one-way link failures
 - Two runs side by side
 - Engine in a Web Worker for larger scenarios
 - Byzantine processes written in Upon
 
-The current differences between the implementation and the specification are listed in [Appendix B of the specification](docs/SPEC.md#appendix-b--implementation-status-v04).
+The current differences between the implementation and the specification are listed in [Appendix B of the specification](docs/SPEC.md#appendix-b--implementation-status-v05).
 
 ## Related tools
 
@@ -632,8 +763,9 @@ Issues and pull requests are welcome. Useful contributions include:
 - **New examples.** Add the scenario to `src/examples.js` and a test in `test/core.test.cjs` that checks the property the algorithm guarantees.
 - **Language and engine features.** Keep `src/core.js` free of DOM access, so that it stays testable under Node.
 - **Interface improvements.** Check both themes and a narrow viewport.
+- **Documentation.** Keep it exact: quote only results obtained from the engine, and state the seed.
 
-Before opening a pull request, run:
+The workflow and the writing guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a pull request, run:
 
 ```sh
 npm test && npm run build && npm run check
@@ -649,6 +781,10 @@ npm test && npm run build && npm run check
 - T. D. Chandra, S. Toueg. Unreliable Failure Detectors for Reliable Distributed Systems. *Journal of the ACM* 43(2), 1996.
 - E. Chang, R. Roberts. An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes. *Communications of the ACM* 22(5), 1979.
 - N. Lynch. *Distributed Algorithms*. Morgan Kaufmann, 1996.
+
+## Citing
+
+If you use the playground in a course or a paper, GitHub's *Cite this repository* button gives a ready-made reference from [CITATION.cff](CITATION.cff).
 
 ## License
 

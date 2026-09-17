@@ -228,7 +228,7 @@ function typeName(v) {
 // ============================================================
 const KEYWORDS = new Set(('interface request indication algorithm implements as uses params state stable ' +
   'upon event where condition exists in do end trigger if then elif else forall while starttimer ' +
-  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil').split(' '));
+  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil function return call via').split(' '));
 
 const UNICODE_MAP = {
   '∪': ['kw', 'union'], '∩': ['kw', 'inter'], '∈': ['kw', 'in'], '∉': ['kw', 'notin'],
@@ -371,7 +371,9 @@ class Parser {
       const t = this.ident('the name of the used interface');
       this.kw('as');
       const a = this.ident('the instance name');
-      uses.push({ type: t.v, alias: a.v, tok: t });
+      let via = null;
+      if (this.isKw('via')) { this.p++; via = this.ident('the name of the algorithm to use'); }
+      uses.push({ type: t.v, alias: a.v, tok: t, via: via ? via.v : null, viaTok: via });
     }
     const params = [], state = [];
     if (this.isKw('params')) {
@@ -392,10 +394,25 @@ class Parser {
         this.skipSemis();
       }
     }
-    const handlers = [];
-    while (this.isKw('upon')) handlers.push(this.handler());
+    const handlers = [], functions = [];
+    while (this.isKw('upon') || this.isKw('function')) {
+      if (this.isKw('upon')) handlers.push(this.handler());
+      else functions.push(this.functionDecl());
+    }
     this.kw('end');
-    return { name, tok, implType: implType.v, implTok: implType, implAlias, uses, params, state, handlers };
+    return { name, tok, implType: implType.v, implTok: implType, implAlias, uses, params, state, handlers, functions };
+  }
+
+  functionDecl() {
+    const tok = this.kw('function');
+    const name = this.ident('the function name');
+    this.op('(');
+    const params = [];
+    if (!this.isOp(')')) { params.push(this.ident().v); while (this.isOp(',')) { this.p++; params.push(this.ident().v); } }
+    this.op(')');
+    const body = this.block();
+    this.kw('end');
+    return { name: name.v, tok: name, params, body, line: tok.line };
   }
 
   handler() {
@@ -558,6 +575,25 @@ class Parser {
         return { s: 'log', args, line };
       }
       case 'skip': this.p++; return { s: 'skip', line };
+      case 'return': {
+        this.p++;
+        const k = this.tok;
+        const bare = k.t === 'eof' || (k.t === 'op' && k.v === ';') ||
+          (k.t === 'kw' && ['end', 'elif', 'else', 'if', 'forall', 'while', 'trigger', 'starttimer', 'canceltimer',
+            'assert', 'log', 'skip', 'return', 'call'].includes(k.v));
+        return { s: 'return', expr: bare ? null : this.expr(), line, tok };
+      }
+      case 'call': {
+        this.p++;
+        const name = this.ident('the function name');
+        this.op('(');
+        const args = [];
+        this.withAngles(() => {
+          if (!this.isOp(')')) { args.push(this.expr()); while (this.isOp(',')) { this.p++; args.push(this.expr()); } }
+        });
+        this.op(')');
+        return { s: 'call', name: name.v, args, line, tok: name };
+      }
     }
     this.err('Invalid statement: ' + this.desc(tok));
   }
@@ -703,7 +739,10 @@ function builtinIfaces() {
 const BUILTIN_VARS = new Set(['self', 'Procs', 'neighbors', 'N', 'DELTA', 'PHI', 'RHO', 'round']);
 const BUILTIN_FUNS = {
   min: [1, 1], max: [1, 1], choose: [1, 1], size: [1, 1], keys: [1, 1], values: [1, 1],
-  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1]
+  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1],
+  head: [1, 1], tail: [1, 1], last: [1, 1], sort: [1, 1], reverse: [1, 1], slice: [3, 3], range: [2, 2],
+  remove: [2, 2], get: [3, 3], sum: [1, 1], mean: [1, 1], argmin: [1, 1], argmax: [1, 1], pick: [1, 1],
+  sqrt: [1, 1], ln: [1, 1], exp: [1, 1], pow: [2, 2], floor: [1, 1], ceil: [1, 1], round: [1, 1]
 };
 
 // ============================================================
@@ -737,9 +776,25 @@ function check(prog, ctx) {
       if (aliases.has(u.alias)) E('Duplicate instance name "' + u.alias + '"', u.tok);
       aliases.set(u.alias, { role: 'use', iface: it });
     }
+    // user functions
+    const funcs = new Map();
+    for (const f of a.functions || []) {
+      if (funcs.has(f.name)) E('Function "' + f.name + '" is already defined', f.tok);
+      else if (BUILTIN_FUNS[f.name]) E('"' + f.name + '" is a built-in function', f.tok);
+      funcs.set(f.name, f);
+      if (new Set(f.params).size !== f.params.length) E('Repeated parameter in "' + f.name + '"', f.tok);
+    }
+    a.funcs = funcs;
+    for (const u of a.uses) {
+      if (!u.via) continue;
+      if (u.type === 'Net' || u.type === 'Rounds') { E('"via" cannot be used with the provided module ' + u.type, u.viaTok); continue; }
+      const target = prog.algorithms.find(x => x.name === u.via);
+      if (!target) E('Algorithm "' + u.via + '" is not defined', u.viaTok);
+      else if (target.implType !== u.type) E('"' + u.via + '" implements ' + target.implType + ', not ' + u.type, u.viaTok);
+    }
     // timers used
     const timers = new Set();
-    walkStmts(a.handlers.flatMap(h => h.body), s => {
+    walkStmts(a.handlers.flatMap(h => h.body).concat((a.functions || []).flatMap(f => f.body)), s => {
       if (s.s === 'starttimer' || s.s === 'canceltimer') timers.add(s.id);
     });
     a.timers = timers;
@@ -780,6 +835,12 @@ function check(prog, ctx) {
           checkExpr(e.where, s2); return;
         }
         case 'call': {
+          if (funcs.has(e.name)) {
+            const fd = funcs.get(e.name);
+            if (e.args.length !== fd.params.length) E('"' + e.name + '" takes ' + fd.params.length + ' argument(s)', e.tok);
+            e.args.forEach(x => checkExpr(x, scope));
+            return;
+          }
           const f = BUILTIN_FUNS[e.name];
           if (!f) { E('Unknown function "' + e.name + '"', e.tok); return; }
           if (e.args.length < f[0] || e.args.length > f[1])
@@ -843,6 +904,14 @@ function check(prog, ctx) {
           case 'canceltimer': break;
           case 'assert': checkExpr(s.expr, scope); checkExpr(s.msg, scope); break;
           case 'log': s.args.forEach(x => checkExpr(x, scope)); break;
+          case 'return':
+            if (!scope.has('#function')) E('"return" can only be used inside a function', s.tok);
+            checkExpr(s.expr, scope); break;
+          case 'call':
+            if (!funcs.has(s.name)) E(BUILTIN_FUNS[s.name] ? '"call" is for your own functions; use "' + s.name + '(…)" in an expression'
+              : 'Unknown function "' + s.name + '"', s.tok);
+            else if (funcs.get(s.name).params.length !== s.args.length) E('"' + s.name + '" takes ' + funcs.get(s.name).params.length + ' argument(s)', s.tok);
+            s.args.forEach(x => checkExpr(x, scope)); break;
         }
       }
     };
@@ -890,6 +959,12 @@ function check(prog, ctx) {
       collectAssigned(h.body, scope);
       checkBlock(h.body, scope);
     }
+    for (const f of a.functions || []) {
+      const scope = new Set(f.params);
+      scope.add('#function');
+      collectAssigned(f.body, scope);
+      checkBlock(f.body, scope);
+    }
     // indications from lower layers that are never handled
     for (const u of a.uses) {
       const it = ifaces.get(u.type);
@@ -933,10 +1008,18 @@ function resolveStack(prog, topName) {
     specs.push(spec);
     for (const u of algo.uses) {
       if (u.type === 'Net' || u.type === 'Rounds') { spec.bind[u.alias] = { builtin: u.type }; continue; }
-      const cands = byIface.get(u.type) || [];
-      if (!cands.length) throw new Error('No algorithm implements "' + u.type + '" (required by ' + algo.name + ')');
-      if (cands.length > 1) warnings.push('Several algorithms implement ' + u.type + ': using ' + cands[0].name);
-      const child = build(cands[0], path + '/' + u.alias, spec.id, u.alias, chain.concat(algo.name));
+      let chosen;
+      if (u.via) {
+        chosen = byName.get(u.via);
+        if (!chosen || chosen.implType !== u.type) throw new Error('"' + u.via + '" does not implement ' + u.type);
+      } else {
+        const cands = byIface.get(u.type) || [];
+        if (!cands.length) throw new Error('No algorithm implements "' + u.type + '" (required by ' + algo.name + ')');
+        if (cands.length > 1) warnings.push('Several algorithms implement ' + u.type + ': ' + algo.name + ' uses ' + cands[0].name +
+          ' (write "uses ' + u.type + ' as ' + u.alias + ' via …" to choose)');
+        chosen = cands[0];
+      }
+      const child = build(chosen, path + '/' + u.alias, spec.id, u.alias, chain.concat(algo.name));
       spec.bind[u.alias] = { inst: child.id };
     }
     return spec;
@@ -950,6 +1033,18 @@ function resolveStack(prog, topName) {
 // ============================================================
 class RtError extends Error { constructor(msg, line) { super(msg); this.line = line; } }
 class HaltSignal extends Error { constructor(msg) { super(msg); } }
+class ReturnSignal { constructor(value) { this.value = value; } }
+const MAX_CALL_DEPTH = 200;
+function callUser(fd, args, env, line) {
+  const depth = (env.depth || 0) + 1;
+  if (depth > MAX_CALL_DEPTH) throw new RtError('Function calls nested deeper than ' + MAX_CALL_DEPTH + ' (infinite recursion?)', line);
+  const locals = new Map();
+  fd.params.forEach((p, i) => locals.set(p, args[i]));
+  const fenv = { node: env.node, inst: env.inst, locals, sim: env.sim, rng: env.rng, time: env.time, depth, origin: env.origin };
+  try { execBlock(fd.body, fenv); }
+  catch (e) { if (e instanceof ReturnSignal) return e.value; throw e; }
+  return null;
+}
 
 function needType(v, pred, what, line) {
   if (!pred(v)) throw new RtError('Expected ' + what + ', found ' + typeName(v) + ' (' + fmt(v) + ')', line);
@@ -1018,7 +1113,11 @@ function evalExpr(e, env) {
       if (x instanceof VMap) { const en = x.m.get(key(i)); return en ? en[1] : null; }
       throw new RtError('Cannot index a ' + typeName(x), line);
     }
-    case 'call': return callBuiltin(e.name, e.args.map(a => evalExpr(a, env)), env, line);
+    case 'call': {
+      const fd = env.inst.algo.funcs && env.inst.algo.funcs.get(e.name);
+      const args = e.args.map(a => evalExpr(a, env));
+      return fd ? callUser(fd, args, env, line) : callBuiltin(e.name, args, env, line);
+    }
   }
   throw new RtError('Unsupported expression', line);
 }
@@ -1090,6 +1189,11 @@ function lookup(name, env, line) {
   throw new RtError('Variable "' + name + '" is not defined', line);
 }
 
+function seqOf(a, name, line) {
+  if (a instanceof Tup) return a.items;
+  if (a instanceof VSet) return a.sorted();
+  throw new RtError(name + ' requires a tuple or a set, found ' + typeName(a), line);
+}
 function callBuiltin(name, args, env, line) {
   const a = args[0];
   switch (name) {
@@ -1122,6 +1226,66 @@ function callBuiltin(name, args, env, line) {
     case 'append': needType(a, v => v instanceof Tup, 'a tuple', line); return new Tup(a.items.concat([args[1]]));
     case 'toset': return VSet.of(elems(a, line));
     case 'str': return typeof a === 'string' ? a : fmt(a);
+    case 'head': case 'last': {
+      const xs = seqOf(a, name, line);
+      if (!xs.length) throw new RtError(name + ' of an empty ' + typeName(a), line);
+      return name === 'head' ? xs[0] : xs[xs.length - 1];
+    }
+    case 'tail': return new Tup(seqOf(a, name, line).slice(1));
+    case 'sort': return new Tup(elems(a, line).slice().sort(compare));
+    case 'reverse': return new Tup(seqOf(a, name, line).slice().reverse());
+    case 'slice': {
+      needType(args[1], isNum, 'a number', line); needType(args[2], isNum, 'a number', line);
+      return new Tup(seqOf(a, name, line).slice(args[1], args[2]));
+    }
+    case 'range': {
+      needType(args[0], isNum, 'a number', line); needType(args[1], isNum, 'a number', line);
+      if (args[1] - args[0] > 100000) throw new RtError('range is too large', line);
+      const out = [];
+      for (let i = Math.ceil(args[0]); i < args[1]; i++) out.push(i);
+      return new Tup(out);
+    }
+    case 'remove': {
+      const x = args[1];
+      if (a instanceof VSet) { const m = new Map(a.m); m.delete(key(x)); return new VSet(m); }
+      if (a instanceof VMap) { const m = new Map(a.m); m.delete(key(x)); return new VMap(m); }
+      if (a instanceof Tup) { const i = a.items.findIndex(v => eq(v, x)); return i < 0 ? a : new Tup(a.items.slice(0, i).concat(a.items.slice(i + 1))); }
+      throw new RtError('remove does not apply to a ' + typeName(a), line);
+    }
+    case 'get': {
+      if (a instanceof VMap) { const en = a.m.get(key(args[1])); return en ? en[1] : args[2]; }
+      if (a instanceof Tup) { const i = args[1]; return (isNum(i) && i >= 0 && i < a.items.length) ? a.items[i] : args[2]; }
+      if (a === null) return args[2];
+      throw new RtError('get does not apply to a ' + typeName(a), line);
+    }
+    case 'sum': case 'mean': {
+      const xs = a instanceof VMap ? a.sorted().map(e => e[1]) : elems(a, line);
+      let t = 0;
+      for (const x of xs) t += needType(x, isNum, 'numbers in ' + name, line);
+      if (name === 'sum') return t;
+      if (!xs.length) throw new RtError('mean of an empty collection', line);
+      return t / xs.length;
+    }
+    case 'argmin': case 'argmax': {
+      needType(a, v => v instanceof VMap, 'a map', line);
+      const es = a.sorted();
+      if (!es.length) throw new RtError(name + ' of an empty map', line);
+      let best = es[0];
+      for (const e of es) if (name === 'argmin' ? compare(e[1], best[1]) < 0 : compare(e[1], best[1]) > 0) best = e;
+      return best[0];
+    }
+    case 'pick': {
+      const xs = elems(a, line);
+      if (!xs.length) throw new RtError('pick of an empty collection', line);
+      return xs[Math.floor(env.rng.next() * xs.length)];
+    }
+    case 'sqrt': case 'ln': case 'exp': case 'floor': case 'ceil': case 'round': {
+      const x = needType(a, isNum, 'a number', line);
+      if (name === 'sqrt') { if (x < 0) throw new RtError('sqrt of a negative number', line); return Math.sqrt(x); }
+      if (name === 'ln') { if (x <= 0) throw new RtError('ln of a number ≤ 0', line); return Math.log(x); }
+      return Math[name](x);
+    }
+    case 'pow': return Math.pow(needType(a, isNum, 'a number', line), needType(args[1], isNum, 'a number', line));
   }
   throw new RtError('Unknown function ' + name, line);
 }
@@ -1233,6 +1397,8 @@ function execBlock(stmts, env) {
         env.sim.userLog(env, s.args.map(x => { const v = evalExpr(x, env); return typeof v === 'string' ? v : fmt(v); }).join(' '), s.line);
         break;
       case 'skip': break;
+      case 'return': throw new ReturnSignal(s.expr ? evalExpr(s.expr, env) : null);
+      case 'call': callUser(env.inst.algo.funcs.get(s.name), s.args.map(x => evalExpr(x, env)), env, s.line); break;
     }
   }
 }
@@ -1274,7 +1440,7 @@ function runSimulation(scn) {
   const out = {
     ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
     snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
-    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], downs: {}, netFaults: { links: [], partitions: [] }
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, netFaults: { links: [], partitions: [] }
   };
   // ---- configuration ----
   let cfg;
@@ -1298,7 +1464,11 @@ function runSimulation(scn) {
   try { stack = resolveStack(prog, topName); }
   catch (e) { out.error = e.message; return out; }
   out.warnings.push(...stack.warnings);
-  out.specs = stack.specs.map(s => ({ id: s.id, path: s.path, algo: s.algo.name }));
+  out.specs = stack.specs.map(s => ({
+    id: s.id, path: s.path, algo: s.algo.name, iface: s.algo.implType, alias: s.algo.implAlias,
+    parent: s.parent, aliasInParent: s.aliasInParent, depth: s.path.split('/').length - 1,
+    builtins: Object.keys(s.bind).filter(k => s.bind[k].builtin).map(k => s.bind[k].builtin)
+  }));
   const topSpec = stack.specs[0];
   const topIface = chk.ifaces.get(topSpec.algo.implType);
 
@@ -1375,10 +1545,18 @@ function runSimulation(scn) {
   let curTime = 0;
   let curEnd = 0;
 
+  const LOCAL_MAX = 200000;
+  const trace = (node, from, to, ev, args) => {
+    if (out.localEvents.length >= LOCAL_MAX) { out.localTruncated = true; return; }
+    let a = args.map(fmt).join(', ');
+    if (a.length > 80) a = a.slice(0, 79) + '…';
+    out.localEvents.push({ t: curEnd, node: node.id, from, to, ev, args: a });
+  };
   sim.emit = function (env, alias, ev, args, line) {
     const inst = env.inst, node = env.node, spec = inst.spec;
     if (alias === spec.algo.implAlias) {
       // indication going up
+      trace(node, spec.id, spec.parent === null ? 'app' : spec.parent, ev, args);
       if (spec.parent === null) {
         const text = ev + (args.length ? ' | ' + args.map(fmt).join(', ') : '');
         out.outputs.push({ t: curEnd, node: node.id, ev, args: args.map(fmt), text });
@@ -1389,10 +1567,15 @@ function runSimulation(scn) {
       return;
     }
     const b = spec.bind[alias];
-    if (b.inst !== undefined) { localQ.push({ inst: b.inst, alias: stack.specs[b.inst].algo.implAlias, ev, args }); return; }
+    if (b.inst !== undefined) {
+      trace(node, spec.id, b.inst, ev, args);
+      localQ.push({ inst: b.inst, alias: stack.specs[b.inst].algo.implAlias, ev, args, origin: env.origin !== undefined ? env.origin : spec.id });
+      return;
+    }
+    trace(node, spec.id, 'net', ev, args);
     // built-in module: network send
     const q = args[0];
-    netSend(node, q, args[1], spec.id, alias, line);
+    netSend(node, q, args[1], spec.id, alias, line, env.origin !== undefined ? env.origin : spec.id);
   };
   let timerSeq = 0;
   sim.startTimer = function (env, id, d) {
@@ -1414,10 +1597,10 @@ function runSimulation(scn) {
     logE(t, nodeId, 'violation', text);
   }
 
-  function netSend(node, q, payload, specId, alias, line) {
+  function netSend(node, q, payload, specId, alias, line, origin) {
     const ts = curEnd;
     const id = msgSeq++;
-    const rec = { id, from: node.id, to: q, payload: fmt(payload), sendT: ts, recvT: null, status: 'pending', violation: false, dup: false, round: null, spec: specId };
+    const rec = { id, from: node.id, to: q, payload: fmt(payload), sendT: ts, recvT: null, status: 'pending', violation: false, dup: false, round: null, spec: specId, origin };
     out.msgs.push(rec);
     if (!byId.has(q)) {
       rec.status = 'dropped-link'; rec.recvT = ts;
@@ -1479,9 +1662,14 @@ function runSimulation(scn) {
     }
 
     const d = sampleDelay();
+    // drawn for every message, so that the random stream of the channel does not depend on the fate of the message
+    const dupDraw = (!self && cfg.dup > 0) ? rng.next() : 1;
     const arr0 = ts + d;
     if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr0; logE(ts, node.id, 'drop', 'message to p' + q + ' lost', line); return; }
-    if (cutDrop(rec, node.id, q, ts, arr0, line)) return;
+    // The order below keeps everything that happens before a fault independent of that fault:
+    // a cut at send time only concerns messages sent after the fault starts; FIFO state is updated by every
+    // message that enters the channel, including those a fault will drop on arrival.
+    if (cutAtSend(rec, node.id, q, ts, line)) return;
     const assumeBound = cfg.known.DELTA !== null &&
       (cfg.timing === 'synchronous-timed' || (cfg.timing === 'partial' && cfg.gst !== null && ts >= cfg.gst) ||
        (cfg.timing === 'partial' && cfg.gst === null));
@@ -1494,14 +1682,14 @@ function runSimulation(scn) {
     let arr = arr0;
     const fifoKey = node.id + '>' + q;
     if (cfg.fifo) { arr = Math.max(arr, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr); }
-    scheduleDeliver(rec, node, q, payload, arr, alias);
-    if (!self && cfg.dup > 0 && rng.next() < cfg.dup) {
+    if (!cutAtArrival(rec, node.id, q, arr)) scheduleDeliver(rec, node, q, payload, arr, alias);
+    if (dupDraw < cfg.dup) {
       const d2 = sampleDelay();
       let arr2 = ts + d2;
       if (cfg.fifo) { arr2 = Math.max(arr2, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr2); }
-      const rec2 = Object.assign({}, rec, { id: msgSeq++, dup: true, violation: false, status: 'pending' });
+      const rec2 = Object.assign({}, rec, { id: msgSeq++, dup: true, violation: false, status: 'pending', recvT: null });
       out.msgs.push(rec2);
-      if (!cutDrop(rec2, node.id, q, ts, arr2, line)) scheduleDeliver(rec2, node, q, payload, arr2, alias);
+      if (!cutAtArrival(rec2, node.id, q, arr2)) scheduleDeliver(rec2, node, q, payload, arr2, alias);
     }
   }
   const fifoLast = new Map();
@@ -1528,22 +1716,26 @@ function runSimulation(scn) {
     }
     return null;
   }
-  // drops a message sent into, or travelling through, an interrupted channel
-  function cutDrop(rec, from, q, ts, arr, line) {
+  // drops a message sent into an interrupted channel
+  function cutAtSend(rec, from, q, ts, line) {
     if (from === q || (!linkCuts.length && !partitions.length)) return false;
-    const atSend = cutAt(from, q, ts);
-    if (atSend) {
-      rec.status = 'dropped-cut'; rec.recvT = ts;
-      logE(ts, from, 'drop', 'message to p' + q + ' dropped: ' + atSend, line);
-      return true;
-    }
-    const atArrival = cutAt(from, q, arr);
-    if (atArrival) {
-      rec.status = 'dropped-cut'; rec.recvT = arr;
-      logE(arr, q, 'drop', 'message from p' + from + ' dropped in transit: ' + atArrival);
-      return true;
-    }
-    return false;
+    const why = cutAt(from, q, ts);
+    if (!why) return false;
+    rec.status = 'dropped-cut'; rec.recvT = ts;
+    logE(ts, from, 'drop', 'message to p' + q + ' dropped: ' + why, line);
+    return true;
+  }
+  // drops a message whose channel is interrupted when it arrives
+  function cutAtArrival(rec, from, q, arr) {
+    if (from === q || (!linkCuts.length && !partitions.length)) return false;
+    const why = cutAt(from, q, arr);
+    if (!why) return false;
+    rec.status = 'dropped-cut'; rec.recvT = arr;
+    logE(arr, q, 'drop', 'message from p' + from + ' dropped in transit: ' + why);
+    return true;
+  }
+  function cutDrop(rec, from, q, ts, arr, line) {
+    return cutAtSend(rec, from, q, ts, line) || cutAtArrival(rec, from, q, arr);
   }
 
   function scheduleDeliver(rec, node, q, payload, arr, alias) {
@@ -1552,13 +1744,17 @@ function runSimulation(scn) {
   }
 
   // dispatch an event to an instance
-  function dispatch(node, specId, alias, ev, args) {
+  // origin: the module that started the chain of requests this event belongs to. A module handling a
+  // request from above keeps the origin; one reacting to an indication, a timer or an input starts its own.
+  function dispatch(node, specId, alias, ev, args, origin) {
     const inst = node.insts[specId];
     const algo = inst.algo;
+    const fromAbove = alias === algo.implAlias && ev !== 'Init' && ev !== 'Recovery' && origin !== undefined;
+    const org = fromAbove ? origin : specId;
     let handled = false;
     for (const h of algo.handlers) {
       if (h.kind !== 'event' || h.inst !== alias || h.ev !== ev) continue;
-      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: curTime };
+      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: curTime, origin: org };
       let ok = true;
       for (let i = 0; i < h.pats.length && ok; i++) ok = matchPat(h.pats[i], args[i], env, h.binds);
       if (!ok) continue;
@@ -1589,7 +1785,7 @@ function runSimulation(scn) {
       while (localQ.length) {
         if (++guard > 20000) throw new RtError('Too many internal events in a single step', 0);
         const e = localQ.shift();
-        dispatch(node, e.inst, e.alias, e.ev, e.args);
+        dispatch(node, e.inst, e.alias, e.ev, e.args, e.origin);
       }
       // guards
       let fired = false;
@@ -1745,8 +1941,15 @@ function runSimulation(scn) {
         recoverNode(node, ev.t);
         continue;
       }
+      // input arguments are evaluated once, when the input first comes up, whatever the state of the target,
+      // so that the shared input stream gives every process the same values with or without faults
+      if (ev.type === 'input' && ev.args === undefined) {
+        const ienv = { node, inst: node.insts[0], locals: new Map(), sim, rng: inputRng, time: ev.t };
+        ev.args = ev.inp.args.map(a => evalExpr(a, ienv));
+      }
       if (node.crashed) {
         if (ev.type === 'deliver') { ev.rec.status = 'lost-crash'; }
+        if (ev.type === 'input') logE(ev.t, node.id, 'warn', 'input ' + ev.inp.ev + ' ignored: p' + node.id + ' is down');
         continue;
       }
       if (ev.t < node.busyUntil) { ev.t = node.busyUntil; push(ev); continue; }
@@ -1766,19 +1969,21 @@ function runSimulation(scn) {
           for (let i = stack.specs.length - 1; i >= 0; i--) dispatch(node, i, stack.specs[i].algo.implAlias, 'Init', []);
           break;
         case 'input': {
-          const env = { node, inst: node.insts[0], locals: new Map(), sim, rng: inputRng, time: curTime };
-          const args = ev.inp.args.map(a => evalExpr(a, env));
+          const args = ev.args;
           logE(ev.t, node.id, 'input', ev.inp.ev + (args.length ? ' | ' + args.map(fmt).join(', ') : ''));
+          trace(node, 'app', 0, ev.inp.ev, args);
           dispatch(node, 0, topSpec.algo.implAlias, ev.inp.ev, args);
           break;
         }
         case 'deliver': {
           ev.rec.status = 'delivered';
           // the sending instance receives under the same alias on the destination node
+          trace(node, 'net', ev.rec.spec, 'Deliver', [ev.from, ev.payload]);
           dispatch(node, ev.rec.spec, ev.alias, 'Deliver', [ev.from, ev.payload]);
           break;
         }
         case 'timer':
+          trace(node, 'timer', ev.inst, 'Timeout', [ev.id]);
           dispatch(node, ev.inst, 'timer', 'Timeout', [ev.id]);
           break;
         case 'roundStart':
@@ -1966,9 +2171,44 @@ function previewDelay(distStr, spikeProb, spikeExtraStr, boundStr, n) {
 
 function isAtomNamePublic(n) { return isAtomName(n); }
 
+// Causal cone of the event of process `node` at time `t` (Lamport's happened-before relation).
+// past[q]: every event of q at or before past[q] may have influenced the origin (-Infinity: none).
+// future[q]: every event of q at or after future[q] may be influenced by the origin (Infinity: none).
+function causalCone(res, node, t) {
+  const ids = Object.keys(res.nodeInfo).map(Number);
+  const past = {}, future = {};
+  for (const q of ids) { past[q] = -Infinity; future[q] = Infinity; }
+  past[node] = t; future[node] = t;
+  const msgs = res.msgs.filter(m => m.status === 'delivered' && m.from !== m.to);
+  const byRecv = msgs.slice().sort((a, b) => b.recvT - a.recvT);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of byRecv) {
+      if (m.recvT <= past[m.to] && m.sendT > past[m.from]) { past[m.from] = m.sendT; changed = true; }
+    }
+  }
+  const bySend = msgs.slice().sort((a, b) => a.sendT - b.sendT);
+  changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of bySend) {
+      if (m.sendT >= future[m.from] && m.recvT < future[m.to]) { future[m.to] = m.recvT; changed = true; }
+    }
+  }
+  const counts = { past: 0, future: 0, concurrent: 0 };
+  for (const a of res.activity) {
+    if (a.node === node && a.t === t) continue;
+    if (a.t <= past[a.node]) counts.past++;
+    else if (a.t >= future[a.node]) counts.future++;
+    else counts.concurrent++;
+  }
+  return { node, t, past, future, counts };
+}
+
 const SimCore = {
   runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay,
-  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups,
+  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups, causalCone,
   DslError, fmt, KEYWORDS
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = SimCore;

@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Distributed Systems Playground</title>
+<meta name="description" content="Write distributed algorithms in textbook pseudocode and watch them run on a simulated network with configurable timing and faults.">
+<meta name="theme-color" content="#17283a">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22 role=%22img%22 aria-label=%22Distributed Systems Playground%22%3E  %3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2317283a%22/%3E  %3Cg stroke=%22%23dbe5ee%22 stroke-width=%223%22 stroke-linecap=%22round%22%3E    %3Cline x1=%2212%22 y1=%2218%22 x2=%2252%22 y2=%2218%22/%3E    %3Cline x1=%2212%22 y1=%2232%22 x2=%2252%22 y2=%2232%22/%3E    %3Cline x1=%2212%22 y1=%2246%22 x2=%2252%22 y2=%2246%22/%3E  %3C/g%3E  %3Cg stroke-width=%222.6%22 stroke-linecap=%22round%22 fill=%22none%22%3E    %3Cpath d=%22M18 18 L28 32%22 stroke=%22%2386aef0%22/%3E    %3Cpath d=%22M28 32 L38 46%22 stroke=%22%234cc2a5%22/%3E    %3Cpath d=%22M30 18 L47 46%22 stroke=%22%23f06a78%22 stroke-dasharray=%223.5 3%22/%3E  %3C/g%3E  %3Cg fill=%22%23ffffff%22%3E    %3Ccircle cx=%2218%22 cy=%2218%22 r=%223.2%22/%3E    %3Ccircle cx=%2228%22 cy=%2232%22 r=%223.2%22/%3E    %3Ccircle cx=%2238%22 cy=%2246%22 r=%223.2%22/%3E  %3C/g%3E  %3Ccircle cx=%2230%22 cy=%2218%22 r=%223.2%22 fill=%22%23f06a78%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -77,10 +80,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 }
 .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
 .brand h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: -0.005em; }
-.logo { width: 40px; height: 28px; flex: none; }
-.logo line { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
-.logo .msg { stroke: var(--blue); stroke-width: 1.8; }
-.logo .late { stroke: var(--red); }
+.logo { width: 32px; height: 32px; flex: none; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* ---------- controlli ---------- */
@@ -432,14 +432,141 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
   .topo-legend { display: none; }
 }
 
+/* ---------- layers, stack view, causality ---------- */
+:root { --layer-0: #2350a3; --layer-1: #0c7760; --layer-2: #7a3fa0; --layer-3: #0f7c9c; --layer-4: #4d7a0a; --layer-5: #5b5f97; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --layer-0: #86aef0; --layer-1: #4cc2a5; --layer-2: #c49af0; --layer-3: #5ccfe6; --layer-4: #a6d86a; --layer-5: #a9aee8; }
+}
+:root[data-theme="dark"] { --layer-0: #86aef0; --layer-1: #4cc2a5; --layer-2: #c49af0; --layer-3: #5ccfe6; --layer-4: #a6d86a; --layer-5: #a9aee8; }
+.layer-legend { flex-direction: column; gap: 2px; }
+.layer-legend span { white-space: nowrap; }
+.sw { display: inline-block; width: 12px; height: 8px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.stack svg { width: 100%; display: block; overflow: visible; }
+.stack .box rect { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1.4; rx: 7; }
+.stack .box.hot rect { stroke-width: 2.6; }
+.stack .box .t1 { font: 700 12.5px var(--ui); fill: var(--ink); }
+.stack .box .t2 { font: 11px var(--mono); fill: var(--muted); }
+.stack .box .cnt { font: 11px var(--mono); fill: var(--muted); text-anchor: end; }
+.stack .box.ext rect { fill: none; stroke-dasharray: 5 4; }
+.stack .edge { fill: none; stroke: var(--rule); stroke-width: 1.2; }
+.stack .flow { fill: none; stroke-width: 2.4; }
+.stack .flow.down { stroke: var(--blue); }
+.stack .flow.up { stroke: var(--green); }
+.stack .flow-label { font: 11px var(--mono); }
+.stack .flow-label.down { fill: var(--blue); }
+.stack .flow-label.up { fill: var(--green); }
+.stack .flow-bg { fill: var(--surface); opacity: .92; }
+.stack h4 { margin: 12px 0 4px; font-size: 13px; }
+.stack .recent { list-style: none; margin: 0; padding: 0; font: 12px/1.5 var(--mono); }
+.stack .recent li { display: grid; grid-template-columns: 70px 1fr; gap: 6px; padding: 2px 0; border-bottom: 1px solid var(--grid); }
+.stack .recent .d-down { color: var(--blue); }
+.stack .recent .d-up { color: var(--green); }
+.stack .recent .d-timer { color: var(--amber); }
+.stack .recent li { word-break: break-word; }
+.stack .pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.cone-info { padding: 5px 10px; font-size: 13px; border-bottom: 1px solid var(--grid); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cone-info .past { color: var(--blue); font-weight: 700; }
+.cone-info .future { color: var(--amber); font-weight: 700; }
+#topo .nd.cause .body { stroke: var(--blue); stroke-width: 3; stroke-dasharray: 2 2; }
+#topo .nd.influenced .body { stroke: var(--amber); stroke-width: 3.4; }
+#topo .nd.origin .body { stroke: var(--ink); stroke-width: 4; }
+body.cone-mode #st { cursor: crosshair; }
+
+/* five tabs on narrow screens */
+.tabs { overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { flex: none; }
+@media (max-width: 420px) {
+  .tabs button { padding-left: 9px; padding-right: 9px; }
+}
+@media (max-width: 360px) {
+  .tabs { padding: 0 2px; }
+  .tabs button { padding-left: 7px; padding-right: 7px; font-size: 13px; }
+}
+
+/* ---------- color vision deficiency palette (Okabe-Ito based) ---------- */
+:root[data-palette="cvd"] { --blue: #0072b2; --red: #d55e00; --amber: #b07a00; --green: #009e73; --violet: #cc79a7;
+  --layer-0: #0072b2; --layer-1: #009e73; --layer-2: #cc79a7; --layer-3: #56b4e9; --layer-4: #8a6d00; --layer-5: #6b6b6b; }
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="cvd"]:not([data-theme="light"]) { --blue: #56b4e9; --red: #ff8a3d; --amber: #f0e442; --green: #2fd1a0; --violet: #e59fc8;
+    --layer-0: #56b4e9; --layer-1: #2fd1a0; --layer-2: #e59fc8; --layer-3: #9fd8f5; --layer-4: #f0e442; --layer-5: #bdbdbd; }
+}
+:root[data-theme="dark"][data-palette="cvd"] { --blue: #56b4e9; --red: #ff8a3d; --amber: #f0e442; --green: #2fd1a0; --violet: #e59fc8;
+  --layer-0: #56b4e9; --layer-1: #2fd1a0; --layer-2: #e59fc8; --layer-3: #9fd8f5; --layer-4: #f0e442; --layer-5: #bdbdbd; }
+
+/* ---------- dialogs: settings, shortcuts, gallery ---------- */
+dialog.wide { width: min(980px, 96vw); }
+.btn-link { align-self: center; color: var(--blue); font-weight: 700; }
+.keys { border-collapse: collapse; width: 100%; font-size: 14px; }
+.keys td { padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+.keys td:first-child { white-space: nowrap; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+.chips-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 12px; }
+.chip-btn { border-radius: 20px; padding: 3px 12px; }
+.chip-btn.on { background: var(--blue-soft); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; max-height: 64vh; overflow: auto; padding: 2px; }
+.card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 10px; border-radius: 10px; background: var(--surface-2); min-height: 0; }
+.card:hover { border-color: var(--blue); }
+.card .thumb { width: 100%; height: 96px; background: var(--paper); border-radius: 6px; }
+.card .thumb line { stroke: var(--muted); stroke-width: 1.2; }
+.card .thumb circle { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
+.card-title { font-weight: 700; line-height: 1.25; }
+.card-text { font-size: 13px; color: var(--muted); }
+.card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+.tag { font-size: 11.5px; border: 1px solid var(--rule); border-radius: 12px; padding: 0 8px; color: var(--muted); }
+
+/* ---------- welcome tour ---------- */
+.tour { position: fixed; inset: 0; z-index: 30; }
+.tour-shade { position: absolute; inset: 0; }
+.tour-ring { position: fixed; border-radius: 10px; border: 2px solid var(--blue);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--ink) 45%, transparent); pointer-events: none; transition: all .2s ease; }
+.tour-card { position: fixed; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 12px 14px; box-shadow: 0 8px 28px color-mix(in srgb, var(--ink) 25%, transparent); transition: top .2s ease, left .2s ease; }
+.tour-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tour-card p { margin: 6px 0 10px; }
+@media (prefers-reduced-motion: reduce) { .tour-ring, .tour-card { transition: none; } }
+
+/* ---------- presentation mode ---------- */
+.present-exit { position: fixed; right: 14px; top: 10px; z-index: 25; }
+body.present { font-size: 16px; }
+body.present .side, body.present .log-col, body.present .panel-bar, body.present .props,
+body.present .toolbar, body.present .legend, body.present .st-bar .zoom, body.present .cone-info { display: none !important; }
+body.present .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "topo" "timeline"; }
+body.present .st-area { grid-template-columns: minmax(0, 1fr); }
+body.present .st-col { border-right: 0; }
+body.present .brand h1 { font-size: 22px; }
+body.present .transport { padding: 10px 14px; }
+body.present .chip { font-size: 14px; }
+body.present .tlabel { font-size: 15px; }
+body.present .nd .name { font-size: 16px; }
+body.present .pk text { font-size: 12px; }
+@media (min-width: 960px) {
+  body.present .app { grid-template-rows: minmax(0, 1fr) clamp(220px, 36vh, 560px); }
+}
+
 </style>
 </head>
 <body data-timing="asynchronous">
 <header class="topbar">
   <div class="brand">
-    <svg class="logo" viewBox="0 0 40 28" aria-hidden="true">
-      <line x1="4" y1="7" x2="36" y2="7"/><line x1="4" y1="21" x2="36" y2="21"/>
-      <line class="msg" x1="10" y1="7" x2="22" y2="21"/><line class="msg late" x1="20" y1="7" x2="34" y2="21"/>
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#17283a"/>
+      <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+        <line x1="12" y1="18" x2="52" y2="18"/>
+        <line x1="12" y1="32" x2="52" y2="32"/>
+        <line x1="12" y1="46" x2="52" y2="46"/>
+      </g>
+      <g stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M18 18 L28 32" stroke="#86aef0"/>
+        <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+        <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+      </g>
+      <g fill="#ffffff">
+        <circle cx="18" cy="18" r="3.2"/>
+        <circle cx="28" cy="32" r="3.2"/>
+        <circle cx="38" cy="46" r="3.2"/>
+      </g>
+      <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
     </svg>
     <h1>Distributed Systems Playground</h1>
   </div>
@@ -447,6 +574,7 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
     <label class="field inline ex-field"><span>Example</span>
       <select id="example"><option value="">Choose…</option></select>
     </label>
+    <button id="btn-gallery" class="ghost" type="button" title="Browse the examples">Gallery</button>
     <label class="field inline"><span>Seed</span>
       <input id="seed" type="number" min="0" step="1" data-bind="seed" class="narrow">
     </label>
@@ -454,6 +582,8 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
     <button id="btn-run" class="primary" type="button" title="Run (Ctrl+Enter)">Run</button>
     <button id="btn-export" class="ghost" type="button">Export</button>
     <button id="btn-import" class="ghost" type="button">Import</button>
+    <button id="btn-shortcuts" class="ghost icon" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+    <button id="btn-settings" class="ghost icon" type="button" title="Settings" aria-label="Settings">⚙</button>
   </div>
 </header>
 
@@ -482,6 +612,7 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
       <button id="btn-fit" type="button" class="ghost" title="Fit to view">Fit</button>
       <span class="sep"></span>
       <label class="check" title="Show the message type on packets in flight"><input type="checkbox" id="labels" checked> Labels</label>
+      <label class="check" title="Color messages by the module that originated them"><input type="checkbox" id="layers"> Layers</label>
     </div>
     <div class="canvas-wrap">
       <svg id="topo" role="img" aria-label="Process graph">
@@ -496,7 +627,8 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
       </svg>
       <svg id="topo-fx" aria-hidden="true"><g id="g-fx"></g><g id="g-msgs"></g><g id="g-top"></g></svg>
       <div id="stale" class="stale" hidden>The scenario has changed. <button type="button" id="btn-rerun" class="link">Run again</button></div>
-      <div class="topo-legend" aria-hidden="true">
+      <div id="layer-legend" class="topo-legend layer-legend" aria-hidden="true" hidden></div>
+      <div class="topo-legend" id="status-legend" aria-hidden="true">
         <span><i class="pk-dot ok"></i>in transit</span>
         <span><i class="pk-dot late"></i>violation</span>
         <span><i class="pk-dot lossy"></i>will be lost</span>
@@ -513,12 +645,15 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
       <button role="tab" data-tab="time" type="button">Timing</button>
       <button role="tab" data-tab="scen" type="button">Scenario</button>
       <button role="tab" data-tab="state" type="button">State</button>
+      <button role="tab" data-tab="stack" type="button">Stack</button>
     </div>
 
     <div class="tab-body" data-body="code">
       <div class="row">
         <label class="field grow"><span>Main algorithm</span><select id="top"></select></label>
+        <label class="field grow"><span>Add module</span><select id="add-module"><option value="">Choose…</option></select></label>
       </div>
+      <p id="module-info" class="hint" hidden></p>
       <div class="symbols" aria-label="Insert symbol">
         <button type="button" data-ins="⟨">⟨</button><button type="button" data-ins="⟩">⟩</button>
         <button type="button" data-ins="∪">∪</button><button type="button" data-ins="∩">∩</button>
@@ -538,7 +673,7 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
       <ul id="diag" class="diag"></ul>
       <details class="guide">
         <summary>Language quick reference</summary>
-        <div class="guide-body">
+        <div class="guide-body" data-i18n-block="guide">
           <p>A program contains <b>interfaces</b> and <b>algorithms</b>. An algorithm implements one interface and uses others: <code>Net</code> (network) and <code>Rounds</code> (synchronous rounds) are provided by the simulator; the rest you write yourself, and they are wired together automatically.</p>
 <pre>upon event ⟨instance, Event | pattern⟩ where condition do … end
 upon condition expression do … end
@@ -548,8 +683,11 @@ forall q in neighbors where q ≠ p do … end
 if … then … elif … then … else … end
 starttimer(t, 100ms)   canceltimer(t)
 ⟨timer, Timeout | t⟩   assert cond, "msg"   log x</pre>
+<pre>function name(a, b) … return value … end      call name(x, y)
+uses PerfectLinks as pl via AckLinks</pre>
+          <p>Functions live inside an algorithm, see its state and parameters, and may trigger events; use them in expressions, or with <code>call</code> as a statement. <code>via</code> picks which algorithm implements a used interface when there are several.</p>
           <p>Indications go up, requests go down. Undeclared all-caps words (<code>HEARTBEAT</code>) are atoms. In patterns, a new name captures the value; an atom or a known name must match.</p>
-          <p>Built-ins: <code>self</code>, <code>Π</code>, <code>N</code>, <code>neighbors</code>, <code>round</code>, <code>now()</code>, <code>DELTA</code> <code>PHI</code> <code>RHO</code> (only when known in the assumed model), <code>min max choose size keys values map() random(a,b) append toset str abs</code>. Tuples are 0-indexed; <code>#S</code> is the cardinality. Durations (<code>50ms</code>) are numbers in microseconds.</p>
+          <p>Built-ins: <code>self</code>, <code>Π</code>, <code>N</code>, <code>neighbors</code>, <code>round</code>, <code>now()</code>, <code>DELTA</code> <code>PHI</code> <code>RHO</code> (only when known in the assumed model), <code>min max choose size keys values map() get(m,k,default) remove(c,x) random(a,b) pick(S) append head tail last sort reverse slice range sum mean argmin argmax toset str abs sqrt ln exp pow floor ceil round</code>. Tuples are 0-indexed; <code>#S</code> is the cardinality. Durations (<code>50ms</code>) are numbers in microseconds.</p>
           <p>ASCII equivalents: <code>&lt; &gt;</code> for ⟨ ⟩, <code>union inter minus in notin subseteq</code>, <code>!= &lt;= &gt;=</code>, <code>and or not</code>, <code>Procs</code> for Π, <code>{}</code> for ∅. Inside an ASCII <code>trigger</code>, wrap comparisons in parentheses.</p>
         </div>
       </details>
@@ -573,7 +711,7 @@ starttimer(t, 100ms)   canceltimer(t)
             <label class="field"><span>PHI</span><input data-bind="assumed.PHI" data-kind="dur-unknown" placeholder="unknown"></label>
             <label class="field"><span>RHO</span><input data-bind="assumed.RHO" data-kind="num-unknown" placeholder="unknown"></label>
           </div>
-          <p class="hint">Write <code>unknown</code> for a bound that exists but the algorithm does not know. DELTA: maximum delay; PHI: maximum step duration; RHO: maximum clock drift.</p>
+          <p class="hint" data-i18n-block="hint-unknown">Write <code>unknown</code> for a bound that exists but the algorithm does not know. DELTA: maximum delay; PHI: maximum step duration; RHO: maximum clock drift.</p>
           <div class="only-rounds">
             <label class="field"><span>Round execution</span>
               <select data-bind="actual.roundMode">
@@ -610,7 +748,7 @@ starttimer(t, 100ms)   canceltimer(t)
             <label class="field"><span>GST</span><input data-bind="actual.gst" data-kind="dur-opt" placeholder="none"></label>
             <label class="field"><span>Delay before GST</span><input data-bind="actual.preGstDelay" data-kind="dist-opt" placeholder="same as above"></label>
           </div>
-          <p class="hint">Distributions: <code>const(d)</code> <code>uniform(a, b)</code> <code>exp(mean)</code> <code>normal(μ, σ)</code> <code>lognormal(μ, σ)</code> (μ, σ in log ms) <code>pareto(xm, α)</code> <code>empirical(a, b, …)</code>. Unitless numbers are ms. Messages sent before GST still arrive by GST + bound.</p>
+          <p class="hint" data-i18n-block="hint-dist">Distributions: <code>const(d)</code> <code>uniform(a, b)</code> <code>exp(mean)</code> <code>normal(μ, σ)</code> <code>lognormal(μ, σ)</code> (μ, σ in log ms) <code>pareto(xm, α)</code> <code>empirical(a, b, …)</code>. Unitless numbers are ms. Messages sent before GST still arrive by GST + bound.</p>
           <label class="field"><span>Simultaneous events</span>
             <select data-bind="tieBreak">
               <option value="stable">Stable order by process</option>
@@ -623,7 +761,7 @@ starttimer(t, 100ms)   canceltimer(t)
     <div class="tab-body" data-body="scen" hidden>
       <label class="field"><span>External inputs</span>
         <textarea id="inputs" data-bind="inputs" rows="5" spellcheck="false" class="mono"></textarea></label>
-      <p class="hint">One event per line: <code>TIME NODE Event | arguments</code>, where <code>*</code> means every process. Examples: <code>0ms 1 Broadcast | "hello"</code>, <code>0ms * Propose | random(1, 9)</code>. Events must be requests of the main algorithm. You can also select a process during playback and inject an event at the current time.</p>
+      <p class="hint" data-i18n-block="hint-inputs">One event per line: <code>TIME NODE Event | arguments</code>, where <code>*</code> means every process. Examples: <code>0ms 1 Broadcast | "hello"</code>, <code>0ms * Propose | random(1, 9)</code>. Events must be requests of the main algorithm. You can also select a process during playback and inject an event at the current time.</p>
       <h3>Faults</h3>
       <ul id="faults" class="faults"></ul>
       <div class="row fault-form">
@@ -643,7 +781,7 @@ starttimer(t, 100ms)   canceltimer(t)
         <label class="field" data-ft="link partition"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
       </div>
-      <p class="hint">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
+      <p class="hint" data-i18n-block="hint-faults">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
       <h3>Run</h3>
       <div class="row">
         <label class="field"><span>Simulated duration</span><input data-bind="stopAt" data-kind="dur" class="narrow"></label>
@@ -653,6 +791,10 @@ starttimer(t, 100ms)   canceltimer(t)
 
     <div class="tab-body" data-body="state" hidden>
       <div id="inspector"></div>
+    </div>
+
+    <div class="tab-body" data-body="stack" hidden>
+      <div id="stack-view"></div>
     </div>
   </section>
 
@@ -683,6 +825,7 @@ starttimer(t, 100ms)   canceltimer(t)
         <div class="st-bar">
           <span id="status" class="status"></span>
           <span class="grow"></span>
+          <label class="check" title="Click an event on the diagram to see what caused it and what it caused"><input type="checkbox" id="cone-mode"> Causality</label>
           <label class="check" title="Show events after the cursor, faded"><input type="checkbox" id="ghost"> Future</label>
           <label class="check" title="Scroll the diagram to keep the cursor in view"><input type="checkbox" id="follow" checked> Follow</label>
           <span class="zoom" role="group" aria-label="Zoom">
@@ -692,6 +835,7 @@ starttimer(t, 100ms)   canceltimer(t)
             <button type="button" id="zoom-all" class="ghost small" title="Show the whole run">All</button>
           </span>
         </div>
+        <div id="cone-info" class="cone-info" hidden></div>
         <div id="st-wrap" class="st-wrap"><canvas id="st"></canvas><div id="tip" class="tip" hidden></div></div>
         <div class="legend">
           <span><i class="lg deliver"></i>delivered</span>
@@ -731,6 +875,13 @@ starttimer(t, 100ms)   canceltimer(t)
     <p class="hint">The JSON file holds topology, code, timing model, inputs, faults and seed: opening it again reproduces the same run.</p>
     <textarea id="export-text" rows="12" class="mono" readonly></textarea>
     <label class="field"><span>Shareable link</span><input id="export-link" readonly></label>
+    <div class="field"><span>Images of the current view</span>
+      <div class="row">
+        <button type="button" id="btn-img-diagram-svg" class="ghost">Diagram as SVG</button>
+        <button type="button" id="btn-img-diagram-png" class="ghost">Diagram as PNG</button>
+        <button type="button" id="btn-img-graph-svg" class="ghost">Graph as SVG</button>
+      </div>
+    </div>
     <p id="export-msg" class="hint" role="status"></p>
     <div class="row end">
       <button type="button" id="btn-copy-json" class="ghost">Copy JSON</button>
@@ -753,6 +904,74 @@ starttimer(t, 100ms)   canceltimer(t)
     </div>
   </form>
 </dialog>
+
+<dialog id="dlg-settings">
+  <form method="dialog">
+    <h2>Settings</h2>
+    <div class="grid2">
+      <label class="field"><span>Theme</span>
+        <select id="set-theme"><option value="system">Follow the system</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      <label class="field"><span>Colors</span>
+        <select id="set-palette"><option value="standard">Standard</option><option value="cvd">Easier to tell apart (color vision deficiency)</option></select></label>
+      <label class="field"><span>Language</span>
+        <select id="set-lang"><option value="en">English</option><option value="it">Italiano</option></select></label>
+    </div>
+    <p class="hint">The language setting translates the interface. Code, diagnostics from the checker and the documentation stay in English.</p>
+    <div class="row">
+      <button type="button" id="btn-open-present" class="ghost">Presentation mode</button>
+      <button type="button" id="btn-open-shortcuts" class="ghost">Keyboard shortcuts</button>
+      <button type="button" id="btn-open-tour" class="ghost">Welcome tour</button>
+      <a class="btn-link" href="https://github.com/engineering87/distributed-systems-playground/tree/main/docs" target="_blank" rel="noopener">Documentation</a>
+    </div>
+    <div class="row end"><button value="close" class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-shortcuts">
+  <form method="dialog">
+    <h2>Keyboard shortcuts</h2>
+    <table class="keys">
+      <tr><td><kbd>Ctrl</kbd> / <kbd>Cmd</kbd> + <kbd>Enter</kbd></td><td>Run</td></tr>
+      <tr><td><kbd>Space</kbd></td><td>Play or pause</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd> or <kbd>Page Up</kbd> <kbd>Page Down</kbd></td><td>Previous or next event</td></tr>
+      <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>Start or end of the run</td></tr>
+      <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>L</kbd> <kbd>D</kbd></td><td>Select, Node, Link, Delete tools</td></tr>
+      <tr><td><kbd>Delete</kbd></td><td>Delete the selected process or link</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Clear the selection, or leave presentation mode</td></tr>
+      <tr><td><kbd>P</kbd></td><td>Presentation mode</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+      <tr><td><kbd>?</kbd></td><td>This list</td></tr>
+      <tr><td><kbd>Ctrl</kbd> + wheel</td><td>Zoom the diagram</td></tr>
+    </table>
+    <p class="hint">Shortcuts work everywhere except while typing in a text field.</p>
+    <div class="row end"><button value="close" class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-gallery" class="wide">
+  <form method="dialog">
+    <h2>Examples</h2>
+    <div id="gallery-filter" class="chips-row" role="group" aria-label="Topic"></div>
+    <div id="gallery-grid" class="gallery"></div>
+    <div class="row end"><button value="close" class="ghost">Close</button></div>
+  </form>
+</dialog>
+
+<div id="tour" class="tour" hidden>
+  <div class="tour-shade"></div>
+  <div class="tour-ring"></div>
+  <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <div class="tour-head"><b id="tour-title"></b><span id="tour-count" class="hint"></span></div>
+    <p id="tour-text"></p>
+    <div class="row end">
+      <button type="button" id="tour-skip" class="link">Skip</button>
+      <button type="button" id="tour-back" class="ghost">Back</button>
+      <button type="button" id="tour-next" class="primary">Next</button>
+    </div>
+  </div>
+</div>
+
+<button id="btn-present-exit" class="present-exit" type="button" hidden>Exit presentation</button>
 
 <div id="toast" class="toast" hidden></div>
 
@@ -987,7 +1206,7 @@ function typeName(v) {
 // ============================================================
 const KEYWORDS = new Set(('interface request indication algorithm implements as uses params state stable ' +
   'upon event where condition exists in do end trigger if then elif else forall while starttimer ' +
-  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil').split(' '));
+  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil function return call via').split(' '));
 
 const UNICODE_MAP = {
   '∪': ['kw', 'union'], '∩': ['kw', 'inter'], '∈': ['kw', 'in'], '∉': ['kw', 'notin'],
@@ -1130,7 +1349,9 @@ class Parser {
       const t = this.ident('the name of the used interface');
       this.kw('as');
       const a = this.ident('the instance name');
-      uses.push({ type: t.v, alias: a.v, tok: t });
+      let via = null;
+      if (this.isKw('via')) { this.p++; via = this.ident('the name of the algorithm to use'); }
+      uses.push({ type: t.v, alias: a.v, tok: t, via: via ? via.v : null, viaTok: via });
     }
     const params = [], state = [];
     if (this.isKw('params')) {
@@ -1151,10 +1372,25 @@ class Parser {
         this.skipSemis();
       }
     }
-    const handlers = [];
-    while (this.isKw('upon')) handlers.push(this.handler());
+    const handlers = [], functions = [];
+    while (this.isKw('upon') || this.isKw('function')) {
+      if (this.isKw('upon')) handlers.push(this.handler());
+      else functions.push(this.functionDecl());
+    }
     this.kw('end');
-    return { name, tok, implType: implType.v, implTok: implType, implAlias, uses, params, state, handlers };
+    return { name, tok, implType: implType.v, implTok: implType, implAlias, uses, params, state, handlers, functions };
+  }
+
+  functionDecl() {
+    const tok = this.kw('function');
+    const name = this.ident('the function name');
+    this.op('(');
+    const params = [];
+    if (!this.isOp(')')) { params.push(this.ident().v); while (this.isOp(',')) { this.p++; params.push(this.ident().v); } }
+    this.op(')');
+    const body = this.block();
+    this.kw('end');
+    return { name: name.v, tok: name, params, body, line: tok.line };
   }
 
   handler() {
@@ -1317,6 +1553,25 @@ class Parser {
         return { s: 'log', args, line };
       }
       case 'skip': this.p++; return { s: 'skip', line };
+      case 'return': {
+        this.p++;
+        const k = this.tok;
+        const bare = k.t === 'eof' || (k.t === 'op' && k.v === ';') ||
+          (k.t === 'kw' && ['end', 'elif', 'else', 'if', 'forall', 'while', 'trigger', 'starttimer', 'canceltimer',
+            'assert', 'log', 'skip', 'return', 'call'].includes(k.v));
+        return { s: 'return', expr: bare ? null : this.expr(), line, tok };
+      }
+      case 'call': {
+        this.p++;
+        const name = this.ident('the function name');
+        this.op('(');
+        const args = [];
+        this.withAngles(() => {
+          if (!this.isOp(')')) { args.push(this.expr()); while (this.isOp(',')) { this.p++; args.push(this.expr()); } }
+        });
+        this.op(')');
+        return { s: 'call', name: name.v, args, line, tok: name };
+      }
     }
     this.err('Invalid statement: ' + this.desc(tok));
   }
@@ -1462,7 +1717,10 @@ function builtinIfaces() {
 const BUILTIN_VARS = new Set(['self', 'Procs', 'neighbors', 'N', 'DELTA', 'PHI', 'RHO', 'round']);
 const BUILTIN_FUNS = {
   min: [1, 1], max: [1, 1], choose: [1, 1], size: [1, 1], keys: [1, 1], values: [1, 1],
-  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1]
+  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1],
+  head: [1, 1], tail: [1, 1], last: [1, 1], sort: [1, 1], reverse: [1, 1], slice: [3, 3], range: [2, 2],
+  remove: [2, 2], get: [3, 3], sum: [1, 1], mean: [1, 1], argmin: [1, 1], argmax: [1, 1], pick: [1, 1],
+  sqrt: [1, 1], ln: [1, 1], exp: [1, 1], pow: [2, 2], floor: [1, 1], ceil: [1, 1], round: [1, 1]
 };
 
 // ============================================================
@@ -1496,9 +1754,25 @@ function check(prog, ctx) {
       if (aliases.has(u.alias)) E('Duplicate instance name "' + u.alias + '"', u.tok);
       aliases.set(u.alias, { role: 'use', iface: it });
     }
+    // user functions
+    const funcs = new Map();
+    for (const f of a.functions || []) {
+      if (funcs.has(f.name)) E('Function "' + f.name + '" is already defined', f.tok);
+      else if (BUILTIN_FUNS[f.name]) E('"' + f.name + '" is a built-in function', f.tok);
+      funcs.set(f.name, f);
+      if (new Set(f.params).size !== f.params.length) E('Repeated parameter in "' + f.name + '"', f.tok);
+    }
+    a.funcs = funcs;
+    for (const u of a.uses) {
+      if (!u.via) continue;
+      if (u.type === 'Net' || u.type === 'Rounds') { E('"via" cannot be used with the provided module ' + u.type, u.viaTok); continue; }
+      const target = prog.algorithms.find(x => x.name === u.via);
+      if (!target) E('Algorithm "' + u.via + '" is not defined', u.viaTok);
+      else if (target.implType !== u.type) E('"' + u.via + '" implements ' + target.implType + ', not ' + u.type, u.viaTok);
+    }
     // timers used
     const timers = new Set();
-    walkStmts(a.handlers.flatMap(h => h.body), s => {
+    walkStmts(a.handlers.flatMap(h => h.body).concat((a.functions || []).flatMap(f => f.body)), s => {
       if (s.s === 'starttimer' || s.s === 'canceltimer') timers.add(s.id);
     });
     a.timers = timers;
@@ -1539,6 +1813,12 @@ function check(prog, ctx) {
           checkExpr(e.where, s2); return;
         }
         case 'call': {
+          if (funcs.has(e.name)) {
+            const fd = funcs.get(e.name);
+            if (e.args.length !== fd.params.length) E('"' + e.name + '" takes ' + fd.params.length + ' argument(s)', e.tok);
+            e.args.forEach(x => checkExpr(x, scope));
+            return;
+          }
           const f = BUILTIN_FUNS[e.name];
           if (!f) { E('Unknown function "' + e.name + '"', e.tok); return; }
           if (e.args.length < f[0] || e.args.length > f[1])
@@ -1602,6 +1882,14 @@ function check(prog, ctx) {
           case 'canceltimer': break;
           case 'assert': checkExpr(s.expr, scope); checkExpr(s.msg, scope); break;
           case 'log': s.args.forEach(x => checkExpr(x, scope)); break;
+          case 'return':
+            if (!scope.has('#function')) E('"return" can only be used inside a function', s.tok);
+            checkExpr(s.expr, scope); break;
+          case 'call':
+            if (!funcs.has(s.name)) E(BUILTIN_FUNS[s.name] ? '"call" is for your own functions; use "' + s.name + '(…)" in an expression'
+              : 'Unknown function "' + s.name + '"', s.tok);
+            else if (funcs.get(s.name).params.length !== s.args.length) E('"' + s.name + '" takes ' + funcs.get(s.name).params.length + ' argument(s)', s.tok);
+            s.args.forEach(x => checkExpr(x, scope)); break;
         }
       }
     };
@@ -1649,6 +1937,12 @@ function check(prog, ctx) {
       collectAssigned(h.body, scope);
       checkBlock(h.body, scope);
     }
+    for (const f of a.functions || []) {
+      const scope = new Set(f.params);
+      scope.add('#function');
+      collectAssigned(f.body, scope);
+      checkBlock(f.body, scope);
+    }
     // indications from lower layers that are never handled
     for (const u of a.uses) {
       const it = ifaces.get(u.type);
@@ -1692,10 +1986,18 @@ function resolveStack(prog, topName) {
     specs.push(spec);
     for (const u of algo.uses) {
       if (u.type === 'Net' || u.type === 'Rounds') { spec.bind[u.alias] = { builtin: u.type }; continue; }
-      const cands = byIface.get(u.type) || [];
-      if (!cands.length) throw new Error('No algorithm implements "' + u.type + '" (required by ' + algo.name + ')');
-      if (cands.length > 1) warnings.push('Several algorithms implement ' + u.type + ': using ' + cands[0].name);
-      const child = build(cands[0], path + '/' + u.alias, spec.id, u.alias, chain.concat(algo.name));
+      let chosen;
+      if (u.via) {
+        chosen = byName.get(u.via);
+        if (!chosen || chosen.implType !== u.type) throw new Error('"' + u.via + '" does not implement ' + u.type);
+      } else {
+        const cands = byIface.get(u.type) || [];
+        if (!cands.length) throw new Error('No algorithm implements "' + u.type + '" (required by ' + algo.name + ')');
+        if (cands.length > 1) warnings.push('Several algorithms implement ' + u.type + ': ' + algo.name + ' uses ' + cands[0].name +
+          ' (write "uses ' + u.type + ' as ' + u.alias + ' via …" to choose)');
+        chosen = cands[0];
+      }
+      const child = build(chosen, path + '/' + u.alias, spec.id, u.alias, chain.concat(algo.name));
       spec.bind[u.alias] = { inst: child.id };
     }
     return spec;
@@ -1709,6 +2011,18 @@ function resolveStack(prog, topName) {
 // ============================================================
 class RtError extends Error { constructor(msg, line) { super(msg); this.line = line; } }
 class HaltSignal extends Error { constructor(msg) { super(msg); } }
+class ReturnSignal { constructor(value) { this.value = value; } }
+const MAX_CALL_DEPTH = 200;
+function callUser(fd, args, env, line) {
+  const depth = (env.depth || 0) + 1;
+  if (depth > MAX_CALL_DEPTH) throw new RtError('Function calls nested deeper than ' + MAX_CALL_DEPTH + ' (infinite recursion?)', line);
+  const locals = new Map();
+  fd.params.forEach((p, i) => locals.set(p, args[i]));
+  const fenv = { node: env.node, inst: env.inst, locals, sim: env.sim, rng: env.rng, time: env.time, depth, origin: env.origin };
+  try { execBlock(fd.body, fenv); }
+  catch (e) { if (e instanceof ReturnSignal) return e.value; throw e; }
+  return null;
+}
 
 function needType(v, pred, what, line) {
   if (!pred(v)) throw new RtError('Expected ' + what + ', found ' + typeName(v) + ' (' + fmt(v) + ')', line);
@@ -1777,7 +2091,11 @@ function evalExpr(e, env) {
       if (x instanceof VMap) { const en = x.m.get(key(i)); return en ? en[1] : null; }
       throw new RtError('Cannot index a ' + typeName(x), line);
     }
-    case 'call': return callBuiltin(e.name, e.args.map(a => evalExpr(a, env)), env, line);
+    case 'call': {
+      const fd = env.inst.algo.funcs && env.inst.algo.funcs.get(e.name);
+      const args = e.args.map(a => evalExpr(a, env));
+      return fd ? callUser(fd, args, env, line) : callBuiltin(e.name, args, env, line);
+    }
   }
   throw new RtError('Unsupported expression', line);
 }
@@ -1849,6 +2167,11 @@ function lookup(name, env, line) {
   throw new RtError('Variable "' + name + '" is not defined', line);
 }
 
+function seqOf(a, name, line) {
+  if (a instanceof Tup) return a.items;
+  if (a instanceof VSet) return a.sorted();
+  throw new RtError(name + ' requires a tuple or a set, found ' + typeName(a), line);
+}
 function callBuiltin(name, args, env, line) {
   const a = args[0];
   switch (name) {
@@ -1881,6 +2204,66 @@ function callBuiltin(name, args, env, line) {
     case 'append': needType(a, v => v instanceof Tup, 'a tuple', line); return new Tup(a.items.concat([args[1]]));
     case 'toset': return VSet.of(elems(a, line));
     case 'str': return typeof a === 'string' ? a : fmt(a);
+    case 'head': case 'last': {
+      const xs = seqOf(a, name, line);
+      if (!xs.length) throw new RtError(name + ' of an empty ' + typeName(a), line);
+      return name === 'head' ? xs[0] : xs[xs.length - 1];
+    }
+    case 'tail': return new Tup(seqOf(a, name, line).slice(1));
+    case 'sort': return new Tup(elems(a, line).slice().sort(compare));
+    case 'reverse': return new Tup(seqOf(a, name, line).slice().reverse());
+    case 'slice': {
+      needType(args[1], isNum, 'a number', line); needType(args[2], isNum, 'a number', line);
+      return new Tup(seqOf(a, name, line).slice(args[1], args[2]));
+    }
+    case 'range': {
+      needType(args[0], isNum, 'a number', line); needType(args[1], isNum, 'a number', line);
+      if (args[1] - args[0] > 100000) throw new RtError('range is too large', line);
+      const out = [];
+      for (let i = Math.ceil(args[0]); i < args[1]; i++) out.push(i);
+      return new Tup(out);
+    }
+    case 'remove': {
+      const x = args[1];
+      if (a instanceof VSet) { const m = new Map(a.m); m.delete(key(x)); return new VSet(m); }
+      if (a instanceof VMap) { const m = new Map(a.m); m.delete(key(x)); return new VMap(m); }
+      if (a instanceof Tup) { const i = a.items.findIndex(v => eq(v, x)); return i < 0 ? a : new Tup(a.items.slice(0, i).concat(a.items.slice(i + 1))); }
+      throw new RtError('remove does not apply to a ' + typeName(a), line);
+    }
+    case 'get': {
+      if (a instanceof VMap) { const en = a.m.get(key(args[1])); return en ? en[1] : args[2]; }
+      if (a instanceof Tup) { const i = args[1]; return (isNum(i) && i >= 0 && i < a.items.length) ? a.items[i] : args[2]; }
+      if (a === null) return args[2];
+      throw new RtError('get does not apply to a ' + typeName(a), line);
+    }
+    case 'sum': case 'mean': {
+      const xs = a instanceof VMap ? a.sorted().map(e => e[1]) : elems(a, line);
+      let t = 0;
+      for (const x of xs) t += needType(x, isNum, 'numbers in ' + name, line);
+      if (name === 'sum') return t;
+      if (!xs.length) throw new RtError('mean of an empty collection', line);
+      return t / xs.length;
+    }
+    case 'argmin': case 'argmax': {
+      needType(a, v => v instanceof VMap, 'a map', line);
+      const es = a.sorted();
+      if (!es.length) throw new RtError(name + ' of an empty map', line);
+      let best = es[0];
+      for (const e of es) if (name === 'argmin' ? compare(e[1], best[1]) < 0 : compare(e[1], best[1]) > 0) best = e;
+      return best[0];
+    }
+    case 'pick': {
+      const xs = elems(a, line);
+      if (!xs.length) throw new RtError('pick of an empty collection', line);
+      return xs[Math.floor(env.rng.next() * xs.length)];
+    }
+    case 'sqrt': case 'ln': case 'exp': case 'floor': case 'ceil': case 'round': {
+      const x = needType(a, isNum, 'a number', line);
+      if (name === 'sqrt') { if (x < 0) throw new RtError('sqrt of a negative number', line); return Math.sqrt(x); }
+      if (name === 'ln') { if (x <= 0) throw new RtError('ln of a number ≤ 0', line); return Math.log(x); }
+      return Math[name](x);
+    }
+    case 'pow': return Math.pow(needType(a, isNum, 'a number', line), needType(args[1], isNum, 'a number', line));
   }
   throw new RtError('Unknown function ' + name, line);
 }
@@ -1992,6 +2375,8 @@ function execBlock(stmts, env) {
         env.sim.userLog(env, s.args.map(x => { const v = evalExpr(x, env); return typeof v === 'string' ? v : fmt(v); }).join(' '), s.line);
         break;
       case 'skip': break;
+      case 'return': throw new ReturnSignal(s.expr ? evalExpr(s.expr, env) : null);
+      case 'call': callUser(env.inst.algo.funcs.get(s.name), s.args.map(x => evalExpr(x, env)), env, s.line); break;
     }
   }
 }
@@ -2033,7 +2418,7 @@ function runSimulation(scn) {
   const out = {
     ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
     snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
-    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], downs: {}, netFaults: { links: [], partitions: [] }
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, netFaults: { links: [], partitions: [] }
   };
   // ---- configuration ----
   let cfg;
@@ -2057,7 +2442,11 @@ function runSimulation(scn) {
   try { stack = resolveStack(prog, topName); }
   catch (e) { out.error = e.message; return out; }
   out.warnings.push(...stack.warnings);
-  out.specs = stack.specs.map(s => ({ id: s.id, path: s.path, algo: s.algo.name }));
+  out.specs = stack.specs.map(s => ({
+    id: s.id, path: s.path, algo: s.algo.name, iface: s.algo.implType, alias: s.algo.implAlias,
+    parent: s.parent, aliasInParent: s.aliasInParent, depth: s.path.split('/').length - 1,
+    builtins: Object.keys(s.bind).filter(k => s.bind[k].builtin).map(k => s.bind[k].builtin)
+  }));
   const topSpec = stack.specs[0];
   const topIface = chk.ifaces.get(topSpec.algo.implType);
 
@@ -2134,10 +2523,18 @@ function runSimulation(scn) {
   let curTime = 0;
   let curEnd = 0;
 
+  const LOCAL_MAX = 200000;
+  const trace = (node, from, to, ev, args) => {
+    if (out.localEvents.length >= LOCAL_MAX) { out.localTruncated = true; return; }
+    let a = args.map(fmt).join(', ');
+    if (a.length > 80) a = a.slice(0, 79) + '…';
+    out.localEvents.push({ t: curEnd, node: node.id, from, to, ev, args: a });
+  };
   sim.emit = function (env, alias, ev, args, line) {
     const inst = env.inst, node = env.node, spec = inst.spec;
     if (alias === spec.algo.implAlias) {
       // indication going up
+      trace(node, spec.id, spec.parent === null ? 'app' : spec.parent, ev, args);
       if (spec.parent === null) {
         const text = ev + (args.length ? ' | ' + args.map(fmt).join(', ') : '');
         out.outputs.push({ t: curEnd, node: node.id, ev, args: args.map(fmt), text });
@@ -2148,10 +2545,15 @@ function runSimulation(scn) {
       return;
     }
     const b = spec.bind[alias];
-    if (b.inst !== undefined) { localQ.push({ inst: b.inst, alias: stack.specs[b.inst].algo.implAlias, ev, args }); return; }
+    if (b.inst !== undefined) {
+      trace(node, spec.id, b.inst, ev, args);
+      localQ.push({ inst: b.inst, alias: stack.specs[b.inst].algo.implAlias, ev, args, origin: env.origin !== undefined ? env.origin : spec.id });
+      return;
+    }
+    trace(node, spec.id, 'net', ev, args);
     // built-in module: network send
     const q = args[0];
-    netSend(node, q, args[1], spec.id, alias, line);
+    netSend(node, q, args[1], spec.id, alias, line, env.origin !== undefined ? env.origin : spec.id);
   };
   let timerSeq = 0;
   sim.startTimer = function (env, id, d) {
@@ -2173,10 +2575,10 @@ function runSimulation(scn) {
     logE(t, nodeId, 'violation', text);
   }
 
-  function netSend(node, q, payload, specId, alias, line) {
+  function netSend(node, q, payload, specId, alias, line, origin) {
     const ts = curEnd;
     const id = msgSeq++;
-    const rec = { id, from: node.id, to: q, payload: fmt(payload), sendT: ts, recvT: null, status: 'pending', violation: false, dup: false, round: null, spec: specId };
+    const rec = { id, from: node.id, to: q, payload: fmt(payload), sendT: ts, recvT: null, status: 'pending', violation: false, dup: false, round: null, spec: specId, origin };
     out.msgs.push(rec);
     if (!byId.has(q)) {
       rec.status = 'dropped-link'; rec.recvT = ts;
@@ -2238,9 +2640,14 @@ function runSimulation(scn) {
     }
 
     const d = sampleDelay();
+    // drawn for every message, so that the random stream of the channel does not depend on the fate of the message
+    const dupDraw = (!self && cfg.dup > 0) ? rng.next() : 1;
     const arr0 = ts + d;
     if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr0; logE(ts, node.id, 'drop', 'message to p' + q + ' lost', line); return; }
-    if (cutDrop(rec, node.id, q, ts, arr0, line)) return;
+    // The order below keeps everything that happens before a fault independent of that fault:
+    // a cut at send time only concerns messages sent after the fault starts; FIFO state is updated by every
+    // message that enters the channel, including those a fault will drop on arrival.
+    if (cutAtSend(rec, node.id, q, ts, line)) return;
     const assumeBound = cfg.known.DELTA !== null &&
       (cfg.timing === 'synchronous-timed' || (cfg.timing === 'partial' && cfg.gst !== null && ts >= cfg.gst) ||
        (cfg.timing === 'partial' && cfg.gst === null));
@@ -2253,14 +2660,14 @@ function runSimulation(scn) {
     let arr = arr0;
     const fifoKey = node.id + '>' + q;
     if (cfg.fifo) { arr = Math.max(arr, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr); }
-    scheduleDeliver(rec, node, q, payload, arr, alias);
-    if (!self && cfg.dup > 0 && rng.next() < cfg.dup) {
+    if (!cutAtArrival(rec, node.id, q, arr)) scheduleDeliver(rec, node, q, payload, arr, alias);
+    if (dupDraw < cfg.dup) {
       const d2 = sampleDelay();
       let arr2 = ts + d2;
       if (cfg.fifo) { arr2 = Math.max(arr2, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr2); }
-      const rec2 = Object.assign({}, rec, { id: msgSeq++, dup: true, violation: false, status: 'pending' });
+      const rec2 = Object.assign({}, rec, { id: msgSeq++, dup: true, violation: false, status: 'pending', recvT: null });
       out.msgs.push(rec2);
-      if (!cutDrop(rec2, node.id, q, ts, arr2, line)) scheduleDeliver(rec2, node, q, payload, arr2, alias);
+      if (!cutAtArrival(rec2, node.id, q, arr2)) scheduleDeliver(rec2, node, q, payload, arr2, alias);
     }
   }
   const fifoLast = new Map();
@@ -2287,22 +2694,26 @@ function runSimulation(scn) {
     }
     return null;
   }
-  // drops a message sent into, or travelling through, an interrupted channel
-  function cutDrop(rec, from, q, ts, arr, line) {
+  // drops a message sent into an interrupted channel
+  function cutAtSend(rec, from, q, ts, line) {
     if (from === q || (!linkCuts.length && !partitions.length)) return false;
-    const atSend = cutAt(from, q, ts);
-    if (atSend) {
-      rec.status = 'dropped-cut'; rec.recvT = ts;
-      logE(ts, from, 'drop', 'message to p' + q + ' dropped: ' + atSend, line);
-      return true;
-    }
-    const atArrival = cutAt(from, q, arr);
-    if (atArrival) {
-      rec.status = 'dropped-cut'; rec.recvT = arr;
-      logE(arr, q, 'drop', 'message from p' + from + ' dropped in transit: ' + atArrival);
-      return true;
-    }
-    return false;
+    const why = cutAt(from, q, ts);
+    if (!why) return false;
+    rec.status = 'dropped-cut'; rec.recvT = ts;
+    logE(ts, from, 'drop', 'message to p' + q + ' dropped: ' + why, line);
+    return true;
+  }
+  // drops a message whose channel is interrupted when it arrives
+  function cutAtArrival(rec, from, q, arr) {
+    if (from === q || (!linkCuts.length && !partitions.length)) return false;
+    const why = cutAt(from, q, arr);
+    if (!why) return false;
+    rec.status = 'dropped-cut'; rec.recvT = arr;
+    logE(arr, q, 'drop', 'message from p' + from + ' dropped in transit: ' + why);
+    return true;
+  }
+  function cutDrop(rec, from, q, ts, arr, line) {
+    return cutAtSend(rec, from, q, ts, line) || cutAtArrival(rec, from, q, arr);
   }
 
   function scheduleDeliver(rec, node, q, payload, arr, alias) {
@@ -2311,13 +2722,17 @@ function runSimulation(scn) {
   }
 
   // dispatch an event to an instance
-  function dispatch(node, specId, alias, ev, args) {
+  // origin: the module that started the chain of requests this event belongs to. A module handling a
+  // request from above keeps the origin; one reacting to an indication, a timer or an input starts its own.
+  function dispatch(node, specId, alias, ev, args, origin) {
     const inst = node.insts[specId];
     const algo = inst.algo;
+    const fromAbove = alias === algo.implAlias && ev !== 'Init' && ev !== 'Recovery' && origin !== undefined;
+    const org = fromAbove ? origin : specId;
     let handled = false;
     for (const h of algo.handlers) {
       if (h.kind !== 'event' || h.inst !== alias || h.ev !== ev) continue;
-      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: curTime };
+      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: curTime, origin: org };
       let ok = true;
       for (let i = 0; i < h.pats.length && ok; i++) ok = matchPat(h.pats[i], args[i], env, h.binds);
       if (!ok) continue;
@@ -2348,7 +2763,7 @@ function runSimulation(scn) {
       while (localQ.length) {
         if (++guard > 20000) throw new RtError('Too many internal events in a single step', 0);
         const e = localQ.shift();
-        dispatch(node, e.inst, e.alias, e.ev, e.args);
+        dispatch(node, e.inst, e.alias, e.ev, e.args, e.origin);
       }
       // guards
       let fired = false;
@@ -2504,8 +2919,15 @@ function runSimulation(scn) {
         recoverNode(node, ev.t);
         continue;
       }
+      // input arguments are evaluated once, when the input first comes up, whatever the state of the target,
+      // so that the shared input stream gives every process the same values with or without faults
+      if (ev.type === 'input' && ev.args === undefined) {
+        const ienv = { node, inst: node.insts[0], locals: new Map(), sim, rng: inputRng, time: ev.t };
+        ev.args = ev.inp.args.map(a => evalExpr(a, ienv));
+      }
       if (node.crashed) {
         if (ev.type === 'deliver') { ev.rec.status = 'lost-crash'; }
+        if (ev.type === 'input') logE(ev.t, node.id, 'warn', 'input ' + ev.inp.ev + ' ignored: p' + node.id + ' is down');
         continue;
       }
       if (ev.t < node.busyUntil) { ev.t = node.busyUntil; push(ev); continue; }
@@ -2525,19 +2947,21 @@ function runSimulation(scn) {
           for (let i = stack.specs.length - 1; i >= 0; i--) dispatch(node, i, stack.specs[i].algo.implAlias, 'Init', []);
           break;
         case 'input': {
-          const env = { node, inst: node.insts[0], locals: new Map(), sim, rng: inputRng, time: curTime };
-          const args = ev.inp.args.map(a => evalExpr(a, env));
+          const args = ev.args;
           logE(ev.t, node.id, 'input', ev.inp.ev + (args.length ? ' | ' + args.map(fmt).join(', ') : ''));
+          trace(node, 'app', 0, ev.inp.ev, args);
           dispatch(node, 0, topSpec.algo.implAlias, ev.inp.ev, args);
           break;
         }
         case 'deliver': {
           ev.rec.status = 'delivered';
           // the sending instance receives under the same alias on the destination node
+          trace(node, 'net', ev.rec.spec, 'Deliver', [ev.from, ev.payload]);
           dispatch(node, ev.rec.spec, ev.alias, 'Deliver', [ev.from, ev.payload]);
           break;
         }
         case 'timer':
+          trace(node, 'timer', ev.inst, 'Timeout', [ev.id]);
           dispatch(node, ev.inst, 'timer', 'Timeout', [ev.id]);
           break;
         case 'roundStart':
@@ -2725,13 +3149,940 @@ function previewDelay(distStr, spikeProb, spikeExtraStr, boundStr, n) {
 
 function isAtomNamePublic(n) { return isAtomName(n); }
 
+// Causal cone of the event of process `node` at time `t` (Lamport's happened-before relation).
+// past[q]: every event of q at or before past[q] may have influenced the origin (-Infinity: none).
+// future[q]: every event of q at or after future[q] may be influenced by the origin (Infinity: none).
+function causalCone(res, node, t) {
+  const ids = Object.keys(res.nodeInfo).map(Number);
+  const past = {}, future = {};
+  for (const q of ids) { past[q] = -Infinity; future[q] = Infinity; }
+  past[node] = t; future[node] = t;
+  const msgs = res.msgs.filter(m => m.status === 'delivered' && m.from !== m.to);
+  const byRecv = msgs.slice().sort((a, b) => b.recvT - a.recvT);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of byRecv) {
+      if (m.recvT <= past[m.to] && m.sendT > past[m.from]) { past[m.from] = m.sendT; changed = true; }
+    }
+  }
+  const bySend = msgs.slice().sort((a, b) => a.sendT - b.sendT);
+  changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of bySend) {
+      if (m.sendT >= future[m.from] && m.recvT < future[m.to]) { future[m.to] = m.recvT; changed = true; }
+    }
+  }
+  const counts = { past: 0, future: 0, concurrent: 0 };
+  for (const a of res.activity) {
+    if (a.node === node && a.t === t) continue;
+    if (a.t <= past[a.node]) counts.past++;
+    else if (a.t >= future[a.node]) counts.future++;
+    else counts.concurrent++;
+  }
+  return { node, t, past, future, counts };
+}
+
 const SimCore = {
   runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay,
-  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups,
+  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups, causalCone,
   DslError, fmt, KEYWORDS
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = SimCore;
 else root.SimCore = SimCore;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* Distributed Systems Playground — library of communication abstractions written in Upon */
+(function (root) {
+'use strict';
+
+const IFACES = {
+  StubbornLinks: `interface StubbornLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end`,
+  PerfectLinks: `interface PerfectLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end`,
+  FifoPerfectLinks: `interface FifoPerfectLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end`,
+  BestEffortBroadcast: `interface BestEffortBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  ReliableBroadcast: `interface ReliableBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  UniformReliableBroadcast: `interface UniformReliableBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  FifoReliableBroadcast: `interface FifoReliableBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  CausalOrderBroadcast: `interface CausalOrderBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  ProbabilisticBroadcast: `interface ProbabilisticBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`
+};
+
+const MODULES = [
+  {
+    key: 'stubborn-links', name: 'RetransmitLinks', implements: 'StubbornLinks', group: 'Links', uses: [],
+    summary: 'Stubborn links: every message is sent again periodically, a bounded number of times.',
+    properties: 'Stubborn delivery (within the retransmission budget), no creation.',
+    source: `// Stubborn links over the lossy network, after "Retransmit Forever"
+// (Cachin, Guerraoui, Rodrigues). The book retransmits forever; here each message is resent RETRIES times,
+// so that runs stay short.
+algorithm RetransmitLinks
+  implements StubbornLinks as sl
+  uses Net as net
+  params
+    PERIOD := 100ms
+    RETRIES := 5
+  state
+    sent := map()            // [q, m] -> retransmissions left
+
+  upon event ⟨sl, Init⟩ do
+    starttimer(retransmit, PERIOD)
+  end
+
+  upon event ⟨sl, Send | q, m⟩ do
+    trigger ⟨net, Send | q, m⟩
+    sent[[q, m]] := RETRIES
+  end
+
+  upon event ⟨timer, Timeout | retransmit⟩ do
+    forall e in keys(sent) do
+      trigger ⟨net, Send | e[0], e[1]⟩
+      if sent[e] <= 1 then
+        sent := remove(sent, e)
+      else
+        sent[e] := sent[e] - 1
+      end
+    end
+    starttimer(retransmit, PERIOD)
+  end
+
+  upon event ⟨net, Deliver | p, m⟩ do
+    trigger ⟨sl, Deliver | p, m⟩
+  end
+end`
+  },
+  {
+    key: 'eliminate-duplicates', name: 'EliminateDuplicates', implements: 'PerfectLinks', group: 'Links', uses: ['StubbornLinks'],
+    summary: 'Perfect links built on stubborn links by discarding duplicates.',
+    properties: 'Reliable delivery, no duplication, no creation (messages are assumed unique).',
+    source: `// Perfect links on top of stubborn links, after "Eliminate Duplicates"
+// (Cachin, Guerraoui, Rodrigues).
+// Like the book, it assumes that every message is unique.
+algorithm EliminateDuplicates
+  implements PerfectLinks as pl
+  uses StubbornLinks as sl
+  state
+    delivered := ∅
+
+  upon event ⟨pl, Send | q, m⟩ do
+    trigger ⟨sl, Send | q, m⟩
+  end
+
+  upon event ⟨sl, Deliver | p, m⟩ where [p, m] ∉ delivered do
+    delivered := delivered ∪ {[p, m]}
+    trigger ⟨pl, Deliver | p, m⟩
+  end
+
+  upon event ⟨sl, Deliver | p, m⟩ where [p, m] ∈ delivered do
+    skip    // duplicate
+  end
+end`
+  },
+  {
+    key: 'ack-links', name: 'AckLinks', implements: 'PerfectLinks', group: 'Links', uses: [],
+    summary: 'Perfect links with sequence numbers, acknowledgements and retransmission until acknowledged.',
+    properties: 'Reliable delivery to correct processes, no duplication, no creation.',
+    source: `// Perfect links with acknowledgements: each message carries a sequence number
+// and is retransmitted until the recipient acknowledges it. Duplicates are
+// recognized by (sender, sequence number), so equal payloads are fine.
+algorithm AckLinks
+  implements PerfectLinks as pl
+  uses Net as net
+  params
+    TIMEOUT := 150ms
+  state
+    seq := 0
+    pending := map()         // [q, n] -> message not yet acknowledged
+    delivered := ∅           // [p, n] already delivered
+
+  upon event ⟨pl, Init⟩ do
+    starttimer(resend, TIMEOUT)
+  end
+
+  upon event ⟨pl, Send | q, m⟩ do
+    seq := seq + 1
+    pending[[q, seq]] := m
+    trigger ⟨net, Send | q, [DATA, seq, m]⟩
+  end
+
+  upon event ⟨net, Deliver | p, [DATA, n, m]⟩ do
+    trigger ⟨net, Send | p, [ACK, n]⟩
+    if [p, n] ∉ delivered then
+      delivered := delivered ∪ {[p, n]}
+      trigger ⟨pl, Deliver | p, m⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | q, [ACK, n]⟩ do
+    pending := remove(pending, [q, n])
+  end
+
+  upon event ⟨timer, Timeout | resend⟩ do
+    forall k in keys(pending) do
+      trigger ⟨net, Send | k[0], [DATA, k[1], pending[k]]⟩
+    end
+    starttimer(resend, TIMEOUT)
+  end
+end`
+  },
+  {
+    key: 'fifo-links', name: 'SequencedFifoLinks', implements: 'FifoPerfectLinks', group: 'Links', uses: ['PerfectLinks'],
+    summary: 'FIFO perfect links: per-sender sequence numbers and a reorder buffer.',
+    properties: 'Perfect link properties, plus FIFO delivery per pair of processes.',
+    source: `// FIFO perfect links on top of perfect links: messages from each sender are
+// numbered, buffered on arrival and delivered in order.
+algorithm SequencedFifoLinks
+  implements FifoPerfectLinks as fpl
+  uses PerfectLinks as pl
+  state
+    next := map()            // q -> sequence number of the next message to q
+    expected := map()        // p -> sequence number expected from p
+    buffer := ∅              // [p, n, m] received but not delivered
+
+  function expectedFrom(p)
+    return get(expected, p, 0)
+  end
+
+  upon event ⟨fpl, Send | q, m⟩ do
+    n := get(next, q, 0)
+    next[q] := n + 1
+    trigger ⟨pl, Send | q, [FIFO, n, m]⟩
+  end
+
+  upon event ⟨pl, Deliver | p, [FIFO, n, m]⟩ do
+    buffer := buffer ∪ {[p, n, m]}
+  end
+
+  upon exists e in buffer where e[1] = expectedFrom(e[0]) do
+    buffer := buffer \\ {e}
+    expected[e[0]] := e[1] + 1
+    trigger ⟨fpl, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'beb', name: 'BasicBroadcast', implements: 'BestEffortBroadcast', group: 'Broadcast', uses: ['PerfectLinks'],
+    summary: 'Best-effort broadcast: send the message to every process over perfect links.',
+    properties: 'Validity, no duplication, no creation. If the sender crashes, some processes may miss the message.',
+    source: `// Best-effort broadcast, after "Basic Broadcast" (Cachin, Guerraoui, Rodrigues).
+algorithm BasicBroadcast
+  implements BestEffortBroadcast as beb
+  uses PerfectLinks as pl
+
+  upon event ⟨beb, Broadcast | m⟩ do
+    forall q in Π do
+      trigger ⟨pl, Send | q, m⟩
+    end
+  end
+
+  upon event ⟨pl, Deliver | p, m⟩ do
+    trigger ⟨beb, Deliver | p, m⟩
+  end
+end`
+  },
+  {
+    key: 'erb', name: 'EagerReliableBroadcast', implements: 'ReliableBroadcast', group: 'Broadcast', uses: ['BestEffortBroadcast'],
+    summary: 'Reliable broadcast without failure detection: every process relays each message once.',
+    properties: 'Validity, no duplication, no creation, agreement among correct processes.',
+    source: `// Reliable broadcast, after "Eager Reliable Broadcast" (Cachin, Guerraoui, Rodrigues).
+// Messages are identified by (original sender, sequence number).
+algorithm EagerReliableBroadcast
+  implements ReliableBroadcast as rb
+  uses BestEffortBroadcast as beb
+  state
+    seq := 0
+    delivered := ∅
+
+  upon event ⟨rb, Broadcast | m⟩ do
+    seq := seq + 1
+    trigger ⟨beb, Broadcast | [RB, self, seq, m]⟩
+  end
+
+  upon event ⟨beb, Deliver | p, [RB, s, n, m]⟩ where [s, n] ∉ delivered do
+    delivered := delivered ∪ {[s, n]}
+    trigger ⟨rb, Deliver | s, m⟩
+    trigger ⟨beb, Broadcast | [RB, s, n, m]⟩
+  end
+
+  upon event ⟨beb, Deliver | p, [RB, s, n, m]⟩ where [s, n] ∈ delivered do
+    skip    // already relayed
+  end
+end`
+  },
+  {
+    key: 'urb', name: 'MajorityAckURB', implements: 'UniformReliableBroadcast', group: 'Broadcast', uses: ['BestEffortBroadcast'],
+    summary: 'Uniform reliable broadcast: deliver only after a majority has relayed the message.',
+    properties: 'Uniform agreement: if any process delivers, every correct process delivers. Needs a correct majority.',
+    source: `// Uniform reliable broadcast, after "Majority-Ack Uniform Reliable Broadcast"
+// (Cachin, Guerraoui, Rodrigues).
+// A message is delivered once more than half of the processes relayed it,
+// so it survives the crash of the processes that delivered it first.
+algorithm MajorityAckURB
+  implements UniformReliableBroadcast as urb
+  uses BestEffortBroadcast as beb
+  state
+    seq := 0
+    pending := ∅             // [s, n, m] seen and relayed
+    ack := map()             // [s, n] -> processes that relayed it
+    delivered := ∅           // [s, n]
+
+  function acks(s, n)
+    return #get(ack, [s, n], ∅)
+  end
+
+  upon event ⟨urb, Broadcast | m⟩ do
+    seq := seq + 1
+    pending := pending ∪ {[self, seq, m]}
+    trigger ⟨beb, Broadcast | [URB, self, seq, m]⟩
+  end
+
+  upon event ⟨beb, Deliver | p, [URB, s, n, m]⟩ do
+    ack[[s, n]] := get(ack, [s, n], ∅) ∪ {p}
+    if [s, n, m] ∉ pending then
+      pending := pending ∪ {[s, n, m]}
+      trigger ⟨beb, Broadcast | [URB, s, n, m]⟩
+    end
+  end
+
+  upon exists e in pending where [e[0], e[1]] ∉ delivered and acks(e[0], e[1]) > N / 2 do
+    delivered := delivered ∪ {[e[0], e[1]]}
+    trigger ⟨urb, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'fifo-rb', name: 'BroadcastWithSequenceNumber', implements: 'FifoReliableBroadcast', group: 'Broadcast', uses: ['ReliableBroadcast'],
+    summary: 'FIFO reliable broadcast: messages of each sender are delivered in the order they were sent.',
+    properties: 'Reliable broadcast properties, plus FIFO delivery per sender.',
+    source: `// FIFO reliable broadcast, after "Broadcast with Sequence Number"
+// (Cachin, Guerraoui, Rodrigues).
+algorithm BroadcastWithSequenceNumber
+  implements FifoReliableBroadcast as frb
+  uses ReliableBroadcast as rb
+  state
+    lsn := 0                 // messages broadcast by this process
+    next := map()            // s -> sequence number expected from s
+    pending := ∅             // [s, n, m]
+
+  function nextFrom(s)
+    return get(next, s, 1)
+  end
+
+  upon event ⟨frb, Broadcast | m⟩ do
+    lsn := lsn + 1
+    trigger ⟨rb, Broadcast | [FIFO, lsn, m]⟩
+  end
+
+  upon event ⟨rb, Deliver | s, [FIFO, n, m]⟩ do
+    pending := pending ∪ {[s, n, m]}
+  end
+
+  upon exists e in pending where e[1] = nextFrom(e[0]) do
+    pending := pending \\ {e}
+    next[e[0]] := e[1] + 1
+    trigger ⟨frb, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'causal', name: 'WaitingCausalBroadcast', implements: 'CausalOrderBroadcast', group: 'Broadcast', uses: ['ReliableBroadcast'],
+    summary: 'Causal order broadcast with vector clocks: a message waits until everything it depends on is delivered.',
+    properties: 'Reliable broadcast properties, plus causal delivery order.',
+    source: `// Causal-order broadcast with vector clocks, after "Waiting Causal Broadcast"
+// (Cachin, Guerraoui, Rodrigues).
+algorithm WaitingCausalBroadcast
+  implements CausalOrderBroadcast as crb
+  uses ReliableBroadcast as rb
+  state
+    V := map()               // q -> messages of q delivered here
+    lsn := 0                 // messages broadcast by this process
+    pending := ∅             // [s, W, m]
+
+  function entry(W, q)
+    return get(W, q, 0)
+  end
+
+  // true when W ≤ V in every component
+  function satisfied(W)
+    forall q in keys(W) do
+      if entry(W, q) > entry(V, q) then
+        return false
+      end
+    end
+    return true
+  end
+
+  upon event ⟨crb, Broadcast | m⟩ do
+    W := V
+    W[self] := lsn
+    lsn := lsn + 1
+    trigger ⟨rb, Broadcast | [CRB, W, m]⟩
+  end
+
+  upon event ⟨rb, Deliver | s, [CRB, W, m]⟩ do
+    pending := pending ∪ {[s, W, m]}
+  end
+
+  upon exists e in pending where satisfied(e[1]) do
+    pending := pending \\ {e}
+    V[e[0]] := entry(V, e[0]) + 1
+    trigger ⟨crb, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'gossip', name: 'EagerGossip', implements: 'ProbabilisticBroadcast', group: 'Broadcast', uses: [],
+    summary: 'Probabilistic broadcast: each process forwards a new message to a few random neighbors for a few rounds.',
+    properties: 'Probabilistic validity: most processes deliver with high probability; no duplication.',
+    source: `// Gossip, after "Eager Probabilistic Broadcast" (Cachin, Guerraoui, Rodrigues).
+// Each hop forwards to FANOUT random neighbors, for at most ROUNDS hops.
+algorithm EagerGossip
+  implements ProbabilisticBroadcast as pb
+  uses Net as net
+  params
+    FANOUT := 2
+    ROUNDS := 4
+  state
+    seq := 0
+    delivered := ∅           // [s, n]
+
+  function targets(k)
+    chosen := ∅
+    left := neighbors
+    while #chosen < k and #left > 0 do
+      q := pick(left)
+      chosen := chosen ∪ {q}
+      left := left \\ {q}
+    end
+    return chosen
+  end
+
+  function gossip(msg)
+    forall q in targets(FANOUT) do
+      trigger ⟨net, Send | q, msg⟩
+    end
+  end
+
+  upon event ⟨pb, Broadcast | m⟩ do
+    seq := seq + 1
+    delivered := delivered ∪ {[self, seq]}
+    trigger ⟨pb, Deliver | self, m⟩
+    call gossip([GOSSIP, self, seq, m, ROUNDS])
+  end
+
+  upon event ⟨net, Deliver | p, [GOSSIP, s, n, m, r]⟩ do
+    if [s, n] ∉ delivered then
+      delivered := delivered ∪ {[s, n]}
+      trigger ⟨pb, Deliver | s, m⟩
+      if r > 1 then
+        call gossip([GOSSIP, s, n, m, r - 1])
+      end
+    end
+  end
+end`
+  }
+];
+
+const byKey = new Map(MODULES.map(m => [m.key, m]));
+const byName = new Map(MODULES.map(m => [m.name, m]));
+// default implementation for an interface when a module needs it
+const DEFAULT_FOR = {
+  StubbornLinks: 'stubborn-links', PerfectLinks: 'ack-links', FifoPerfectLinks: 'fifo-links',
+  BestEffortBroadcast: 'beb', ReliableBroadcast: 'erb', UniformReliableBroadcast: 'urb',
+  FifoReliableBroadcast: 'fifo-rb', CausalOrderBroadcast: 'causal', ProbabilisticBroadcast: 'gossip'
+};
+
+// Modules to add, dependencies first, so that `key` works in a program that already
+// declares `interfaces` and implements `implemented`.
+function plan(key, implemented, interfaces) {
+  const order = [], seen = new Set();
+  const impl = new Set(implemented || []);
+  const visit = k => {
+    const m = byKey.get(k);
+    if (!m || seen.has(k)) return;
+    seen.add(k);
+    for (const iface of m.uses) if (!impl.has(iface)) visit(DEFAULT_FOR[iface]);
+    impl.add(m.implements);
+    order.push(m);
+  };
+  visit(key);
+  const have = new Set(interfaces || []);
+  const ifaces = [];
+  for (const m of order) {
+    for (const i of [m.implements].concat(m.uses)) {
+      if (IFACES[i] && !have.has(i)) { have.add(i); ifaces.push(i); }
+    }
+  }
+  return { modules: order, interfaces: ifaces };
+}
+
+// Full source for a stack whose top is `key` (used by the examples)
+function source(key) {
+  const p = plan(key, [], []);
+  return p.interfaces.map(i => IFACES[i]).concat(p.modules.map(m => m.source)).join('\n\n') + '\n';
+}
+
+const Library = { IFACES, MODULES, byKey, byName, DEFAULT_FOR, plan, source };
+if (typeof module !== 'undefined' && module.exports) module.exports = Library;
+else root.SimLibrary = Library;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* Distributed Systems Playground — interface translations.
+   The interface is written in English. When another language is chosen, a MutationObserver translates text
+   nodes and a few attributes as they appear, using exact phrases and patterns. Code, checker diagnostics and
+   the documentation are not translated. */
+(function (root) {
+'use strict';
+
+const IT = {};
+const PAT = [];
+const BLOCKS = {};
+const M = (en, it) => { IT[en] = it; };
+const P = (re, fn) => PAT.push([re, fn]);
+
+// ---------------------------------------------------------------- exact phrases
+[
+  ['Distributed Systems Playground', 'Distributed Systems Playground'],
+  ['Example', 'Esempio'], ['Choose…', 'Scegli…'], ['Seed', 'Seme'], ['Random seed', 'Seme casuale'],
+  ['Run', 'Esegui'], ['Run (Ctrl+Enter)', 'Esegui (Ctrl+Invio)'], ['Export', 'Esporta'], ['Import', 'Importa'],
+  ['Gallery', 'Galleria'], ['Browse the examples', 'Sfoglia gli esempi'], ['Settings', 'Impostazioni'],
+  ['Keyboard shortcuts', 'Scorciatoie da tastiera'], ['Keyboard shortcuts (?)', 'Scorciatoie da tastiera (?)'],
+  ['Topology', 'Topologia'], ['Tool', 'Strumento'], ['Select', 'Seleziona'], ['Node', 'Nodo'], ['Link', 'Collegamento'],
+  ['Delete', 'Elimina'], ['Select and move (V)', 'Seleziona e sposta (V)'], ['Add a process (N)', 'Aggiungi un processo (N)'],
+  ['Connect two processes (L)', 'Collega due processi (L)'], ['Delete (D)', 'Elimina (D)'], ['Directed', 'Orientato'],
+  ['Topology generator', 'Generatore di topologia'], ['Ring', 'Anello'], ['Complete', 'Completo'], ['Star', 'Stella'],
+  ['Grid', 'Griglia'], ['Line', 'Linea'], ['Random', 'Casuale'], ['Binary tree', 'Albero binario'],
+  ['Number of processes', 'Numero di processi'], ['Number of processes (2 to 40)', 'Numero di processi (da 2 a 40)'],
+  ['Generate', 'Genera'], ['Fit', 'Adatta'], ['Fit to view', 'Adatta alla vista'], ['Labels', 'Etichette'],
+  ['Show the message type on packets in flight', 'Mostra il tipo dei messaggi sui pacchetti in viaggio'],
+  ['Layers', 'Livelli'], ['Color messages by the module that originated them', 'Colora i messaggi in base al modulo che li ha originati'],
+  ['Process graph', 'Grafo dei processi'], ['The scenario has changed.', 'Lo scenario è cambiato.'], ['Run again', 'Esegui di nuovo'],
+  ['in transit', 'in viaggio'], ['violation', 'violazione'], ['will be lost', 'verrà perso'], ['processing', 'in elaborazione'],
+  ['link down', 'collegamento interrotto'], ['Originated by', 'Originati da'],
+  ['Configuration', 'Configurazione'], ['Code', 'Codice'], ['Timing', 'Tempi'], ['Scenario', 'Scenario'], ['State', 'Stato'], ['Stack', 'Stack'],
+  ['Main algorithm', 'Algoritmo principale'], ['Add module', 'Aggiungi modulo'], ['Insert symbol', 'Inserisci simbolo'],
+  ['Algorithm code', 'Codice dell\'algoritmo'], ['Language quick reference', 'Guida rapida al linguaggio'],
+  ['No errors: the code is consistent with the assumed model.', 'Nessun errore: il codice è coerente con il modello assunto.'],
+  ['Presets', 'Preset'], ['Custom', 'Personalizzato'],
+  ['Parameters edited by hand. Pick a preset to start again from a known configuration.', 'Parametri modificati a mano. Scegli un preset per ripartire da una configurazione nota.'],
+  ['Ideal synchronous', 'Sincrono ideale'], ['Realistic synchronous', 'Sincrono realistico'], ['Timed synchronous', 'Sincrono temporizzato'],
+  ['Partially synchronous', 'Parzialmente sincrono'], ['Asynchronous', 'Asincrono'],
+  ['Lockstep rounds: no violation can happen. This is the textbook model.', 'Round in lockstep: nessuna violazione è possibile. È il modello dei libri di testo.'],
+  ['The algorithm believes in rounds; the network has long tails and clocks drift. Late messages become omissions.', 'L\'algoritmo crede nei round; la rete ha code lunghe e i clock derivano. I messaggi in ritardo diventano omissioni.'],
+  ['DELTA is known and respected by the network; clocks do not drift.', 'DELTA è noto e la rete lo rispetta; i clock non derivano.'],
+  ['Before GST delays are heavy-tailed; after GST a bound exists, unknown to the algorithm.', 'Prima di GST i ritardi hanno code pesanti; dopo GST esiste un limite, ignoto all\'algoritmo.'],
+  ['No bounds on delays, steps or clocks. DELTA, PHI and RHO do not exist for the algorithm.', 'Nessun limite su ritardi, passi e clock. Per l\'algoritmo DELTA, PHI e RHO non esistono.'],
+  ['Assumed model', 'Modello assunto'], ['what the algorithm believes', 'ciò che l\'algoritmo crede'],
+  ['Actual model', 'Modello effettivo'], ['what the system really does', 'ciò che il sistema fa davvero'],
+  ['Synchrony', 'Sincronia'], ['Synchronous rounds', 'Round sincroni'], ['unknown', 'unknown'],
+  ['Round execution', 'Esecuzione dei round'], ['Ideal lockstep', 'Lockstep ideale'], ['Emulated on local clocks', 'Emulati sui clock locali'],
+  ['Round length on screen', 'Durata del round sullo schermo'],
+  ['Each process opens round r when its own clock reads r·(DELTA+PHI).', 'Ogni processo apre il round r quando il suo clock segna r·(DELTA+PHI).'],
+  ['When reality exceeds the assumption', 'Quando la realtà supera l\'assunzione'], ['Deliver late', 'Consegna in ritardo'],
+  ['Discard (becomes an omission)', 'Scarta (diventa un\'omissione)'], ['Stop the simulation', 'Ferma la simulazione'],
+  ['Delay', 'Ritardo'], ['Delay distribution', 'Distribuzione dei ritardi'], ['Upper bound', 'Limite superiore'], ['none', 'nessuno'],
+  ['FIFO channels', 'Canali FIFO'], ['Spike probability', 'Probabilità di picco'], ['Spike delay', 'Ritardo del picco'],
+  ['Loss', 'Perdita'], ['Duplication', 'Duplicazione'], ['Step duration', 'Durata del passo'], ['Clock offset', 'Offset del clock'],
+  ['Clock drift', 'Deriva del clock'], ['GST', 'GST'], ['Delay before GST', 'Ritardo prima di GST'], ['same as above', 'come sopra'],
+  ['Simultaneous events', 'Eventi simultanei'], ['Stable order by process', 'Ordine stabile per processo'], ['Random order (from the seed)', 'Ordine casuale (dal seme)'],
+  ['The delay distribution is not valid.', 'La distribuzione dei ritardi non è valida.'],
+  ['External inputs', 'Input esterni'], ['Faults', 'Guasti'], ['No faults scheduled.', 'Nessun guasto programmato.'],
+  ['Type', 'Tipo'], ['Crash', 'Crash'], ['Recovery', 'Ripartenza'], ['Link failure', 'Guasto di collegamento'], ['Partition', 'Partizione'],
+  ['Process', 'Processo'], ['At', 'A'], ['Between', 'Tra'], ['and', 'e'], ['First process', 'Primo processo'], ['Second process', 'Secondo processo'],
+  ['Groups', 'Gruppi'], ['From', 'Da'], ['Until', 'Fino a'], ['forever', 'per sempre'], ['Add fault', 'Aggiungi guasto'], ['Remove', 'Rimuovi'],
+  ['Simulated duration', 'Durata simulata'], ['Stop at the first failed assertion', 'Fermati alla prima asserzione violata'],
+  ['Select a process in the topology to see its state at the cursor time.', 'Seleziona un processo nella topologia per vederne lo stato all\'istante del cursore.'],
+  ['Run the simulation to inspect the state.', 'Esegui la simulazione per ispezionare lo stato.'],
+  ['This process did not exist in the last run.', 'Questo processo non esisteva nell\'ultima esecuzione.'],
+  ['status', 'stato'], ['running', 'attivo'], ['local clock', 'clock locale'], ['offset', 'offset'], ['drift', 'deriva'], ['round', 'round'],
+  ['No event processed yet.', 'Nessun evento ancora elaborato.'], ['No state variables.', 'Nessuna variabile di stato.'],
+  ['changed in the last step', 'cambiato nell\'ultimo passo'], ['Latest outputs', 'Ultimi output'], ['None.', 'Nessuno.'],
+  ['Run the simulation to see how events move through the module stack.', 'Esegui la simulazione per vedere come gli eventi attraversano lo stack dei moduli.'],
+  ['Application', 'Applicazione'], ['inputs and outputs', 'input e output'], ['Network', 'Rete'], ['Rounds', 'Round'],
+  ['provided by the simulator', 'fornita dal simulatore'], ['Nothing has happened on this process yet.', 'Su questo processo non è ancora successo nulla.'],
+  ['The run is long: only its first 200,000 local events were recorded.', 'L\'esecuzione è lunga: sono stati registrati solo i primi 200.000 eventi locali.'],
+  ['Execution', 'Esecuzione'], ['Go to start', 'Vai all\'inizio'], ['Start (Home)', 'Inizio (Home)'], ['Previous event', 'Evento precedente'],
+  ['Previous event (←)', 'Evento precedente (←)'], ['Play', 'Riproduci'], ['Pause', 'Pausa'], ['Play or pause (space)', 'Riproduci o pausa (spazio)'],
+  ['Next event', 'Evento successivo'], ['Next event (→)', 'Evento successivo (→)'], ['Go to end', 'Vai alla fine'], ['End (End)', 'Fine (Fine)'],
+  ['Playback speed', 'Velocità di riproduzione'], ['Event by event', 'Evento per evento'], ['Auto speed', 'Velocità automatica'],
+  ['Autoplay', 'Avvio automatico'], ['Start playing after every run', 'Avvia la riproduzione dopo ogni esecuzione'], ['Position in time', 'Posizione nel tempo'],
+  ['Causality', 'Causalità'], ['Click an event on the diagram to see what caused it and what it caused', 'Clicca un evento sul diagramma per vedere cosa lo ha causato e cosa ha causato'],
+  ['Future', 'Futuro'], ['Show events after the cursor, faded', 'Mostra, sbiaditi, gli eventi dopo il cursore'],
+  ['Follow', 'Segui'], ['Scroll the diagram to keep the cursor in view', 'Scorri il diagramma per tenere visibile il cursore'],
+  ['Zoom', 'Zoom'], ['Zoom out', 'Riduci'], ['Zoom in', 'Ingrandisci'], ['Zoom in (Ctrl + wheel)', 'Ingrandisci (Ctrl + rotella)'],
+  ['Action', 'Azione'], ['Zoom to where the action is', 'Inquadra dove succede qualcosa'], ['All', 'Tutto'], ['Show the whole run', 'Mostra tutta l\'esecuzione'],
+  ['Clear', 'Pulisci'], ['delivered', 'consegnato'], ['lost or discarded', 'perso o scartato'], ['output', 'output'], ['crashed', 'in crash'],
+  ['recovery', 'ripartenza'], ['network cut', 'rete interrotta'], ['Events', 'Eventi'], ['Event filter', 'Filtro eventi'],
+  ['Outputs', 'Output'], ['Inputs', 'Input'], ['Violations', 'Violazioni'], ['Dropped messages', 'Messaggi scartati'],
+  ['Warnings and errors', 'Avvisi ed errori'], ['Logs and assertions', 'Log e asserzioni'], ['No events match this filter.', 'Nessun evento corrisponde al filtro.'],
+  ['Export the scenario', 'Esporta lo scenario'],
+  ['The JSON file holds topology, code, timing model, inputs, faults and seed: opening it again reproduces the same run.', 'Il file JSON contiene topologia, codice, modello dei tempi, input, guasti e seme: riaprendolo si ottiene la stessa esecuzione.'],
+  ['Shareable link', 'Link da condividere'], ['Images of the current view', 'Immagini della vista corrente'], ['Diagram as SVG', 'Diagramma in SVG'],
+  ['Diagram as PNG', 'Diagramma in PNG'], ['Graph as SVG', 'Grafo in SVG'], ['Copy JSON', 'Copia JSON'], ['Copy link', 'Copia link'],
+  ['Save file', 'Salva file'], ['Close', 'Chiudi'], ['Import a scenario', 'Importa uno scenario'], ['JSON file', 'File JSON'],
+  ['Or paste its content', 'Oppure incollane il contenuto'], ['Cancel', 'Annulla'], ['Theme', 'Tema'], ['Follow the system', 'Come il sistema'],
+  ['Light', 'Chiaro'], ['Dark', 'Scuro'], ['Colors', 'Colori'], ['Standard', 'Standard'],
+  ['Easier to tell apart (color vision deficiency)', 'Più distinguibili (deficit nella visione dei colori)'], ['Language', 'Lingua'],
+  ['The language setting translates the interface. Code, diagnostics from the checker and the documentation stay in English.', 'La lingua traduce l\'interfaccia. Il codice, la diagnostica del checker e la documentazione restano in inglese.'],
+  ['Presentation mode', 'Modalità presentazione'], ['Welcome tour', 'Visita guidata'], ['Documentation', 'Documentazione'],
+  ['Run', 'Esegui'], ['Play or pause', 'Riproduci o pausa'], ['Previous or next event', 'Evento precedente o successivo'],
+  ['Start or end of the run', 'Inizio o fine dell\'esecuzione'], ['Select, Node, Link, Delete tools', 'Strumenti Seleziona, Nodo, Collegamento, Elimina'],
+  ['Delete the selected process or link', 'Elimina il processo o il collegamento selezionato'],
+  ['Clear the selection, or leave presentation mode', 'Annulla la selezione o esci dalla modalità presentazione'],
+  ['Full screen', 'Schermo intero'], ['This list', 'Questo elenco'], ['+ wheel', '+ rotella'], ['Zoom the diagram', 'Zoom del diagramma'],
+  ['Shortcuts work everywhere except while typing in a text field.', 'Le scorciatoie funzionano ovunque, tranne mentre si scrive in un campo di testo.'],
+  ['Examples', 'Esempi'], ['Topic', 'Argomento'], ['Exit presentation', 'Esci dalla presentazione'],
+  ['Skip', 'Salta'], ['Back', 'Indietro'], ['Next', 'Avanti'], ['Done', 'Fine'],
+  ['Crash here', 'Crash qui'], ['Recover here', 'Riparti qui'], ['Isolate here', 'Isola qui'], ['Cut here', 'Interrompi qui'],
+  ['Inject event', 'Inietta evento'], ['Event to inject', 'Evento da iniettare'], ['Event arguments', 'Argomenti dell\'evento'],
+  ['arguments, e.g. "hello"', 'argomenti, es. "ciao"'], ['never', 'mai'], ['Isolation duration', 'Durata dell\'isolamento'],
+  ['Duration, empty for forever', 'Durata, vuoto per sempre'], ['no neighbors', 'nessun vicino'], ['no faults scheduled', 'nessun guasto programmato'],
+  ['Enabled', 'Attivo'], ['Unchecked: the link is down for the whole run', 'Non selezionato: il collegamento è interrotto per tutta l\'esecuzione'],
+  ['global', 'globale'], ['Link loss', 'Perdita del collegamento'], ['Link delay', 'Ritardo del collegamento'],
+  ['Link failure duration', 'Durata del guasto'], ['take the link down for', 'interrompi il collegamento per'],
+  ['Go to send', 'Vai all\'invio'], ['Go to arrival', 'Vai all\'arrivo'], ['This message is not part of the current run.', 'Questo messaggio non appartiene all\'esecuzione corrente.'],
+  ['Click the source process, then the destination.', 'Clicca il processo di partenza, poi quello di arrivo.'],
+  ['Click an empty spot to add a process.', 'Clicca un punto vuoto per aggiungere un processo.'],
+  ['Click a process or a link to delete it.', 'Clicca un processo o un collegamento per eliminarlo.'],
+  ['No processes yet: use the Node tool or a generator.', 'Nessun processo: usa lo strumento Nodo o un generatore.'],
+  ['Event of', 'Evento di'], ['Press Run to see the space-time diagram.', 'Premi Esegui per vedere il diagramma spazio-tempo.'],
+  ['Add some processes to get started.', 'Aggiungi qualche processo per iniziare.'], ['partition', 'partizione'], ['down', 'interrotto'],
+  ['Simulating…', 'Simulazione in corso…'], ['Preparing…', 'Preparazione…'], ['Preparing the file…', 'Preparazione del file…'],
+  ['Copied to the clipboard.', 'Copiato negli appunti.'], ['Save cancelled.', 'Salvataggio annullato.'],
+  ['Copying is not allowed here: select the text and copy it manually.', 'Qui la copia non è consentita: seleziona il testo e copialo a mano.'],
+  ['Saving files is not available here: use Copy JSON.', 'Qui non è possibile salvare file: usa Copia JSON.'],
+  ['Saving files is not available here.', 'Qui non è possibile salvare file.'], ['A save request is already open.', 'Una richiesta di salvataggio è già aperta.'],
+  ['Links are not supported in this browser', 'Questo browser non supporta i link'], ['Run the simulation first.', 'Esegui prima la simulazione.'],
+  ['Loaded the empty scenario.', 'Caricato lo scenario vuoto.'], ['Scenario imported.', 'Scenario importato.'],
+  ['Previous scenario restored.', 'Scenario precedente ripristinato.'], ['Opened the shared scenario.', 'Aperto lo scenario condiviso.'],
+  ['That link already exists.', 'Il collegamento esiste già.'], ['Topology changed: press Run to simulate again.', 'Topologia modificata: premi Esegui per simulare di nuovo.'],
+  ['Click an event on the diagram to see its causal past and future.', 'Clicca un evento sul diagramma per vederne passato e futuro causali.'],
+  ['Presentation mode: arrows or a clicker step through events, P or Esc to leave.', 'Modalità presentazione: le frecce o un telecomando scorrono gli eventi, P o Esc per uscire.'],
+  ['Fix the syntax errors in the code before adding a module.', 'Correggi gli errori di sintassi prima di aggiungere un modulo.'],
+  ['Invalid time: use a duration such as 1.5s', 'Istante non valido: usa una durata come 1.5s'],
+  ['The link does not contain a valid scenario: loading the last saved one.', 'Il link non contiene uno scenario valido: carico l\'ultimo salvato.'],
+  ['The link does not contain a valid scenario.', 'Il link non contiene uno scenario valido.'],
+  ['Undo', 'Annulla'], ['Getting started', 'Primi passi'], ['Empty scenario', 'Scenario vuoto'],
+  ['A small ring and a starter program to write your own algorithm.', 'Un piccolo anello e un programma di partenza per scrivere il tuo algoritmo.'],
+  ['Broadcast', 'Broadcast'], ['Leader election', 'Elezione del leader'], ['Consensus', 'Consenso'], ['Failure detection', 'Rilevamento dei guasti'],
+  ['asynchronous', 'asincrono'], ['partially synchronous', 'parzialmente sincrono'], ['synchronous rounds', 'round sincroni'], ['timed synchronous', 'sincrono temporizzato'],
+  // example titles and summaries
+  ['Flooding broadcast (asynchronous)', 'Broadcast per inondazione (asincrono)'],
+  ['Ring leader election, Chang-Roberts (asynchronous)', 'Elezione su anello, Chang-Roberts (asincrono)'],
+  ['FloodSet consensus (synchronous rounds)', 'Consenso FloodSet (round sincroni)'],
+  ['Failure detector ◇P (partially synchronous)', 'Failure detector ◇P (parzialmente sincrono)'],
+  ['Failure detector across a partition and a recovery', 'Failure detector con partizione e ripartenza'],
+  ['Reliable broadcast when the sender crashes', 'Reliable broadcast con crash del mittente'],
+  ['Causal order broadcast: questions before answers', 'Broadcast causale: domande prima delle risposte'],
+  ['Gossip: spreading a rumor', 'Gossip: diffondere una voce'],
+  ['Two messages spread across a grid; each process forwards what it has not seen yet.', 'Due messaggi si diffondono su una griglia; ogni processo inoltra ciò che non ha ancora visto.'],
+  ['Identifiers travel around a directed ring until the largest one comes back.', 'Gli identificatori girano su un anello orientato finché il più grande non torna indietro.'],
+  ['Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.', 'Consenso in f + 1 round, e cosa succede quando i round sono solo un\'ipotesi.'],
+  ['Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.', 'Heartbeat e timeout crescente: sospetti sbagliati prima di GST, un crash rilevato dopo.'],
+  ['The same detector through a network partition, a crash and a recovery.', 'Lo stesso detector attraverso una partizione, un crash e una ripartenza.'],
+  ['The sender crashes on a lossy network; relays make sure every correct process gets the news.', 'Il mittente cade su una rete che perde messaggi; i rilanci fanno arrivare la notizia a tutti i processi corretti.'],
+  ['Vector clocks keep answers after their questions, even when the network reorders them.', 'I vector clock tengono le risposte dopo le domande, anche quando la rete le riordina.'],
+  ['A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.', 'Una voce si diffonde a vicini casuali; copertura e costo dipendono da fanout e round.'],
+  // tour
+  ['The graph', 'Il grafo'],
+  ['Processes and the links between them. Messages travel along the links as packets. Click a process or a packet to inspect it.', 'I processi e i collegamenti tra loro. I messaggi viaggiano sui collegamenti come pacchetti. Clicca un processo o un pacchetto per ispezionarlo.'],
+  ['The algorithm', 'L\'algoritmo'],
+  ['Algorithms are written in Upon, the event-driven pseudocode of the textbooks. Errors appear under the editor as you type.', 'Gli algoritmi si scrivono in Upon, lo pseudocodice a eventi dei libri di testo. Gli errori compaiono sotto l\'editor mentre scrivi.'],
+  ['The timing model', 'Il modello dei tempi'],
+  ['Choose what the algorithm assumes and how the network really behaves. When reality breaks the assumption, the message turns red.', 'Scegli cosa assume l\'algoritmo e come si comporta davvero la rete. Quando la realtà viola l\'assunzione, il messaggio diventa rosso.'],
+  ['Inputs and faults', 'Input e guasti'],
+  ['Tell processes what to do, and schedule crashes, recoveries, link failures and partitions.', 'Di\' ai processi cosa fare e programma crash, ripartenze, guasti di collegamento e partizioni.'],
+  ['Simulate the scenario. The same seed always gives the same run.', 'Simula lo scenario. Lo stesso seme dà sempre la stessa esecuzione.'],
+  ['Playback', 'Riproduzione'],
+  ['Play, pause and step. "Event by event" is the easiest speed to follow an algorithm.', 'Riproduci, metti in pausa e avanza. "Evento per evento" è la velocità più comoda per seguire un algoritmo.'],
+  ['The space-time diagram', 'Il diagramma spazio-tempo'],
+  ['One line per process, one arrow per message. Tick Causality and click an event to see what caused it.', 'Una linea per processo, una freccia per messaggio. Attiva Causalità e clicca un evento per vedere cosa lo ha causato.'],
+  ['Start from a classic algorithm. Each example comes with experiments to try. The ⚙ menu brings this tour back.', 'Parti da un algoritmo classico. Ogni esempio propone esperimenti da provare. Il menu ⚙ riapre questa visita.'],
+  // message status and extras
+  ['still in transit when the run ended', 'ancora in viaggio a fine esecuzione'], ['lost by the network', 'perso dalla rete'],
+  ['discarded because late', 'scartato perché in ritardo'], ['recipient crashed', 'destinatario in crash'], ['no link', 'nessun collegamento'],
+  ['dropped by a link failure or a partition', 'scartato per un guasto di collegamento o una partizione'],
+  ['violates the assumed model', 'viola il modello assunto'], ['duplicate', 'duplicato'],
+  // log labels and engine messages
+  ['input', 'input'], ['fault', 'guasto'], ['dropped', 'scartato'], ['warning', 'avviso'], ['error', 'errore'],
+  ['assertion failed', 'asserzione violata'], ['log', 'log'], ['network partition', 'partizione di rete'],
+  ['Time limit reached', 'Raggiunto il limite di tempo'], ['No more events in the queue', 'Nessun altro evento in coda'],
+  ['Runtime error', 'Errore di esecuzione'], ['Timing violation (policy: halt)', 'Violazione temporale (politica: ferma)'],
+  ['Syntax error', 'Errore di sintassi'], ['The code contains errors', 'Il codice contiene errori'], ['No algorithm is defined', 'Nessun algoritmo definito']
+].forEach(([en, it]) => M(en, it));
+
+// ---------------------------------------------------------------- patterns
+const plural = (n, one, many) => (+n === 1 ? one : many);
+P(/^(\d+) messages?$/, m => m[1] + ' ' + plural(m[1], 'messaggio', 'messaggi'));
+P(/^(\d+) delivered$/, m => m[1] + ' ' + plural(m[1], 'consegnato', 'consegnati'));
+P(/^(\d+) lost$/, m => m[1] + ' ' + plural(m[1], 'perso', 'persi'));
+P(/^(\d+) violations?$/, m => m[1] + ' ' + plural(m[1], 'violazione', 'violazioni'));
+P(/^(\d+) outputs?$/, m => m[1] + ' output');
+P(/^(\d+) events could have caused it$/, m => m[1] + ' eventi potrebbero averlo causato');
+P(/^(\d+) events it could affect$/, m => m[1] + ' eventi che può influenzare');
+P(/^(\d+) concurrent$/, m => m[1] + ' ' + plural(m[1], 'concorrente', 'concorrenti'));
+P(/^([\d.]+) (ms|s) per second$/, m => m[1] + ' ' + m[2] + ' al secondo');
+P(/^At (.+):$/, m => 'A ' + m[1] + ':');
+P(/^at (.+):$/, m => 'a ' + m[1] + ':');
+P(/^(p\d+) at t = (.+)$/, m => m[1] + ' a t = ' + m[2]);
+P(/^at t = (.+)\. Requests go down \(blue\), indications come up \(green\)\.$/, m => 'a t = ' + m[1] + '. Le richieste scendono (blu), le indicazioni salgono (verde).');
+P(/^Latest events on (p\d+)$/, m => 'Ultimi eventi su ' + m[1]);
+P(/^Module stack of (p\d+)$/, m => 'Stack dei moduli di ' + m[1]);
+P(/^Process (p\d+)$/, m => 'Processo ' + m[1]);
+P(/^(\d+) processes, (\d+) links\. Select an element to edit it, drag processes to move them, click a message in flight to inspect it\.$/,
+  m => m[1] + ' processi, ' + m[2] + ' collegamenti. Seleziona un elemento per modificarlo, trascina i processi per spostarli, clicca un messaggio in viaggio per ispezionarlo.');
+P(/^neighbors: (.+)$/, m => 'vicini: ' + m[1]);
+P(/^(\d+) faults? scheduled$/, m => m[1] + ' ' + plural(m[1], 'guasto programmato', 'guasti programmati'));
+P(/^Source: (p\d+)\. Now click the destination \(Esc to cancel\)\.$/, m => 'Partenza: ' + m[1] + '. Ora clicca l\'arrivo (Esc per annullare).');
+P(/^line (\d+)$/, m => 'riga ' + m[1]);
+P(/^crashed at (.+)$/, m => 'in crash da ' + m[1]);
+P(/^running, recovered at (.+)$/, m => 'attivo, ripartito a ' + m[1]);
+P(/^Loaded: (.+)\.$/, m => 'Caricato: ' + tr(m[1]) + '.');
+P(/^(Time limit reached|No more events in the queue): (\d+) events processed\.(.*)$/,
+  m => tr(m[1]) + ': ' + m[2] + ' eventi elaborati.' + (m[3] ? m[3].replace(' Warnings:', ' Avvisi:') : ''));
+P(/^Limit of (\d+) events reached: (\d+) events processed\.$/, m => 'Raggiunto il limite di ' + m[1] + ' eventi: ' + m[2] + ' eventi elaborati.');
+P(/^(p\d+) crashes at (.+)$/, m => m[1] + ' va in crash a ' + m[2]);
+P(/^(p\d+) recovers at (.+)$/, m => m[1] + ' riparte a ' + m[2]);
+P(/^(p\d+) crashes at (.+)\.$/, m => m[1] + ' va in crash a ' + m[2] + '.');
+P(/^(p\d+) recovers at (.+)\.$/, m => m[1] + ' riparte a ' + m[2] + '.');
+P(/^(p\d+) is isolated at (.+)\.$/, m => m[1] + ' viene isolato a ' + m[2] + '.');
+P(/^Link (p\d+–p\d+) goes down at (.+)\.$/, m => 'Il collegamento ' + m[1] + ' si interrompe a ' + m[2] + '.');
+P(/^link (p\d+–p\d+) down from (\S+)(?: until (\S+)| onwards)$/, m => 'collegamento ' + m[1] + ' interrotto da ' + m[2] + (m[3] ? ' fino a ' + m[3] : ' in poi'));
+P(/^partition (.+) from (\S+)(?: until (\S+)| onwards)$/, m => 'partizione ' + m[1] + ' da ' + m[2] + (m[3] ? ' fino a ' + m[3] : ' in poi'));
+P(/^Fault added: (.+)\.$/, m => 'Guasto aggiunto: ' + tr(m[1]) + '.');
+P(/^Injected (\w+) on (p\d+) at (.+)\.$/, m => 'Iniettato ' + m[1] + ' su ' + m[2] + ' a ' + m[3] + '.');
+P(/^No such process: (.+)$/, m => 'Processo inesistente: ' + m[1]);
+P(/^(p\d+) has no events in this run\.$/, m => m[1] + ' non ha eventi in questa esecuzione.');
+P(/^(\S+) is already in the code\.$/, m => m[1] + ' è già nel codice.');
+P(/^Added (.+)\. Use it with "uses (\w+) as …"\.$/, m => 'Aggiunti ' + m[1] + '. Usalo con "uses ' + m[2] + ' as …".');
+P(/^Could not open the scenario: (.+)$/, m => 'Impossibile aprire lo scenario: ' + m[1]);
+P(/^Downloading (.+)\.$/, m => 'Download di ' + m[1] + '.');
+P(/^Saved (.+)\.$/, m => 'Salvato ' + m[1] + '.');
+P(/^(p\d+ [—→] p\d+) \((partition|link down|disabled)\)$/, m => m[1] + ' (' + ({ partition: 'partizione', 'link down': 'collegamento interrotto', disabled: 'disattivato' })[m[2]] + ')');
+P(/^sent (?:at )?(.+?), arrives (?:at )?(.+?) \(delay (.+?)\)(, round \d+)?(\. Click to select\.)?$/,
+  m => 'inviato ' + m[1] + ', arriva ' + m[2] + ' (ritardo ' + m[3] + ')' + (m[4] || '') + (m[5] ? '. Clic per selezionare.' : ''));
+P(/^sent (?:at )?(.+?)(, round \d+)?(\. Click to select\.)?$/, m => 'inviato ' + m[1] + (m[2] || '') + (m[3] ? '. Clic per selezionare.' : ''));
+P(/^Median (.+?), 99th percentile (.+?)\.(.*)$/, m => {
+  let rest = m[3]
+    .replace(/ ([\d.]+)% of messages exceed DELTA( \(after GST\))?\./, (x, p, g) => ' ' + p.replace('.', ',') + '% dei messaggi supera DELTA' + (g ? ' (dopo GST)' : '') + '.')
+    .replace(' With emulated rounds the usable window is about DELTA + PHI, shrunk by clock offsets.', ' Con i round emulati la finestra utile è circa DELTA + PHI, ridotta dagli offset dei clock.')
+    .replace(' The amber line is the delay before GST.', ' La linea ambra è il ritardo prima di GST.');
+  return 'Mediana ' + m[1] + ', 99° percentile ' + m[2] + '.' + rest;
+});
+// engine log messages
+P(/^(p\d+) crashes$/, m => m[1] + ' va in crash');
+P(/^(p\d+) recovers \(volatile state reset\)$/, m => m[1] + ' riparte (stato volatile azzerato)');
+P(/^network partition: (.+)$/, m => 'partizione di rete: ' + m[1]);
+P(/^partition healed: (.+)$/, m => 'partizione risolta: ' + m[1]);
+P(/^link (p\d+–p\d+) goes down$/, m => 'il collegamento ' + m[1] + ' si interrompe');
+P(/^link (p\d+–p\d+) is back up$/, m => 'il collegamento ' + m[1] + ' torna attivo');
+P(/^message to (p\d+) lost( \(omission\))?$/, m => 'messaggio per ' + m[1] + ' perso' + (m[2] ? ' (omissione)' : ''));
+P(/^message to (p\d+) dropped: (.+)$/, m => 'messaggio per ' + m[1] + ' scartato: ' + tr(m[2]));
+P(/^message from (p\d+) dropped in transit: (.+)$/, m => 'messaggio da ' + m[1] + ' scartato in viaggio: ' + tr(m[2]));
+P(/^no link to (p\d+)( \(link disabled\))?$/, m => 'nessun collegamento verso ' + m[1] + (m[2] ? ' (collegamento disattivato)' : ''));
+P(/^round (\d+) message from (p\d+) arrived after the round ended on (p\d+) \(delay (.+)\)$/,
+  m => 'messaggio del round ' + m[1] + ' da ' + m[2] + ' arrivato dopo la fine del round su ' + m[3] + ' (ritardo ' + m[4] + ')');
+P(/^delay (.+) exceeds DELTA = (.+) \((p\d+) → (p\d+)\)$/, m => 'ritardo ' + m[1] + ' oltre DELTA = ' + m[2] + ' (' + m[3] + ' → ' + m[4] + ')');
+P(/^clock drift (.+) exceeds RHO = (.+)$/, m => 'deriva del clock ' + m[1] + ' oltre RHO = ' + m[2]);
+P(/^processing step of (.+) exceeds PHI = (.+)$/, m => 'passo di elaborazione di ' + m[1] + ' oltre PHI = ' + m[2]);
+P(/^event (⟨.+⟩) has no handler in (\S+) \(shown once\)$/, m => 'l\'evento ' + m[1] + ' non ha un handler in ' + m[2] + ' (mostrato una volta)');
+P(/^(p\d+) is running: recovery ignored$/, m => m[1] + ' è attivo: ripartenza ignorata');
+P(/^input (\w+) ignored: (p\d+) is down$/, m => 'input ' + m[1] + ' ignorato: ' + m[2] + ' è in crash');
+P(/^([a-z ]+): (.+)$/, m => (IT[m[1]] !== undefined ? IT[m[1]] : null) === null ? null : IT[m[1]] + ': ' + (tr(m[2]) || m[2]));
+P(/^(.+), (.+)$/, m => { const parts = m[0].split(', '); const out = parts.map(x => IT[x]); return out.every(x => x !== undefined) ? out.join(', ') : null; });
+
+// library modules shown under "Add module"
+const LIBTXT = {
+  'Stubborn links: every message is sent again periodically, a bounded number of times.': 'Stubborn links: ogni messaggio viene rinviato periodicamente, un numero limitato di volte.',
+  'Stubborn delivery (within the retransmission budget), no creation.': 'consegna ostinata (entro il numero di ritrasmissioni), nessuna creazione.',
+  'Perfect links built on stubborn links by discarding duplicates.': 'Perfect links costruiti sugli stubborn links scartando i duplicati.',
+  'Reliable delivery, no duplication, no creation (messages are assumed unique).': 'consegna affidabile, nessuna duplicazione, nessuna creazione (i messaggi sono ritenuti unici).',
+  'Perfect links with sequence numbers, acknowledgements and retransmission until acknowledged.': 'Perfect links con numeri di sequenza, conferme e ritrasmissione fino alla conferma.',
+  'Reliable delivery to correct processes, no duplication, no creation.': 'consegna affidabile ai processi corretti, nessuna duplicazione, nessuna creazione.',
+  'FIFO perfect links: per-sender sequence numbers and a reorder buffer.': 'Perfect links FIFO: numeri di sequenza per mittente e un buffer di riordino.',
+  'Perfect link properties, plus FIFO delivery per pair of processes.': 'le proprietà dei perfect links, più la consegna FIFO per ogni coppia di processi.',
+  'Best-effort broadcast: send the message to every process over perfect links.': 'Best-effort broadcast: invia il messaggio a ogni processo su perfect links.',
+  'Validity, no duplication, no creation. If the sender crashes, some processes may miss the message.': 'validità, nessuna duplicazione, nessuna creazione. Se il mittente cade, alcuni processi possono non ricevere il messaggio.',
+  'Reliable broadcast without failure detection: every process relays each message once.': 'Reliable broadcast senza rilevamento dei guasti: ogni processo rilancia ogni messaggio una volta.',
+  'Validity, no duplication, no creation, agreement among correct processes.': 'validità, nessuna duplicazione, nessuna creazione, accordo tra i processi corretti.',
+  'Uniform reliable broadcast: deliver only after a majority has relayed the message.': 'Uniform reliable broadcast: consegna solo dopo che una maggioranza ha rilanciato il messaggio.',
+  'Uniform agreement: if any process delivers, every correct process delivers. Needs a correct majority.': 'accordo uniforme: se un processo consegna, lo fanno tutti i processi corretti. Richiede una maggioranza corretta.',
+  'FIFO reliable broadcast: messages of each sender are delivered in the order they were sent.': 'FIFO reliable broadcast: i messaggi di ogni mittente sono consegnati nell\'ordine di invio.',
+  'Reliable broadcast properties, plus FIFO delivery per sender.': 'le proprietà del reliable broadcast, più la consegna FIFO per mittente.',
+  'Causal order broadcast with vector clocks: a message waits until everything it depends on is delivered.': 'Broadcast causale con vector clock: un messaggio attende che sia consegnato tutto ciò da cui dipende.',
+  'Reliable broadcast properties, plus causal delivery order.': 'le proprietà del reliable broadcast, più l\'ordine causale di consegna.',
+  'Probabilistic broadcast: each process forwards a new message to a few random neighbors for a few rounds.': 'Broadcast probabilistico: ogni processo inoltra un messaggio nuovo a pochi vicini casuali per pochi passaggi.',
+  'Probabilistic validity: most processes deliver with high probability; no duplication.': 'validità probabilistica: la maggior parte dei processi consegna con alta probabilità; nessuna duplicazione.'
+};
+P(/^(\w+): (.+?) Guarantees: (.+)$/, m => LIBTXT[m[2]] ? m[1] + ': ' + LIBTXT[m[2]] + ' Garanzie: ' + (LIBTXT[m[3]] || m[3]) : null);
+M('Links', 'Collegamenti');
+M('or', 'o');
+P(/^Invalid duration: "(.*)" \(examples: (.*)\)$/, m => 'Durata non valida: "' + m[1] + '" (esempi: ' + m[2] + ')');
+P(/^Unknown distribution: (\w+) \(available: (.*)\)$/, m => 'Distribuzione sconosciuta: ' + m[1] + ' (disponibili: ' + m[2] + ')');
+P(/^(\w+) takes (\d+) argument\(s\)$/, m => m[1] + ' richiede ' + m[2] + ' argomenti');
+P(/^Input line (\d+): (.+)$/, m => 'Riga di input ' + m[1] + ': ' + (tr(m[2]) || m[2]));
+P(/^Fault (\d*): (.+)$/, m => 'Guasto ' + m[1] + ': ' + (tr(m[2]) || m[2]));
+
+// ---------------------------------------------------------------- blocks with markup
+BLOCKS.guide = `<p>Un programma contiene <b>interfacce</b> e <b>algoritmi</b>. Un algoritmo implementa un'interfaccia e ne usa altre: <code>Net</code> (la rete) e <code>Rounds</code> (i round sincroni) sono forniti dal simulatore; le altre le scrivi tu, e vengono collegate automaticamente.</p>
+<pre>upon event ⟨instance, Event | pattern⟩ where condition do … end
+upon condition expression do … end
+upon exists x in S where condition do … end
+trigger ⟨instance, Event | arg1, arg2⟩
+forall q in neighbors where q ≠ p do … end
+if … then … elif … then … else … end
+starttimer(t, 100ms)   canceltimer(t)
+⟨timer, Timeout | t⟩   assert cond, "msg"   log x</pre>
+<pre>function name(a, b) … return value … end      call name(x, y)
+uses PerfectLinks as pl via AckLinks</pre>
+<p>Le funzioni stanno dentro un algoritmo, ne vedono stato e parametri e possono generare eventi; si usano nelle espressioni o, come istruzione, con <code>call</code>. <code>via</code> sceglie quale algoritmo implementa un'interfaccia usata quando ce ne sono più di uno.</p>
+<p>Le indication salgono, le request scendono. Le parole tutte maiuscole non dichiarate (<code>HEARTBEAT</code>) sono atomi. Nei pattern un nome nuovo cattura il valore; un atomo o un nome già noto deve coincidere.</p>
+<p>Predefiniti: <code>self</code>, <code>Π</code>, <code>N</code>, <code>neighbors</code>, <code>round</code>, <code>now()</code>, <code>DELTA</code> <code>PHI</code> <code>RHO</code> (solo se noti nel modello assunto), <code>min max choose size keys values map() get(m,k,default) remove(c,x) random(a,b) pick(S) append head tail last sort reverse slice range sum mean argmin argmax toset str abs sqrt ln exp pow floor ceil round</code>. Le tuple partono da 0; <code>#S</code> è la cardinalità. Le durate (<code>50ms</code>) sono numeri in microsecondi.</p>
+<p>Equivalenti ASCII: <code>&lt; &gt;</code> per ⟨ ⟩, <code>union inter minus in notin subseteq</code>, <code>!= &lt;= &gt;=</code>, <code>and or not</code>, <code>Procs</code> per Π, <code>{}</code> per ∅. Dentro un <code>trigger</code> in ASCII, metti i confronti tra parentesi.</p>`;
+BLOCKS['hint-unknown'] = 'Scrivi <code>unknown</code> per un limite che esiste ma che l\'algoritmo non conosce. DELTA: ritardo massimo; PHI: durata massima di un passo; RHO: deriva massima dei clock.';
+BLOCKS['hint-dist'] = 'Distribuzioni: <code>const(d)</code> <code>uniform(a, b)</code> <code>exp(media)</code> <code>normal(μ, σ)</code> <code>lognormal(μ, σ)</code> (μ, σ in log ms) <code>pareto(xm, α)</code> <code>empirical(a, b, …)</code>. I numeri senza unità sono ms. I messaggi inviati prima di GST arrivano comunque entro GST + limite.';
+BLOCKS['hint-inputs'] = 'Un evento per riga: <code>TEMPO NODO Evento | argomenti</code>, dove <code>*</code> indica tutti i processi. Esempi: <code>0ms 1 Broadcast | "ciao"</code>, <code>0ms * Propose | random(1, 9)</code>. Gli eventi devono essere request dell\'algoritmo principale. Durante la riproduzione puoi anche selezionare un processo e iniettare un evento all\'istante corrente.';
+BLOCKS['hint-faults'] = 'I processi non elencati in una partizione formano un gruppo a parte, quindi <code>3</code> da solo isola p3. Lascia vuoto <em>Fino a</em> per un guasto permanente. Un processo che riparte ha lo stato volatile azzerato: le variabili dichiarate <code>stable</code> conservano il valore, e ogni modulo riceve <code>Recovery</code> se lo gestisce, <code>Init</code> altrimenti. Durante la riproduzione puoi anche selezionare un processo o un collegamento e iniettare crash, ripartenze, isolamenti o guasti all\'istante corrente.';
+
+// ---------------------------------------------------------------- engine
+const cache = new Map();
+function tr(s) {
+  if (s === undefined || s === null) return s;
+  if (Object.prototype.hasOwnProperty.call(IT, s)) return IT[s];
+  if (cache.has(s)) return cache.get(s);
+  let out = null;
+  for (const [re, fn] of PAT) {
+    const m = re.exec(s);
+    if (!m) continue;
+    const r = fn(m);
+    if (r !== null && r !== undefined) { out = r; break; }
+  }
+  if (cache.size > 5000) cache.clear();
+  cache.set(s, out);
+  return out;
+}
+
+let lang = 'en';
+let observer = null;
+const SKIP = '#code, #code-hl, #gutter, textarea, script, style, .log .t, .log .n, .insp td, .insp h4.path, .recent, code, kbd, pre, #tlabel, .nd, .pk, .payload, [data-i18n-block], .flow-label';
+const ATTRS = ['title', 'placeholder', 'aria-label'];
+
+function translateText(node) {
+  const p = node.parentElement;
+  if (!p || p.closest(SKIP)) return;
+  const raw = node.nodeValue;
+  const s = raw.trim();
+  if (!s || !/[A-Za-z]/.test(s)) return;
+  if (node.__it === raw) return;
+  const t = tr(s);
+  if (t === null || t === undefined || t === s) return;
+  const lead = raw.slice(0, raw.indexOf(s)), tail = raw.slice(raw.indexOf(s) + s.length);
+  node.__en = raw;
+  node.__it = lead + t + tail;
+  node.nodeValue = node.__it;
+}
+function translateAttrs(el) {
+  for (const a of ATTRS) {
+    const v = el.getAttribute && el.getAttribute(a);
+    if (!v) continue;
+    el.__it = el.__it || {};
+    if (el.__it[a] === v) continue;
+    const t = tr(v);
+    if (t === null || t === undefined || t === v) continue;
+    el.__en = el.__en || {};
+    el.__en[a] = v;
+    el.__it[a] = t;
+    el.setAttribute(a, t);
+  }
+}
+function translateTree(rootEl) {
+  if (rootEl.nodeType === 3) { translateText(rootEl); return; }
+  if (rootEl.nodeType !== 1) return;
+  translateAttrs(rootEl);
+  const w = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let n;
+  while ((n = w.nextNode())) {
+    if (n.nodeType === 3) translateText(n);
+    else translateAttrs(n);
+  }
+}
+function restoreTree() {
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let n;
+  while ((n = w.nextNode())) {
+    if (n.nodeType === 3) {
+      if (n.__en !== undefined && n.nodeValue === n.__it) n.nodeValue = n.__en;
+      n.__it = undefined;
+    } else if (n.__en) {
+      for (const a in n.__en) if (n.getAttribute(a) === n.__it[a]) n.setAttribute(a, n.__en[a]);
+      n.__en = undefined; n.__it = undefined;
+    }
+  }
+}
+function applyBlocks(to) {
+  for (const el of document.querySelectorAll('[data-i18n-block]')) {
+    const k = el.getAttribute('data-i18n-block');
+    if (el.__enHTML === undefined) el.__enHTML = el.innerHTML;
+    el.innerHTML = to === 'it' && BLOCKS[k] ? BLOCKS[k] : el.__enHTML;
+  }
+}
+function setLang(l) {
+  l = l === 'it' ? 'it' : 'en';
+  if (l === lang) { if (l === 'it') translateTree(document.body); return; }
+  lang = l;
+  applyBlocks(l);
+  if (l === 'it') {
+    translateTree(document.body);
+    if (!observer) {
+      observer = new MutationObserver(list => {
+        if (lang !== 'it') return;
+        for (const m of list) {
+          if (m.type === 'childList') m.addedNodes.forEach(translateTree);
+          else if (m.type === 'characterData') translateText(m.target);
+          else if (m.type === 'attributes') translateAttrs(m.target);
+        }
+      });
+      observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+    }
+  } else {
+    restoreTree();
+  }
+}
+function t(s) { if (lang !== 'it') return s; const r = tr(s); return r === null || r === undefined ? s : r; }
+
+root.SimI18n = { setLang, t, lang: () => lang, _tr: tr };
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
@@ -2991,9 +4342,9 @@ const EXAMPLES = [
     key: 'floodset',
     title: 'FloodSet consensus (synchronous rounds)',
     scenario: (function () {
-      const ids = [1, 2, 3, 4, 5];
+      const ids = [1, 2, 3, 4];
       return {
-        version: 1, seed: 3, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+        version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
         code: FLOODSET, top: 'FloodSet',
         inputs: '0ms * Propose | random(1, 9)', faults: [], preset: 'sync-ideal',
         assumed: { timing: 'synchronous-rounds', DELTA: '40ms', PHI: '10ms', RHO: '0.0001' },
@@ -3051,6 +4402,159 @@ EXAMPLES.push({
   })()
 });
 
+// ---- examples built from the library of communication abstractions
+const Lib = (typeof module !== 'undefined' && module.exports) ? require('./library.js') : root.SimLibrary;
+
+const RB_APP = `// Application on top of the broadcast stack.
+// Swap "ReliableBroadcast" for "BestEffortBroadcast" in the uses line
+// and run again with the same seed: when the sender crashes before its
+// retransmissions, only some processes get the news.
+interface News
+  request Publish(m)
+  indication Read(from, m)
+end
+
+algorithm Newsroom
+  implements News as app
+  uses ReliableBroadcast as rb
+
+  upon event ⟨app, Publish | m⟩ do
+    trigger ⟨rb, Broadcast | m⟩
+  end
+
+  upon event ⟨rb, Deliver | p, m⟩ do
+    trigger ⟨app, Read | p, m⟩
+  end
+end
+`;
+
+const CAUSAL_APP = `// p1 asks a question, p2 answers as soon as it reads it.
+// With causal order every process reads the question before the answer.
+// Swap "CausalOrderBroadcast" for "ReliableBroadcast" and run again with
+// the same seed: p4 and p5 read the answer first.
+interface Forum
+  request Post(m)
+  indication Read(from, m)
+end
+
+algorithm Discussion
+  implements Forum as app
+  uses CausalOrderBroadcast as cb
+
+  upon event ⟨app, Post | m⟩ do
+    trigger ⟨cb, Broadcast | m⟩
+  end
+
+  upon event ⟨cb, Deliver | p, m⟩ do
+    trigger ⟨app, Read | p, m⟩
+    if m = "question" and self = 2 then
+      trigger ⟨cb, Broadcast | "answer"⟩
+    end
+  end
+end
+`;
+
+const GOSSIP_APP = `// A rumor spreads by gossip: each process forwards it to FANOUT random
+// neighbors, for at most ROUNDS hops. Change FANOUT and ROUNDS in EagerGossip
+// and compare how many processes hear it and how many messages it costs.
+interface Rumors
+  request Spread(m)
+  indication Heard(from, m)
+end
+
+algorithm Village
+  implements Rumors as app
+  uses ProbabilisticBroadcast as pb
+
+  upon event ⟨app, Spread | m⟩ do
+    trigger ⟨pb, Broadcast | m⟩
+  end
+
+  upon event ⟨pb, Deliver | p, m⟩ do
+    trigger ⟨app, Heard | p, m⟩
+  end
+end
+`;
+
+function libStack(keys) {
+  const seen = new Set(), ifaces = [], mods = [];
+  for (const k of keys) {
+    const p = Lib.plan(k, mods.map(m => m.implements), ifaces);
+    for (const i of p.interfaces) if (!seen.has('i' + i)) { seen.add('i' + i); ifaces.push(i); }
+    for (const m of p.modules) if (!seen.has('m' + m.key)) { seen.add('m' + m.key); mods.push(m); }
+  }
+  return '// Library modules (Code tab → Add module)\n\n' +
+    ifaces.map(i => Lib.IFACES[i]).concat(mods.map(m => m.source)).join('\n\n') + '\n\n';
+}
+function asyncActual(extra) {
+  return Object.assign({ delay: 'uniform(5ms, 30ms)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+    step: 'uniform(100us, 1ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' }, extra);
+}
+const ASYNC = { timing: 'asynchronous', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' };
+
+EXAMPLES.push({
+  key: 'reliable-broadcast',
+  title: 'Reliable broadcast when the sender crashes',
+  scenario: (function () {
+    const ids = [1, 2, 3, 4, 5];
+    return {
+      version: 1, seed: 4, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+      code: RB_APP + '\n' + libStack(['beb', 'erb']), top: 'Newsroom',
+      inputs: '0ms 1 Publish | "news"',
+      faults: [{ type: 'crash', node: 1, at: '40ms' }],
+      preset: 'async', assumed: Object.assign({}, ASYNC), actual: asyncActual({ loss: 0.4 }),
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    };
+  })()
+});
+EXAMPLES.push({
+  key: 'causal-broadcast',
+  title: 'Causal order broadcast: questions before answers',
+  scenario: (function () {
+    const ids = [1, 2, 3, 4, 5];
+    return {
+      version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+      code: CAUSAL_APP + '\n' + libStack(['causal']), top: 'Discussion',
+      inputs: '0ms 1 Post | "question"',
+      faults: [],
+      preset: 'custom', assumed: Object.assign({}, ASYNC), actual: asyncActual({ fifo: false, delay: 'uniform(5ms, 120ms)' }),
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    };
+  })()
+});
+EXAMPLES.push({
+  key: 'gossip',
+  title: 'Gossip: spreading a rumor',
+  scenario: (function () {
+    const ids = Array.from({ length: 16 }, (_, i) => i + 1);
+    const links = [];
+    const L = (a, b) => links.push({ a, b, directed: false, enabled: true });
+    // a ring with chords: every process has four neighbors
+    ids.forEach((id, i) => { L(id, ids[(i + 1) % 16]); if (i < 8) L(id, ids[(i + 8) % 16]); if (i % 2 === 0) L(id, ids[(i + 5) % 16]); });
+    return {
+      version: 1, seed: 7, nodes: ringLayout(ids, 360, 260, 220), links,
+      code: GOSSIP_APP + '\n' + libStack(['gossip']), top: 'Village',
+      inputs: '0ms 1 Spread | "rumor"',
+      faults: [],
+      preset: 'async', assumed: Object.assign({}, ASYNC), actual: asyncActual({ delay: 'uniform(10ms, 60ms)' }),
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    };
+  })()
+});
+
+// Gallery metadata
+const META = {
+  'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
+  'chang-roberts': { category: 'Leader election', summary: 'Identifiers travel around a directed ring until the largest one comes back.' },
+  'floodset': { category: 'Consensus', summary: 'Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.' },
+  'epfd': { category: 'Failure detection', summary: 'Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.' },
+  'epfd-partition': { category: 'Failure detection', summary: 'The same detector through a network partition, a crash and a recovery.' },
+  'reliable-broadcast': { category: 'Broadcast', summary: 'The sender crashes on a lossy network; relays make sure every correct process gets the news.' },
+  'causal-broadcast': { category: 'Broadcast', summary: 'Vector clocks keep answers after their questions, even when the network reorders them.' },
+  'gossip': { category: 'Broadcast', summary: 'A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.' }
+};
+for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
+
 // Timing model presets: they only change assumed/actual/policy
 const PRESETS = {
   'sync-ideal': {
@@ -3106,7 +4610,7 @@ else root.SimExamples = Examples;
 <script>
 (function () {
 'use strict';
-const C = window.SimCore, EX = window.SimExamples;
+const C = window.SimCore, EX = window.SimExamples, LIB = window.SimLibrary;
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -3508,6 +5012,38 @@ function bindEditor() {
   });
   $$('.symbols button').forEach(b => b.addEventListener('click', () => insertText(b.dataset.ins)));
   $('#top').addEventListener('change', e => { S.scn.top = e.target.value; updateTopReqs(); markStale(); });
+  const addSel = $('#add-module');
+  const groups = {};
+  for (const m of LIB.MODULES) {
+    if (!groups[m.group]) { groups[m.group] = el('optgroup', { label: m.group }); addSel.append(groups[m.group]); }
+    groups[m.group].append(el('option', { value: m.key }, m.name + ' (' + m.implements + ')'));
+  }
+  addSel.addEventListener('change', () => {
+    const k = addSel.value;
+    addSel.value = '';
+    if (k) insertModule(k);
+  });
+}
+function insertModule(key) {
+  let prog;
+  try { prog = C.parseProgram(S.scn.code); }
+  catch (e) { toast('Fix the syntax errors in the code before adding a module.'); return; }
+  const m = LIB.byKey.get(key);
+  if (prog.algorithms.some(a => a.name === m.name)) { toast(m.name + ' is already in the code.'); return; }
+  const plan = LIB.plan(key, prog.algorithms.map(a => a.implType), [...prog.interfaces.keys()]);
+  const parts = plan.interfaces.map(i => LIB.IFACES[i]).concat(plan.modules.filter(x => !prog.algorithms.some(a => a.name === x.name)).map(x => x.source));
+  const ta = $('#code');
+  const text = ta.value.replace(/\s*$/, '') + '\n\n' + parts.join('\n\n') + '\n';
+  ta.value = text;
+  S.scn.code = text;
+  S.runtimeErr = null;
+  refreshCode(); checkCode(); markStale();
+  ta.scrollTop = ta.scrollHeight; syncScroll();
+  const added = plan.modules.map(x => x.name);
+  toast('Added ' + added.join(', ') + '. Use it with "uses ' + m.implements + ' as …".');
+  const info = $('#module-info');
+  info.hidden = false;
+  info.textContent = m.name + ': ' + m.summary + ' Guarantees: ' + m.properties;
 }
 
 // ============================================================ topology
@@ -3685,7 +5221,13 @@ function renderTopo() {
     const crashed = !!downAt(id, t);
     const b = crashed ? null : busy.get(id);
     const base = 'nd' + (S.selected && S.selected.type === 'node' && S.selected.id === id ? ' sel' : '') + (S.linkFrom === id ? ' from' : '');
-    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : ''));
+    let coneCls = '';
+    if (S.cone) {
+      if (id === S.cone.node) coneCls = ' origin';
+      else if (t >= S.cone.future[id]) coneCls = ' influenced';
+      else if (t <= S.cone.past[id]) coneCls = ' cause';
+    }
+    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : '') + coneCls);
     setIf(R, 'cross', R.cross, 'display', crashed ? 'inline' : 'none');
     if (b) {
       setIf(R, 'glow', R.glow, 'display', 'inline');
@@ -3785,6 +5327,7 @@ function renderAnim() {
     // with many packets on screen, labels and trails only add clutter and cost
     const crowd = S.lastInFlight || 0;
     const labels = $('#labels').checked && crowd <= 120;
+    const layers = layersOn();
     const withTrails = crowd <= 200;
     const sel = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
     const hi = upperBound(S.msgsBySend, t, m => m.sendT);
@@ -3801,19 +5344,23 @@ function renderAnim() {
         const g = msgGeom(m);
         if (!g) continue;
         let f = (t - m.sendT) / (m.recvT - m.sendT);
+        f = 1 - Math.pow(1 - f, 1.6);
         if (m.status === 'dropped-loss') f *= 0.5;
         if (labels) f = 0.14 + 0.72 * f;
         const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
+        const tint = layers && cls === 'ok' ? layerColor(m.origin) : '';
         if (withTrails) {
           const tr = trails.take();
           tr.root.setAttribute('d', geomPrefix(g, f));
           tr.root.setAttribute('class', 'trail ' + cls);
+          tr.root.style.stroke = tint;
         }
         const [x, y] = geomAt(g, f);
         const P = packets.take();
         P.root.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
         const pcls = 'pk ' + cls + (m.dup ? ' dup' : '') + (sel === m.id ? ' sel' : '');
         if (P.s.cls !== pcls) { P.root.setAttribute('class', pcls); P.s.cls = pcls; }
+        if (P.s.tint !== tint) { P.s.tint = tint; P.rect.style.fill = tint; P.rect.style.stroke = tint; P.dot.style.fill = tint; P.dot.style.stroke = tint; }
         if (P.s.id !== m.id || P.s.labels !== labels) {
           P.s.id = m.id; P.s.labels = labels;
           P.root.setAttribute('data-msg', m.id);
@@ -3908,6 +5455,7 @@ function select(sel) {
   S.selected = sel;
   renderTopo(); renderProps();
   if (S.tab === 'state') renderInspector();
+  if (S.tab === 'stack') renderStack(true);
 }
 function setMode(m) {
   S.mode = m; S.linkFrom = null;
@@ -3948,6 +5496,10 @@ function bindTopo() {
     const pEl = e.target.closest('[data-msg]');
     if (!pEl) return;
     e.stopPropagation();
+    // a process under the pointer wins over a packet drawn on top of it
+    const pt = svgPoint(e);
+    const hit = S.scn.nodes.find(n => Math.hypot(n.x - pt.x, n.y - pt.y) <= R_NODE + 2);
+    if (hit) { select({ type: 'node', id: hit.id }); return; }
     stopPlay();
     select({ type: 'msg', id: +pEl.dataset.msg });
   });
@@ -4317,8 +5869,39 @@ function prepareResults() {
   S.playEnd = r ? focusEnd(r) : 0;
   S.view = { start: 0, span: r ? S.playEnd * 1.03 : 1e6 };
   S.logSorted = r ? r.log.map((e, i) => Object.assign({ i }, e)).sort((a, b) => a.t - b.t || a.i - b.i) : [];
+  S.localByNode = {};
+  if (r) {
+    r.localEvents.forEach((e, i) => { e.i = i; (S.localByNode[e.node] = S.localByNode[e.node] || []).push(e); });
+    for (const k in S.localByNode) S.localByNode[k].sort((a, b) => a.t - b.t || a.i - b.i);
+  }
+  S.cone = null;
+  S.stackKey = '';
+  renderConeInfo();
   if (S.selected && S.selected.type === 'msg' && !S.msgById.has(S.selected.id)) S.selected = null;
   updatePulse();
+}
+// color of the module that originated a message (depth in the stack picks the hue)
+function layerColor(specId) {
+  const spec = S.res && S.res.specs[specId];
+  const pal = S.colors.layers || [];
+  if (!spec || !pal.length) return S.colors.blue;
+  return pal[spec.id % pal.length];
+}
+function layersOn() { return !!(S.res && $('#layers').checked); }
+function renderLayerLegend() {
+  const box = $('#layer-legend');
+  const on = layersOn();
+  box.hidden = !on;
+  $('#status-legend').hidden = on;
+  if (!on) return;
+  box.textContent = '';
+  box.append(el('b', {}, 'Originated by'));
+  for (const sp of S.res.specs) {
+    if (!S.res.msgs.some(m => m.origin === sp.id)) continue;
+    const sw = el('i', { class: 'sw' });
+    sw.style.background = layerColor(sp.id);
+    box.append(el('span', {}, sw, sp.algo));
+  }
 }
 // the last moment where something visible happens (messages, outputs, crashes, log entries);
 // rounds and timers can keep a run going long after the algorithm has finished
@@ -4370,7 +5953,7 @@ function run(keepCursor, resume) {
     if (play) startPlay();
   }, 20);
 }
-function renderResultViews() { renderChips(); renderLog(); renderProps(); setCursor(S.cursor); }
+function renderResultViews() { renderChips(); renderLog(); renderProps(); renderLayerLegend(); setCursor(S.cursor); }
 
 function renderChips() {
   const box = $('#chips'); box.textContent = '';
@@ -4389,11 +5972,17 @@ function renderChips() {
 }
 
 // ============================================================ space-time diagram
-const ROW = 26, TOP = 26, LEFT = 52, RIGHT = 14;
+let ROW = 26, TOP = 26;
+const LEFT = 52, RIGHT = 14;
+let PathCtor = window.Path2D;
+// font helper: sizes grow in presentation mode
+function fnt(size, family, weight) { return (weight ? weight + ' ' : '') + Math.round(size * (S.fontScale || 1)) + 'px ' + family; }
+const T = s => (window.SimI18n ? window.SimI18n.t(s) : s);
 function readColors() {
   const cs = getComputedStyle(document.documentElement);
   for (const k of ['paper', 'surface', 'grid', 'grid-strong', 'rule', 'ink', 'muted', 'blue', 'red', 'amber', 'green', 'violet'])
     S.colors[k] = cs.getPropertyValue('--' + k).trim();
+  S.colors.layers = [0, 1, 2, 3, 4, 5].map(i => cs.getPropertyValue('--layer-' + i).trim());
 }
 function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1))));
@@ -4403,18 +5992,36 @@ function niceStep(raw) {
 function plotWidth(W) { return Math.max(10, W - LEFT - RIGHT); }
 function xToT(x, W) { return S.view.start + (x - LEFT) / plotWidth(W) * S.view.span; }
 
-function drawDiagram() {
+// target (optional): { ctx, W, Path2D } to draw somewhere else than the on-screen canvas
+function diagramHeight() { return Math.max(120, TOP + S.scn.nodes.length * ROW + 14); }
+function drawDiagram(target) {
   if (!S.scn) return;
+  // event handlers and observers pass their own arguments: only an object with a context is a target
+  if (!(target && target.ctx)) target = null;
   const wrap = $('#st-wrap'), cv = $('#st');
   const nodes = S.scn.nodes.slice().sort((a, b) => a.id - b.id);
-  const W = wrap.clientWidth || 600;
-  const H = Math.max(120, TOP + nodes.length * ROW + 14);
-  const dpr = window.devicePixelRatio || 1;
-  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px';
+  const W = target ? target.W : (wrap.clientWidth || 600);
+  const H = diagramHeight();
+  let ctx;
+  const savedSegs = S.segs;
+  if (target) {
+    ctx = target.ctx;
+    PathCtor = target.Path2D || window.Path2D;
+  } else {
+    const dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + 'px';
+    }
+    ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  const ctx = cv.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  try { drawDiagramInto(ctx, nodes, W, H); }
+  finally {
+    PathCtor = window.Path2D;
+    if (target) S.segs = savedSegs;
+  }
+}
+function drawDiagramInto(ctx, nodes, W, H) {
   const col = S.colors;
   ctx.fillStyle = col.surface; ctx.fillRect(0, 0, W, H);
   const rowY = new Map(nodes.map((n, i) => [n.id, TOP + i * ROW + ROW / 2]));
@@ -4425,7 +6032,7 @@ function drawDiagram() {
   // time grid
   const step = niceStep(v.span / Math.max(2, pw / 95));
   ctx.lineWidth = 1; ctx.strokeStyle = col.grid; ctx.fillStyle = col.muted;
-  ctx.font = '11px ' + MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = fnt(11, MONO); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (let t = Math.max(0, Math.ceil(v.start / step) * step); t <= v.start + v.span; t += step) {
     const x = Math.round(X(t)) + 0.5;
     if (x < LEFT + 12) continue;
@@ -4441,14 +6048,14 @@ function drawDiagram() {
       const x = X(r.cfg.gst);
       ctx.strokeStyle = col.amber; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(x, TOP - 8); ctx.lineTo(x, H); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = col.amber; ctx.textAlign = 'left'; ctx.font = '700 11px ' + UIF;
-      ctx.fillText('GST', x + 4, TOP - 4);
+      ctx.fillStyle = col.amber; ctx.textAlign = 'left'; ctx.font = fnt(11, UIF, 700);
+      ctx.fillText(T('GST'), x + 4, TOP - 4);
     }
     if (r.rounds) {
       const R = r.rounds.R;
       if (r.rounds.lockstep) {
         ctx.strokeStyle = col.rule; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
-        ctx.fillStyle = col.muted; ctx.font = '11px ' + UIF; ctx.textAlign = 'left';
+        ctx.fillStyle = col.muted; ctx.font = fnt(11, UIF); ctx.textAlign = 'left';
         for (let k = Math.max(0, Math.floor(v.start / R)); k * R <= v.start + v.span; k++) {
           const x = X(k * R);
           ctx.beginPath(); ctx.moveTo(x, TOP - 8); ctx.lineTo(x, H); ctx.stroke();
@@ -4480,13 +6087,32 @@ function drawDiagram() {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = col.red; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1, y2); ctx.stroke(); ctx.setLineDash([]);
-      if (label && x2 - x1 > 60) { ctx.fillStyle = col.red; ctx.font = '700 11px ' + UIF; ctx.textAlign = 'left'; ctx.fillText(label, x1 + 4, y1 + 9); }
+      if (label && x2 - x1 > 60) { ctx.fillStyle = col.red; ctx.font = fnt(11, UIF, 700); ctx.textAlign = 'left'; ctx.fillText(label, x1 + 4, y1 + 9); }
     };
-    for (const p of r.netFaults.partitions) band(p.from, p.to, TOP - 8, H, 'partition');
+    for (const p of r.netFaults.partitions) band(p.from, p.to, TOP - 8, H, T('partition'));
     for (const l of r.netFaults.links) {
       const ya = rowY.get(l.a), yb = rowY.get(l.b);
       if (ya === undefined || yb === undefined) continue;
-      band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' down');
+      band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' ' + T('down'));
+    }
+  }
+  // causal cone: the part of each process line that can affect the origin, and the part it can affect
+  if (r && S.cone) {
+    const c = S.cone;
+    for (const n of nodes) {
+      const y = rowY.get(n.id);
+      const pst = c.past[n.id], fut = c.future[n.id];
+      if (pst > -Infinity) {
+        ctx.fillStyle = col.blue; ctx.globalAlpha = 0.13;
+        const x2 = Math.min(X(pst), W);
+        ctx.fillRect(LEFT, y - 9, Math.max(0, x2 - LEFT), 18);
+      }
+      if (fut < Infinity) {
+        ctx.fillStyle = col.amber; ctx.globalAlpha = 0.16;
+        const x1 = Math.max(X(fut), LEFT);
+        ctx.fillRect(x1, y - 9, Math.max(0, W - x1), 18);
+      }
+      ctx.globalAlpha = 1;
     }
   }
   // process lines: solid while running, dashed from a crash to the recovery (or to the end)
@@ -4522,7 +6148,7 @@ function drawDiagram() {
     // processing steps as short bars on the process lines
     const aHi = upperBound(S.activity, Math.min(t, v.start + v.span), a => a.t);
     const aLo = lowerBound(S.activity, v.start - S.maxBusy, a => a.t);
-    const bars = new Path2D();
+    const bars = new PathCtor();
     let lastX = {};
     for (let i = aLo; i < aHi; i++) {
       const a = S.activity[i];
@@ -4542,14 +6168,22 @@ function drawDiagram() {
     let drawn = 0;
     const selId = S.selected && S.selected.type === 'msg' ? S.selected.id : null;
     const batches = msgBatches();
+    const layers = layersOn();
     const last = ghost ? hi : Math.min(hi, upperBound(S.msgsBySend, t, m => m.sendT));
     for (let i = lo; i < last && drawn < 30000; i++) {
       const m = S.msgsBySend[i];
-      if (m.sendT > t) { drawMsg(batches, m, 0.16, Infinity, X, rowY, false); continue; }
-      drawMsg(batches, m, 1, t, X, rowY, m.id === selId);
+      if (m.sendT > t) { drawMsg(batches, m, 0.16, Infinity, X, rowY, false, layers); continue; }
+      drawMsg(batches, m, inCone(m) ? 1 : 0.25, t, X, rowY, m.id === selId, layers);
       drawn++;
     }
     batches.flush(ctx);
+    if (S.cone) {
+      const c = S.cone, y = rowY.get(c.node);
+      if (y !== undefined) {
+        ctx.strokeStyle = col.ink; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(X(c.t), y, 7, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
     // violations, assertions, errors
     const logHi = upperBound(S.logSorted, ghost ? v.start + v.span : Math.min(t, v.start + v.span), e => e.t);
     const logLo = lowerBound(S.logSorted, v.start, e => e.t);
@@ -4568,7 +6202,7 @@ function drawDiagram() {
       ctx.globalAlpha = 1;
     }
     // outputs
-    ctx.font = '11px ' + UIF; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = fnt(11, UIF); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     const lastLabel = {};
     for (const o of r.outputs) {
       if (o.t < v.start || o.t > v.start + v.span) continue;
@@ -4598,14 +6232,14 @@ function drawDiagram() {
   ctx.fillStyle = col.surface; ctx.fillRect(0, 0, LEFT, H);
   ctx.strokeStyle = col.rule; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(LEFT - 0.5, 0); ctx.lineTo(LEFT - 0.5, H); ctx.stroke();
-  ctx.font = '700 12px ' + UIF; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.font = fnt(12, UIF, 700); ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   for (const n of nodes) {
     ctx.fillStyle = r && downAt(n.id, t) ? col.muted : col.ink;
     ctx.fillText('p' + n.id, 10, rowY.get(n.id));
   }
   if (!r) {
-    ctx.fillStyle = col.muted; ctx.font = '13px ' + UIF; ctx.textAlign = 'center';
-    ctx.fillText(nodes.length ? 'Press Run to see the space-time diagram.' : 'Add some processes to get started.', LEFT + pw / 2, Math.min(H - 20, TOP + 30));
+    ctx.fillStyle = col.muted; ctx.font = fnt(13, UIF); ctx.textAlign = 'center';
+    ctx.fillText(T(nodes.length ? 'Press Run to see the space-time diagram.' : 'Add some processes to get started.'), LEFT + pw / 2, Math.min(H - 20, TOP + 30));
   }
 }
 
@@ -4616,7 +6250,7 @@ function msgBatches() {
     get(color, width, dash, alpha) {
       const k = color + '|' + width + '|' + dash.join(',') + '|' + alpha;
       let b = map.get(k);
-      if (!b) { b = { color, width, dash, alpha, line: new Path2D(), mark: new Path2D(), fill: new Path2D() }; map.set(k, b); }
+      if (!b) { b = { color, width, dash, alpha, line: new PathCtor(), mark: new PathCtor(), fill: new PathCtor() }; map.set(k, b); }
       return b;
     },
     flush(ctx) {
@@ -4633,7 +6267,7 @@ function msgBatches() {
     }
   };
 }
-function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
+function drawMsg(B, m, alpha, tcut, X, rowY, selected, layers) {
   const col = S.colors;
   const y1 = rowY.get(m.from);
   const y2 = rowY.get(m.to);
@@ -4644,7 +6278,7 @@ function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
     b.mark.moveTo(x1 - 3, y1 - 3); b.mark.lineTo(x1 + 3, y1 + 3); b.mark.moveTo(x1 + 3, y1 - 3); b.mark.lineTo(x1 - 3, y1 + 3);
     return;
   }
-  let color = m.violation ? col.red : col.blue;
+  let color = m.violation ? col.red : layers ? layerColor(m.origin) : col.blue;
   let dash = [];
   if (m.status === 'dropped-loss' || m.status === 'dropped-cut') { color = col.amber; dash = [4, 3]; }
   else if (m.status === 'lost-crash') { color = col.muted; dash = [2, 3]; }
@@ -4675,7 +6309,13 @@ function drawMsg(B, m, alpha, tcut, X, rowY, selected) {
     b.fill.moveTo(xe + 3.2, ye);
     b.fill.arc(xe, ye, 3.2, 0, Math.PI * 2);
   }
-  if (alpha === 1) S.segs.push({ x1, y1, x2: xe, y2: ye, m });
+  if (alpha > 0.2) S.segs.push({ x1, y1, x2: xe, y2: ye, m });
+}
+function inCone(m) {
+  const c = S.cone;
+  if (!c) return true;
+  if (m.status === 'delivered' && m.recvT <= c.past[m.to]) return true;
+  return m.sendT >= c.future[m.from];
 }
 function distSeg(px, py, s) {
   const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
@@ -4741,7 +6381,8 @@ function bindDiagram() {
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
       const best = nearestSeg(x, y);
       stopPlay();
-      if (best) select({ type: 'msg', id: best.m.id });
+      if ($('#cone-mode').checked && x > LEFT) setCone(y, xToT(x, rect.width));
+      else if (best) select({ type: 'msg', id: best.m.id });
       else if (x > LEFT) setCursor(xToT(x, rect.width));
     }
     drag = null; cv.classList.remove('dragging');
@@ -4760,8 +6401,43 @@ function bindDiagram() {
   $('#zoom-all').addEventListener('click', () => { S.view = { start: 0, span: (S.res ? S.res.endT : 1e6) * 1.03 }; drawDiagram(); });
   $('#zoom-fit').addEventListener('click', () => { S.view = { start: 0, span: (S.res ? S.playEnd : 1e6) * 1.03 }; drawDiagram(); });
   $('#ghost').addEventListener('change', drawDiagram);
+  $('#cone-mode').addEventListener('change', () => {
+    document.body.classList.toggle('cone-mode', $('#cone-mode').checked);
+    if (!$('#cone-mode').checked) clearCone();
+    else toast('Click an event on the diagram to see its causal past and future.');
+  });
+  $('#layers').addEventListener('change', () => { renderLayerLegend(); renderAnim(); drawDiagram(); });
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => drawDiagram()).observe(wrap);
   else window.addEventListener('resize', drawDiagram);
+}
+// pick the event of the clicked process nearest to the clicked time and compute its causal cone
+function setCone(y, t) {
+  const nodes = S.scn.nodes.slice().sort((a, b) => a.id - b.id);
+  const row = Math.floor((y - TOP) / ROW);
+  const n = nodes[row];
+  if (!n || !S.res) return;
+  const acts = S.activity.filter(a => a.node === n.id);
+  if (!acts.length) { toast('p' + n.id + ' has no events in this run.'); return; }
+  let best = acts[0];
+  for (const a of acts) if (Math.abs(a.t - t) < Math.abs(best.t - t)) best = a;
+  S.cone = C.causalCone(S.res, n.id, best.t);
+  renderConeInfo();
+  setCursor(best.t);
+}
+function clearCone() { S.cone = null; renderConeInfo(); renderTopo(); drawDiagram(); }
+function renderConeInfo() {
+  const box = $('#cone-info');
+  if (!box) return;
+  box.textContent = '';
+  box.hidden = !S.cone;
+  if (!S.cone) return;
+  const c = S.cone;
+  box.append(
+    el('span', {}, 'Event of ', el('b', {}, 'p' + c.node), ' at ' + C.fmtDuration(c.t) + ':'),
+    el('span', { class: 'past' }, c.counts.past + ' events could have caused it'),
+    el('span', { class: 'future' }, c.counts.future + ' events it could affect'),
+    el('span', {}, c.counts.concurrent + ' concurrent'),
+    el('button', { type: 'button', class: 'ghost small', onclick: clearCone }, 'Clear'));
 }
 function zoomAt(tc, factor) {
   const v = S.view;
@@ -4795,6 +6471,7 @@ function setCursor(t) {
   }
   renderTopo(); drawDiagram(); updateTransport(); updateLogCursor();
   if (S.tab === 'state') renderInspector();
+  if (S.tab === 'stack') renderStack();
   if (S.selected && (S.selected.type === 'node' || S.selected.type === 'link') && S.res) {
     const lbl = $('#props .inject .lbl');
     if (lbl) lbl.textContent = 'At ' + C.fmtDuration(S.cursor) + ':';
@@ -4962,7 +6639,7 @@ function renderInspector(force) {
     for (const path of Object.keys(cur.states)) {
       const st = cur.states[path], ps = prev ? prev.states[path] : null;
       const spec = r.specs.find(s => s.path === path);
-      wrap.append(el('h4', {}, path + (spec ? ' : ' + spec.algo : '')));
+      wrap.append(el('h4', { class: 'path' }, path + (spec ? ' : ' + spec.algo : '')));
       const names = Object.keys(st);
       if (!names.length) { wrap.append(el('p', { class: 'hint' }, 'No state variables.')); continue; }
       const tb = el('table');
@@ -4978,6 +6655,126 @@ function renderInspector(force) {
   wrap.append(el('h4', {}, 'Latest outputs'));
   if (outs.length) wrap.append(el('ol', { class: 'outs' }, ...outs.map(o => el('li', {}, C.fmtDuration(o.t) + '  ' + o.text))));
   else wrap.append(el('p', { class: 'hint' }, 'None.'));
+}
+
+// ============================================================ stack view
+function stackNode() {
+  if (S.selected && S.selected.type === 'node') return S.selected.id;
+  return S.stackNode || (S.scn.nodes[0] && S.scn.nodes[0].id);
+}
+function renderStack(force) {
+  const box = $('#stack-view');
+  if (!box || !S.scn) return;
+  const id = stackNode();
+  const W = S.pulse;
+  const key = [S.resVer, id, Math.floor(S.cursor / Math.max(1, W / 6)), box.clientWidth].join('|');
+  if (!force && key === S.stackKey) return;
+  S.stackKey = key;
+  box.textContent = '';
+  const wrap = el('div', { class: 'stack' });
+  box.append(wrap);
+  if (!S.res) { wrap.append(el('p', { class: 'empty' }, 'Run the simulation to see how events move through the module stack.')); return; }
+  const sel = el('select', { 'aria-label': 'Process' });
+  for (const n of S.scn.nodes.slice().sort((a, b) => a.id - b.id)) sel.append(el('option', { value: n.id }, 'p' + n.id));
+  sel.value = id;
+  sel.addEventListener('change', () => { S.stackNode = +sel.value; select({ type: 'node', id: +sel.value }); renderStack(true); });
+  wrap.append(el('div', { class: 'pick' }, el('label', { class: 'field inline' }, el('span', {}, 'Process'), sel),
+    el('span', { class: 'hint', style: 'margin:0' }, 'at t = ' + C.fmtDuration(S.cursor) + '. Requests go down (blue), indications come up (green).')));
+  const specs = S.res.specs;
+  // layout: a tree of modules, the application on top and the network at the bottom
+  const children = {};
+  specs.forEach(sp => { if (sp.parent !== null) (children[sp.parent] = children[sp.parent] || []).push(sp.id); });
+  const col = {};
+  let leaf = 0;
+  const place = idx => {
+    const ch = children[idx] || [];
+    if (!ch.length) { col[idx] = leaf++; return; }
+    ch.forEach(place);
+    col[idx] = (col[ch[0]] + col[ch[ch.length - 1]]) / 2;
+  };
+  place(0);
+  const cols = Math.max(1, leaf);
+  const maxDepth = Math.max(...specs.map(sp => sp.depth));
+  const Wd = Math.max(280, box.clientWidth - 4);
+  const boxW = Math.min(230, Wd / cols - 16), boxH = 42, gap = 44;
+  const cx = c => (c + 0.5) * Wd / cols;
+  const yOf = d => 14 + (d + 1) * (boxH + gap);
+  const H = yOf(maxDepth + 1) + boxH + 14;
+  const svgEl = sv('svg', { viewBox: `0 0 ${Wd} ${H}`, role: 'img', 'aria-label': 'Module stack of p' + id });
+  svgEl.style.height = H + 'px';
+  const pos = {};
+  pos.app = { x: cx(col[0]), y: 14 };
+  specs.forEach(sp => { pos[sp.id] = { x: cx(col[sp.id]), y: yOf(sp.depth) }; });
+  const netUsers = specs.filter(sp => sp.builtins.length);
+  const netX = netUsers.length ? netUsers.reduce((a, sp) => a + pos[sp.id].x, 0) / netUsers.length : Wd / 2;
+  pos.net = { x: netX, y: yOf(maxDepth + 1) };
+  // counts of events handled so far
+  const evs = S.localByNode[id] || [];
+  const hi = upperBound(evs, S.cursor, e => e.t);
+  const handled = {};
+  for (let i = 0; i < hi; i++) { const e = evs[i]; handled[e.to] = (handled[e.to] || 0) + 1; }
+  // static edges
+  const edge = (a, b) => svgEl.append(sv('line', { x1: pos[a].x, y1: pos[a].y + boxH, x2: pos[b].x, y2: pos[b].y, class: 'edge' }));
+  edge('app', 0);
+  specs.forEach(sp => { if (sp.parent !== null) edge(sp.parent, sp.id); });
+  netUsers.forEach(sp => edge(sp.id, 'net'));
+  // recent flows within the animation window
+  // the latest group of events of this process is always shown; older ones only within the animation window
+  const recent = new Map();
+  const lastT = hi ? evs[hi - 1].t : -Infinity;
+  const since = Math.min(lastT, S.cursor - Math.max(W, 1));
+  for (let i = hi - 1; i >= 0; i--) {
+    const e = evs[i];
+    if (e.t < since) break;
+    const k = e.from + '>' + e.to;
+    if (!recent.has(k)) recent.set(k, e);
+  }
+  const labels = sv('g', {});
+  for (const [k, e] of recent) {
+    if (e.from === 'timer') continue;
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) continue;
+    const down = e.from === 'app' || (typeof e.from === 'number' && (e.to === 'net' || (typeof e.to === 'number' && specs[e.to].parent === e.from)));
+    const age = e.t === lastT ? Math.min(0.6, (S.cursor - e.t) / Math.max(W, 1) * 0.3) : Math.min(1, (S.cursor - e.t) / Math.max(W, 1));
+    const off = down ? -9 : 9;
+    const [x1, y1, x2, y2] = down ? [a.x + off, a.y + boxH, b.x + off, b.y] : [a.x + off, a.y, b.x + off, b.y + boxH];
+    const line = sv('line', { x1, y1, x2, y2, class: 'flow ' + (down ? 'down' : 'up'), opacity: (1 - 0.7 * age).toFixed(2), 'marker-end': 'url(#arrow)' });
+    svgEl.append(line);
+    const txt = e.ev + (e.args ? ' | ' + truncate(e.args, 26) : '');
+    const lx = (x1 + x2) / 2 + (down ? -6 : 6), ly = (y1 + y2) / 2 + 4;
+    const t = sv('text', { x: lx, y: ly, class: 'flow-label ' + (down ? 'down' : 'up'), 'text-anchor': down ? 'end' : 'start', opacity: (1 - 0.6 * age).toFixed(2) }, txt);
+    labels.append(t);
+  }
+  // boxes
+  const hot = new Set([...recent.values()].flatMap(e => [e.from, e.to]).map(String));
+  const drawBox = (k, title, sub, ext) => {
+    const P = pos[k];
+    const g = sv('g', { class: 'box' + (ext ? ' ext' : '') + (hot.has(String(k)) ? ' hot' : ''), transform: `translate(${P.x - boxW / 2} ${P.y})` });
+    const rect = sv('rect', { width: boxW, height: boxH });
+    if (typeof k === 'number') rect.style.stroke = layerColor(k);
+    g.append(rect, sv('text', { x: 8, y: 17, class: 't1' }, truncate(title, Math.floor(boxW / 7.5))),
+      sv('text', { x: 8, y: 33, class: 't2' }, truncate(sub, Math.floor(boxW / 6.8))));
+    if (handled[k]) g.append(sv('text', { x: boxW - 7, y: 17, class: 'cnt' }, String(handled[k])));
+    svgEl.append(g);
+  };
+  drawBox('app', 'Application', 'inputs and outputs', true);
+  specs.forEach(sp => drawBox(sp.id, sp.algo, sp.alias + ' : ' + sp.iface, false));
+  drawBox('net', netUsers.some(sp => sp.builtins.includes('Rounds')) ? 'Rounds' : 'Network', 'provided by the simulator', true);
+  svgEl.append(labels);
+  wrap.append(svgEl);
+  // recent events as text
+  wrap.append(el('h4', {}, 'Latest events on p' + id));
+  const list = el('ol', { class: 'recent' });
+  const name = k => k === 'app' ? 'app' : k === 'net' ? 'net' : k === 'timer' ? 'timer' : specs[k].alias;
+  for (let i = hi - 1; i >= Math.max(0, hi - 14); i--) {
+    const e = evs[i];
+    const dir = e.from === 'timer' ? 'timer' : (e.to === 'app' || e.from === 'net' || (typeof e.from === 'number' && typeof e.to === 'number' && specs[e.from].parent === e.to)) ? 'up' : 'down';
+    list.append(el('li', {}, el('span', { class: 't' }, C.fmtDuration(e.t)),
+      el('span', { class: 'd-' + dir }, name(e.from) + (dir === 'up' ? ' ↑ ' : dir === 'down' ? ' ↓ ' : ' ⏱ ') + name(e.to) + '  ' + e.ev + (e.args ? ' | ' + e.args : ''))));
+  }
+  if (!hi) list.append(el('li', {}, el('span', {}, ''), el('span', { class: 'hint' }, 'Nothing has happened on this process yet.')));
+  wrap.append(list);
+  if (S.res.localTruncated) wrap.append(el('p', { class: 'hint' }, 'The run is long: only its first 200,000 local events were recorded.'));
 }
 
 // ============================================================ delay preview
@@ -5045,6 +6842,7 @@ function setTab(t) {
   $$('.tabs [data-tab]').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
   $$('.tab-body').forEach(d => { d.hidden = d.dataset.body !== t; });
   if (t === 'state') renderInspector(true);
+  if (t === 'stack') renderStack(true);
   if (t === 'time') drawPreview();
   if (t === 'code') refreshCode();
 }
@@ -5086,13 +6884,14 @@ async function copyText(text, msgEl) {
   try { await navigator.clipboard.writeText(text); msgEl.textContent = 'Copied to the clipboard.'; }
   catch (e) { msgEl.textContent = 'Copying is not allowed here: select the text and copy it manually.'; }
 }
-async function saveFile(name, text) {
-  const msg = $('#export-msg');
+async function saveFile(name, text, mime, msgEl) {
+  const msg = msgEl || $('#export-msg');
+  mime = mime || 'application/json';
   try {
     if (window.claude && typeof window.claude.use === 'function') {
       msg.textContent = 'Preparing the file…';
       const dl = await window.claude.use('downloads');
-      if (!dl) { msg.textContent = 'Saving files is not available here: use Copy JSON.'; return; }
+      if (!dl) { msg.textContent = mime === 'application/json' ? 'Saving files is not available here: use Copy JSON.' : 'Saving files is not available here.'; return; }
       try {
         await dl.save({ filename: name, data: text });
         msg.textContent = 'Saved ' + name + '.';
@@ -5100,12 +6899,12 @@ async function saveFile(name, text) {
         const code = e && e.code;
         msg.textContent = code === 'declined' ? 'Save cancelled.'
           : code === 'rate_limited' ? 'A save request is already open.'
-          : 'Saving files is not available here: use Copy JSON.';
+          : (mime === 'application/json' ? 'Saving files is not available here: use Copy JSON.' : 'Saving files is not available here.');
       }
       return;
     }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.href = URL.createObjectURL(text instanceof Blob ? text : new Blob([text], { type: mime }));
     a.download = name;
     document.body.append(a);
     a.click();
@@ -5229,6 +7028,12 @@ function bindHeader() {
 function bindKeys() {
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(false); return; }
+    if (tourStep >= 0) {
+      if (e.key === 'Escape') { e.preventDefault(); endTour(); }
+      else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); $('#tour-next').click(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); $('#tour-back').click(); }
+      return;
+    }
     const tg = e.target || {};
     const tag = (tg.tagName || '').toLowerCase();
     const type = (tg.type || '').toLowerCase();
@@ -5237,14 +7042,20 @@ function bindKeys() {
     if (textLike) return;
     // checkboxes and sliders keep Space and the arrow keys for themselves
     if (tag === 'input' && (e.key === ' ' || e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End')) return;
-    if ($('#dlg-export').open || $('#dlg-import').open) return;
+    if (document.querySelector('dialog[open]')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     switch (e.key) {
       case ' ':
         if (tag === 'button') return;
         e.preventDefault(); togglePlay(); break;
-      case 'ArrowRight': e.preventDefault(); stepEvent(1); break;
-      case 'ArrowLeft': e.preventDefault(); stepEvent(-1); break;
+      case 'ArrowRight': case 'PageDown': e.preventDefault(); stepEvent(1); break;
+      case 'ArrowLeft': case 'PageUp': e.preventDefault(); stepEvent(-1); break;
+      case '?': e.preventDefault(); $('#dlg-shortcuts').showModal(); break;
+      case 'p': case 'P': togglePresentation(); break;
+      case 'f': case 'F':
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+        break;
       case 'Home': stopPlay(); setCursor(0); break;
       case 'End': stopPlay(); if (S.res) setCursor(S.res.endT); break;
       case 'Delete': case 'Backspace':
@@ -5254,6 +7065,7 @@ function bindKeys() {
         }
         break;
       case 'Escape':
+        if (document.body.classList.contains('present')) { togglePresentation(false); break; }
         if (S.linkFrom !== null) { S.linkFrom = null; renderTopo(); renderProps(); }
         else select(null);
         break;
@@ -5265,13 +7077,293 @@ function bindKeys() {
   });
 }
 
+// ============================================================ images
+// A recorder with the subset of the Canvas 2D API used by the diagram, producing SVG.
+class SvgPath {
+  constructor() { this.d = ''; }
+  moveTo(x, y) { this.d += 'M' + r2(x) + ' ' + r2(y); }
+  lineTo(x, y) { this.d += 'L' + r2(x) + ' ' + r2(y); }
+  quadraticCurveTo(cx, cy, x, y) { this.d += 'Q' + r2(cx) + ' ' + r2(cy) + ' ' + r2(x) + ' ' + r2(y); }
+  closePath() { this.d += 'Z'; }
+  rect(x, y, w, h) { this.d += 'M' + r2(x) + ' ' + r2(y) + 'h' + r2(w) + 'v' + r2(h) + 'h' + r2(-w) + 'Z'; }
+  arc(x, y, r) { this.d += 'M' + r2(x + r) + ' ' + r2(y) + 'A' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(x - r) + ' ' + r2(y) + 'A' + r2(r) + ' ' + r2(r) + ' 0 1 0 ' + r2(x + r) + ' ' + r2(y); }
+}
+function r2(v) { return Math.round(v * 100) / 100; }
+function xmlEsc(v) { return String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+class SvgCtx {
+  constructor() {
+    this.out = []; this.path = new SvgPath(); this.stack = []; this.clipN = 0; this.open = 0;
+    this.fillStyle = '#000'; this.strokeStyle = '#000'; this.lineWidth = 1; this.globalAlpha = 1;
+    this.font = '11px sans-serif'; this.textAlign = 'start'; this.textBaseline = 'alphabetic'; this.dash = [];
+    this.measure = document.createElement('canvas').getContext('2d');
+  }
+  setTransform() {}
+  setLineDash(d) { this.dash = d.slice(); }
+  save() { this.stack.push({ f: this.fillStyle, s: this.strokeStyle, w: this.lineWidth, a: this.globalAlpha, font: this.font, ta: this.textAlign, tb: this.textBaseline, d: this.dash, open: this.open }); }
+  restore() {
+    const st = this.stack.pop();
+    if (!st) return;
+    while (this.open > st.open) { this.out.push('</g>'); this.open--; }
+    this.fillStyle = st.f; this.strokeStyle = st.s; this.lineWidth = st.w; this.globalAlpha = st.a;
+    this.font = st.font; this.textAlign = st.ta; this.textBaseline = st.tb; this.dash = st.d;
+  }
+  beginPath() { this.path = new SvgPath(); }
+  moveTo(x, y) { this.path.moveTo(x, y); }
+  lineTo(x, y) { this.path.lineTo(x, y); }
+  quadraticCurveTo(a, b, c, d) { this.path.quadraticCurveTo(a, b, c, d); }
+  closePath() { this.path.closePath(); }
+  rect(x, y, w, h) { this.path.rect(x, y, w, h); }
+  arc(x, y, r) { this.path.arc(x, y, r); }
+  clip() {
+    const id = 'c' + (++this.clipN);
+    this.out.push('<clipPath id="' + id + '"><path d="' + this.path.d + '"/></clipPath><g clip-path="url(#' + id + ')">');
+    this.open++;
+  }
+  alpha() { return this.globalAlpha < 1 ? ' opacity="' + r2(this.globalAlpha) + '"' : ''; }
+  stroke(p) {
+    const d = (p || this.path).d;
+    if (!d) return;
+    this.out.push('<path d="' + d + '" fill="none" stroke="' + this.strokeStyle + '" stroke-width="' + r2(this.lineWidth) + '"' +
+      (this.dash.length ? ' stroke-dasharray="' + this.dash.join(' ') + '"' : '') + ' stroke-linecap="round"' + this.alpha() + '/>');
+  }
+  fill(p) {
+    const d = (p || this.path).d;
+    if (d) this.out.push('<path d="' + d + '" fill="' + this.fillStyle + '"' + this.alpha() + '/>');
+  }
+  fillRect(x, y, w, h) {
+    this.out.push('<rect x="' + r2(x) + '" y="' + r2(y) + '" width="' + r2(w) + '" height="' + r2(h) + '" fill="' + this.fillStyle + '"' + this.alpha() + '/>');
+  }
+  measureText(t) { this.measure.font = this.font; return this.measure.measureText(t); }
+  fillText(t, x, y) {
+    const m = /^(?:(\d+)\s+)?([\d.]+)px\s+(.*)$/.exec(this.font) || [];
+    const anchor = { center: 'middle', right: 'end', end: 'end' }[this.textAlign] || 'start';
+    const base = this.textBaseline === 'middle' ? ' dominant-baseline="central"' : '';
+    this.out.push('<text x="' + r2(x) + '" y="' + r2(y) + '" fill="' + this.fillStyle + '" font-size="' + (m[2] || 11) + '"' +
+      (m[1] ? ' font-weight="' + m[1] + '"' : '') + ' font-family="' + xmlEsc(m[3] || 'sans-serif') + '" text-anchor="' + anchor + '"' + base + this.alpha() + '>' + xmlEsc(t) + '</text>');
+  }
+  svg(W, H) {
+    while (this.open > 0) { this.out.push('</g>'); this.open--; }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + this.out.join('') + '</svg>';
+  }
+}
+function diagramWidth() { return Math.max(600, $('#st-wrap').clientWidth || 900); }
+function exportName(ext, what) {
+  const base = (S.scn.top || 'scenario').replace(/[^A-Za-z0-9_-]+/g, '-').toLowerCase();
+  return base + '-' + what + '-seed' + S.scn.seed + '.' + ext;
+}
+function diagramSvg() {
+  const W = diagramWidth();
+  const c = new SvgCtx();
+  drawDiagram({ ctx: c, W, Path2D: SvgPath });
+  return c.svg(W, diagramHeight());
+}
+function diagramPng() {
+  const W = diagramWidth(), H = diagramHeight(), k = 2;
+  const cv = document.createElement('canvas');
+  cv.width = W * k; cv.height = H * k;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  drawDiagram({ ctx, W });
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+// the graph: both SVG layers merged, with computed styles written inline
+function graphSvg() {
+  const src = [$('#topo'), $('#topo-fx')];
+  const vb = src[0].getAttribute('viewBox') || '0 0 700 460';
+  const [, , w, h] = vb.split(/\s+/).map(Number);
+  const props = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'opacity',
+    'font-family', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline'];
+  const out = document.createElementNS(SVGNS, 'svg');
+  out.setAttribute('xmlns', SVGNS);
+  out.setAttribute('viewBox', vb);
+  out.setAttribute('width', Math.round(w));
+  out.setAttribute('height', Math.round(h));
+  const [vx, vy] = vb.split(/\s+/).map(Number);
+  const bg = document.createElementNS(SVGNS, 'rect');
+  bg.setAttribute('x', vx); bg.setAttribute('y', vy); bg.setAttribute('width', w); bg.setAttribute('height', h);
+  bg.setAttribute('fill', S.colors.paper || '#ffffff');
+  out.append(bg);
+  const copy = (node, parent) => {
+    if (node.nodeType === 3) { parent.append(node.textContent); return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'title' || tag === 'pattern' || node.id === 'topo-bg' || node.classList.contains('lk-hit')) return;
+    const cs = getComputedStyle(node);
+    if (cs.display === 'none' || node.getAttribute('display') === 'none') return;
+    const el2 = document.createElementNS(SVGNS, tag);
+    for (const a of node.attributes) if (!['class', 'style', 'tabindex', 'role', 'data-node', 'data-link', 'data-msg', 'aria-label'].includes(a.name)) el2.setAttribute(a.name, a.value);
+    if (tag !== 'g' && tag !== 'svg' && tag !== 'defs' && tag !== 'marker') {
+      for (const pr of props) {
+        const v = cs.getPropertyValue(pr);
+        if (v && v !== 'none' || pr === 'fill') el2.setAttribute(pr, v);
+      }
+    }
+    parent.append(el2);
+    for (const ch of node.childNodes) copy(ch, el2);
+  };
+  for (const s of src) for (const ch of s.childNodes) copy(ch, out);
+  return new XMLSerializer().serializeToString(out);
+}
+async function exportImage(kind) {
+  const msg = $('#export-msg');
+  if (!S.res && kind !== 'graph-svg') { msg.textContent = T('Run the simulation first.'); return; }
+  try {
+    if (kind === 'diagram-svg') await saveFile(exportName('svg', 'diagram'), new Blob([diagramSvg()], { type: 'image/svg+xml' }), 'image/svg+xml', msg);
+    else if (kind === 'diagram-png') await saveFile(exportName('png', 'diagram'), await diagramPng(), 'image/png', msg);
+    else await saveFile(exportName('svg', 'graph'), new Blob([graphSvg()], { type: 'image/svg+xml' }), 'image/svg+xml', msg);
+  } catch (e) { msg.textContent = 'Could not create the image: ' + e.message; }
+}
+
+// ============================================================ settings
+const SETTINGS_KEY = 'ds-playground:settings';
+const SET = Object.assign({ theme: 'system', palette: 'standard', lang: 'en' }, (() => {
+  try { return JSON.parse(store.get(SETTINGS_KEY) || '{}'); } catch (e) { return {}; }
+})());
+function applySettings() {
+  const root = document.documentElement;
+  if (SET.theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', SET.theme);
+  if (SET.palette === 'cvd') root.setAttribute('data-palette', 'cvd'); else root.removeAttribute('data-palette');
+  root.setAttribute('lang', SET.lang);
+  if (window.SimI18n) window.SimI18n.setLang(SET.lang);
+  readColors();
+  if (S.scn) { renderTopo(); drawDiagram(); drawPreview(); renderLayerLegend(); if (S.tab === 'stack') renderStack(true); }
+}
+function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(SET)); }
+function bindSettings() {
+  const dlg = $('#dlg-settings');
+  $('#btn-settings').addEventListener('click', () => {
+    $('#set-theme').value = SET.theme; $('#set-palette').value = SET.palette; $('#set-lang').value = SET.lang;
+    dlg.showModal();
+  });
+  for (const [id, key] of [['#set-theme', 'theme'], ['#set-palette', 'palette'], ['#set-lang', 'lang']]) {
+    $(id).addEventListener('change', e => { SET[key] = e.target.value; saveSettings(); applySettings(); });
+  }
+  const docs = dlg.querySelector('a.btn-link');
+  if (location.protocol === 'file:' || /github\.io$/.test(location.hostname)) { docs.href = 'manual/index.html'; docs.removeAttribute('target'); }
+  $('#btn-open-present').addEventListener('click', () => { dlg.close(); togglePresentation(true); });
+  $('#btn-open-shortcuts').addEventListener('click', () => { dlg.close(); $('#dlg-shortcuts').showModal(); });
+  $('#btn-open-tour').addEventListener('click', () => { dlg.close(); startTour(); });
+  $('#btn-shortcuts').addEventListener('click', () => $('#dlg-shortcuts').showModal());
+  $('#btn-present-exit').addEventListener('click', () => togglePresentation(false));
+}
+
+// ============================================================ presentation mode
+function togglePresentation(on) {
+  const body = document.body;
+  on = on === undefined ? !body.classList.contains('present') : on;
+  body.classList.toggle('present', on);
+  $('#btn-present-exit').hidden = !on;
+  S.fontScale = on ? 1.35 : 1;
+  ROW = on ? 36 : 26; TOP = on ? 32 : 26;
+  if (on) {
+    const el = document.documentElement;
+    if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {});
+    toast(T('Presentation mode: arrows or a clicker step through events, P or Esc to leave.'));
+  } else if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  setTimeout(() => { fitView(); renderTopo(); drawDiagram(); }, 60);
+}
+
+// ============================================================ welcome tour
+const TOUR = [
+  { sel: '.topo', title: 'The graph', text: 'Processes and the links between them. Messages travel along the links as packets. Click a process or a packet to inspect it.' },
+  { sel: '[data-tab=code]', title: 'The algorithm', text: 'Algorithms are written in Upon, the event-driven pseudocode of the textbooks. Errors appear under the editor as you type.' },
+  { sel: '[data-tab=time]', title: 'The timing model', text: 'Choose what the algorithm assumes and how the network really behaves. When reality breaks the assumption, the message turns red.' },
+  { sel: '[data-tab=scen]', title: 'Inputs and faults', text: 'Tell processes what to do, and schedule crashes, recoveries, link failures and partitions.' },
+  { sel: '#btn-run', title: 'Run', text: 'Simulate the scenario. The same seed always gives the same run.' },
+  { sel: '.transport', title: 'Playback', text: 'Play, pause and step. "Event by event" is the easiest speed to follow an algorithm.' },
+  { sel: '#st-wrap', title: 'The space-time diagram', text: 'One line per process, one arrow per message. Tick Causality and click an event to see what caused it.' },
+  { sel: '#btn-gallery', title: 'Examples', text: 'Start from a classic algorithm. Each example comes with experiments to try. The ⚙ menu brings this tour back.' }
+];
+const TOUR_KEY = 'ds-playground:toured';
+let tourStep = -1;
+function startTour() { tourStep = 0; $('#tour').hidden = false; showTourStep(); }
+function endTour() { tourStep = -1; $('#tour').hidden = true; store.set(TOUR_KEY, '1'); }
+function showTourStep() {
+  const step = TOUR[tourStep];
+  const target = $(step.sel);
+  if (!target) { endTour(); return; }
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const r = target.getBoundingClientRect();
+  const ring = $('#tour .tour-ring'), card = $('#tour .tour-card');
+  const pad = 6;
+  Object.assign(ring.style, { left: (r.left - pad) + 'px', top: (r.top - pad) + 'px', width: (r.width + 2 * pad) + 'px', height: (r.height + 2 * pad) + 'px' });
+  $('#tour-title').textContent = T(step.title);
+  $('#tour-text').textContent = T(step.text);
+  $('#tour-count').textContent = (tourStep + 1) + ' / ' + TOUR.length;
+  $('#tour-back').disabled = tourStep === 0;
+  $('#tour-next').textContent = T(tourStep === TOUR.length - 1 ? 'Done' : 'Next');
+  const cw = Math.min(340, window.innerWidth - 20);
+  card.style.width = cw + 'px';
+  const ch = card.offsetHeight || 150;
+  let top = r.bottom + pad + 10;
+  if (top + ch > window.innerHeight - 10) top = Math.max(10, r.top - pad - 10 - ch);
+  if (top + ch > window.innerHeight - 10) top = Math.max(10, window.innerHeight - ch - 10);
+  const left = Math.max(10, Math.min(r.left, window.innerWidth - cw - 10));
+  Object.assign(card.style, { top: top + 'px', left: left + 'px' });
+  $('#tour-next').focus();
+}
+function bindTour() {
+  $('#tour-next').addEventListener('click', () => { if (tourStep >= TOUR.length - 1) endTour(); else { tourStep++; showTourStep(); } });
+  $('#tour-back').addEventListener('click', () => { if (tourStep > 0) { tourStep--; showTourStep(); } });
+  $('#tour-skip').addEventListener('click', endTour);
+  window.addEventListener('resize', () => { if (tourStep >= 0) showTourStep(); });
+}
+
+// ============================================================ gallery
+function thumbnail(scn) {
+  const ns = scn.nodes;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of ns) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+  const W = 160, H = 96, pad = 12;
+  const k = Math.min((W - 2 * pad) / Math.max(1, x1 - x0), (H - 2 * pad) / Math.max(1, y1 - y0));
+  const px = n => pad + (n.x - x0) * k + ((W - 2 * pad) - (x1 - x0) * k) / 2;
+  const py = n => pad + (n.y - y0) * k + ((H - 2 * pad) - (y1 - y0) * k) / 2;
+  const byId = new Map(ns.map(n => [+n.id, n]));
+  const g = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'thumb', 'aria-hidden': 'true' });
+  for (const l of scn.links || []) {
+    const a = byId.get(+l.a), b = byId.get(+l.b);
+    if (a && b) g.append(sv('line', { x1: px(a), y1: py(a), x2: px(b), y2: py(b) }));
+  }
+  for (const n of ns) g.append(sv('circle', { cx: px(n), cy: py(n), r: ns.length > 10 ? 3.5 : 5 }));
+  return g;
+}
+const MODEL_NAMES = { 'asynchronous': 'asynchronous', 'partial': 'partially synchronous', 'synchronous-rounds': 'synchronous rounds', 'synchronous-timed': 'timed synchronous' };
+function renderGallery(filter) {
+  const grid = $('#gallery-grid'); grid.textContent = '';
+  const cats = ['All'].concat([...new Set(EX.EXAMPLES.map(e => e.category))]);
+  const bar = $('#gallery-filter'); bar.textContent = '';
+  for (const c of cats) bar.append(el('button', { type: 'button', class: 'chip-btn' + (c === filter ? ' on' : ''), onclick: () => renderGallery(c) }, T(c)));
+  const items = EX.EXAMPLES.filter(e => filter === 'All' || e.category === filter);
+  for (const ex of items) {
+    const card = el('button', { type: 'button', class: 'card', onclick: () => { $('#dlg-gallery').close(); loadScenario(ex.scenario, T('Loaded:') + ' ' + T(ex.title) + '.'); } },
+      thumbnail(ex.scenario),
+      el('span', { class: 'card-title' }, T(ex.title)),
+      el('span', { class: 'card-text' }, T(ex.summary || '')),
+      el('span', { class: 'card-tags' }, el('span', { class: 'tag' }, T(ex.category || '')), el('span', { class: 'tag' }, T(MODEL_NAMES[ex.scenario.assumed.timing] || ''))));
+    grid.append(card);
+  }
+  const blank = el('button', { type: 'button', class: 'card', onclick: () => { $('#dlg-gallery').close(); loadScenario(blankScenario(), T('Loaded the empty scenario.')); } },
+    thumbnail(blankScenario()), el('span', { class: 'card-title' }, T('Empty scenario')),
+    el('span', { class: 'card-text' }, T('A small ring and a starter program to write your own algorithm.')),
+    el('span', { class: 'card-tags' }, el('span', { class: 'tag' }, T('Getting started'))));
+  if (filter === 'All') grid.append(blank);
+}
+function bindGallery() {
+  $('#btn-gallery').addEventListener('click', () => { renderGallery('All'); $('#dlg-gallery').showModal(); });
+  $('#btn-img-diagram-svg').addEventListener('click', () => exportImage('diagram-svg'));
+  $('#btn-img-diagram-png').addEventListener('click', () => exportImage('diagram-png'));
+  $('#btn-img-graph-svg').addEventListener('click', () => exportImage('graph-svg'));
+}
+
 async function init() {
   readColors();
   try {
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); drawDiagram(); drawPreview(); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); renderTopo(); drawDiagram(); drawPreview(); });
   } catch (e) { /* older browsers */ }
   $('#toast').setAttribute('role', 'status');
+  applySettings();
   bindHeader(); bindForms(); bindEditor(); bindTopo(); bindDiagram(); bindTransport(); bindDialogs(); bindKeys();
+  bindSettings(); bindTour(); bindGallery();
   window.addEventListener('resize', () => { if (S.tab === 'time') drawPreview(); });
   window.addEventListener('hashchange', async () => {
     try { const shared = await fromHash(); if (shared) loadScenario(shared, 'Opened the shared scenario.'); }
@@ -5289,6 +7381,8 @@ async function init() {
   setMode('move');
   setTab('code');
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { drawDiagram(); refreshCode(); });
+  // the tour opens once, on the first visit (not under automated browsers)
+  if (!store.get(TOUR_KEY) && !navigator.webdriver && !/[?&]notour\b/.test(location.search)) setTimeout(startTour, 900);
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

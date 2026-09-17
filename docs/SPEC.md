@@ -1,6 +1,6 @@
 # SPEC — Distributed Systems Playground
 
-Version: 0.4 (draft) · Status: proposal, partially implemented (see Appendix B)
+Version: 0.5 (draft) · Status: proposal, partially implemented (see Appendix B)
 
 ## 1. Purpose
 
@@ -196,10 +196,12 @@ iface_event    = ( "request" | "indication" ) IDENT [ "(" [ ident_list ] ")" ] ;
 (* ---------- Algorithms ---------- *)
 algorithm      = "algorithm" IDENT
                  "implements" IDENT "as" IDENT
-                 { "uses" IDENT "as" IDENT }
+                 { "uses" IDENT "as" IDENT [ "via" IDENT ] }
                  [ params ] [ state ]
-                 { handler }
+                 { handler | function }
                  "end" ;
+
+function       = "function" IDENT "(" [ ident_list ] ")" block "end" ;
 
 params         = "params" { IDENT ":=" expr [ ";" ] } ;
 state          = "state" { [ "stable" ] IDENT ":=" expr [ ";" ] } ;
@@ -216,7 +218,9 @@ pattern        = "_" | IDENT | literal
 (* ---------- Statements ---------- *)
 block          = { stmt [ ";" ] } ;
 stmt           = assign | trigger | if | forall | while
-               | timer | assert | log | "skip" ;
+               | timer | assert | log | "skip"
+               | "call" IDENT "(" [ expr_list ] ")"
+               | "return" [ expr ] ;                        (* only inside functions *)
 assign         = IDENT { "[" expr "]" } ":=" expr ;
 trigger        = "trigger" LANGLE IDENT "," IDENT [ "|" expr { "," expr } ] RANGLE ;
 if             = "if" expr "then" block
@@ -275,6 +279,9 @@ Implementation note: inside a `trigger`, the ASCII `>` closes the event, so comp
   - an event with no matching handler is logged once as a warning.
 - **Values:** integers, booleans, strings, atoms, durations, sets, tuples (0-indexed) and maps (`map()`, `m[k]`). All immutable; assignment rebuilds the value, which keeps snapshots cheap.
 - **Deterministic choice:** `choose(S)` returns the minimum of `S` in a total order defined over all values.
+- **Functions:** declared inside an algorithm, they see its state and parameters, have their own local variables, may assign state, trigger events and start timers, and may recurse (up to 200 nested calls). A function used in an expression returns the value of `return`, or `nil`.
+- **Binding:** `uses X as a via Y` binds `a` to algorithm `Y`, which must implement `X`. Without `via`, the first algorithm implementing `X` is used, with a warning when there are several.
+- **Origin of messages:** every request carries the module that started its chain. A module handling a request from above keeps that origin; a module reacting to an indication, a timer or an input starts a new chain. Network messages record their origin, which the UI uses to color them by layer.
 
 ### 5.4 Built-ins
 
@@ -289,6 +296,8 @@ Implementation note: inside a `trigger`, the ASCII `>` closes the event, so comp
 | `round` | `synchronous-rounds` | current round |
 | `random(a, b)` | always | from the node's PRNG substream |
 | `min`, `max`, `choose`, `size`, `keys`, `values`, `map`, `append`, `toset`, `str`, `abs` | always | pure functions |
+| `head`, `last`, `tail`, `sort`, `reverse`, `slice`, `range`, `get`, `remove`, `sum`, `mean`, `argmin`, `argmax`, `sqrt`, `ln`, `exp`, `pow`, `floor`, `ceil`, `round` | always | pure functions on sequences, collections and numbers |
+| `pick(S)` | always | random element from the node's PRNG substream |
 
 ### 5.5 Modules provided by the simulator
 
@@ -297,6 +306,10 @@ Implementation note: inside a `trigger`, the ASCII `>` closes the event, so comp
 - `Rounds` (only with `synchronous-rounds`): `RoundStart(r)`, `RoundEnd(r)`, `Send(q, m)`, `Deliver(p, m)`.
 
 Every higher abstraction (stubborn link, perfect link, broadcast, failure detector, consensus) is **written in the DSL**. Its source code is part of the teaching material.
+
+### 5.7 Module library
+
+`src/library.js` holds modules written in Upon, each with the interface it implements, the interfaces it uses, a summary and its guarantees: `RetransmitLinks` (stubborn links, bounded retransmissions), `EliminateDuplicates` and `AckLinks` (perfect links), `SequencedFifoLinks` (FIFO perfect links), `BasicBroadcast`, `EagerReliableBroadcast`, `MajorityAckURB`, `BroadcastWithSequenceNumber` (FIFO reliable broadcast), `WaitingCausalBroadcast` (vector clocks) and `EagerGossip`. Adding a module inserts the missing interfaces and, for every used interface that the program does not implement yet, a default module that does.
 
 ### 5.6 Static checks
 
@@ -364,10 +377,13 @@ A scenario is self-contained and can be shared as a file or as a URL (deflate-co
 5. **Playback:** play, pause, previous and next event, time scrubber; speeds from 2 ms to 5 s of simulated time per second, "auto" (the interesting part of the run in about 25 s), and **event by event** (each step animated at a constant pace regardless of the time scale). Optional autoplay after each run.
 6. **Interaction during playback:** with a process selected, inject an event (a request of the main algorithm), a crash, a recovery or an isolation at the cursor time; with a link selected, take it down for a given duration. The simulation re-runs and continues from that point.
 7. **Faults list** in the Scenario tab, with a form for every fault type.
-8. **Space-time diagram** synchronized with the cursor: processing bars, messages, violations, outputs, round lines, GST, down intervals with crash and recovery markers, shaded partitions and link failures; pan, zoom, "Action" and "All" views; hovering shows message details, clicking selects the message.
-9. **State inspector:** local clock, round and every variable of every instance at the cursor, with changes highlighted.
-10. **Event log:** filterable; clicking an entry moves the cursor.
-11. **Comparison** of two runs side by side (roadmap).
+8. **Stack view:** the module tree of a process with the application on top and the network at the bottom; the latest requests (down) and indications (up) between modules at the cursor, event counts per module, and a list of recent local events.
+9. **Layer colors:** messages and packets colored by the module that originated them, with a legend.
+10. **Causality mode:** clicking an event computes its causal past and future (the happened-before relation over delivered messages); the diagram shades both, fades unrelated messages and reports how many events precede, follow or are concurrent with it; the graph marks the processes the event has reached at the cursor.
+11. **Space-time diagram** synchronized with the cursor: processing bars, messages, violations, outputs, round lines, GST, down intervals with crash and recovery markers, shaded partitions and link failures; pan, zoom, "Action" and "All" views; hovering shows message details, clicking selects the message.
+12. **State inspector:** local clock, round and every variable of every instance at the cursor, with changes highlighted.
+13. **Event log:** filterable; clicking an entry moves the cursor.
+14. **Comparison** of two runs side by side (roadmap).
 
 ---
 
@@ -403,6 +419,9 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.2** | English UI, animated execution on the topology, event-by-event playback, interactive injection |
 | **v0.3** | crash-recovery with `stable`, link failures and partitions over time, fault injection at the cursor |
 | **v0.4** | responsive layouts and touch support, faster rendering of large runs, robustness fixes |
+| **v0.5** | functions and `via` in Upon, more built-ins, module library for links and broadcast, stack view, layer colors, causality mode, full user documentation |
+| **v0.6** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
+| **v0.7** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with automatic property checks |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |
 | **v1.2** | failure detector oracles (P, ◇P, Ω) as provided modules, to study consensus on top of the abstraction |
 | **v2** | Byzantine faults (adversarial nodes written in the DSL), systematic exploration of interleavings, trace export |
@@ -503,7 +522,7 @@ end
 
 ---
 
-## Appendix B — Implementation status (v0.4)
+## Appendix B — Implementation status (v0.5)
 
 ### Implemented
 
@@ -521,16 +540,16 @@ end
 | Engine in a Web Worker | engine on the main thread, capped at 150,000 events | simplicity; enough for teaching scenarios |
 | Canvas for animation beyond a few hundred nodes | SVG with a static layer redrawn only on topology changes, a separate composited layer for animations, pooled elements, and batched canvas drawing for the diagram; packets switch to a compact form when many are in flight | keeps editing simple while playing large runs smoothly |
 | Periodic snapshots for time travel | the whole run is computed first and then replayed; state recorded at every step that changes it | equivalent thanks to determinism, and simpler |
-| Explicit `stack` in the scenario | automatic binding: for each `uses X`, the first algorithm implementing `X` | less configuration |
-| Standard library in `.dalg` files | algorithms live in the examples; `PerfectLinks` in the ◇P example is a direct link, perfect only with zero loss | stubborn links retransmit forever and make traces grow too much |
+| Explicit `stack` in the scenario | binding in the code: `via` when needed, otherwise the first algorithm implementing `X` | the choice lives next to the code that depends on it |
+| Standard library in `.dalg` files | a library of Upon modules in `library.js`, added from the editor; `RetransmitLinks` retransmits a bounded number of times | textbook stubborn links retransmit forever and make traces grow too much |
 | Global invariants | local `assert` only, with an optional halt | v1.1 |
 | Per-node process parameters, GC pauses, `pauses` | global `step` distribution only | v1.1 |
 | Omission failures of a process | omissions come from channel loss only | v1.1 |
 
 ### Suggested next steps
 
-1. Node pauses, send and receive omissions, one-way link failures.
-2. Global invariants (agreement, validity) checked at every step and shown on the timeline.
-3. Explicit stack in the scenario and a separate standard library.
-4. Engine in a Web Worker and faster rendering for large traces.
-5. Failure detector oracles (P, ◇P, Ω) as provided modules.
+1. Failure detectors (P, ◇P ping-pong, Ω, φ-accrual, simplified SWIM), a suspicion matrix over time and quality metrics.
+2. An algorithm catalog grouped by topic, with automatic checks of agreement, validity, termination and mutual exclusion.
+3. Global invariants written by the user, checked at every step and shown on the timeline.
+4. Node pauses, send and receive omissions, one-way link failures.
+5. Engine in a Web Worker for larger traces.

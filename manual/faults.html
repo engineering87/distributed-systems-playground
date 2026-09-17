@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faults · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: Faults.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html" aria-current="page">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="faults">Faults<a class="anchor" href="#faults" aria-label="Link to this section">#</a></h1>
+<p>Fault tolerance is the reason most distributed algorithms exist. This page describes the faults the playground can inject, what each one does to a run, and how to add them. The modeling choices behind them are listed in <a href="assumptions.html#failures">Assumptions and simplifications</a>.</p>
+<h2 id="overview">Overview<a class="anchor" href="#overview" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Fault</th><th>Affects</th><th>Duration</th></tr></thead><tbody><tr><td>Crash</td><td>a process</td><td>until a recovery, or forever</td></tr><tr><td>Recovery</td><td>a crashed process</td><td>instant</td></tr><tr><td>Link failure</td><td>both directions between two processes</td><td>an interval, or forever</td></tr><tr><td>Partition</td><td>all channels between groups of processes</td><td>an interval, or forever</td></tr><tr><td>Disabled link</td><td>one link</td><td>the whole run</td></tr><tr><td>Loss, duplication, delays</td><td>every message, independently</td><td>the whole run</td></tr></tbody></table></div>
+<p>All of them are part of the scenario, so they are saved, exported and shared with it, and a run with the same seed and the same faults is always identical.</p>
+<h2 id="crash">Crash<a class="anchor" href="#crash" aria-label="Link to this section">#</a></h2>
+<p>A crash stops a process at a given time. From then on:</p>
+<ul><li>events that reach it are discarded;</li><li>messages that arrive for it are lost and marked <em>recipient crashed</em>;</li><li>its timers never fire;</li><li>it sends nothing.</li></ul>
+<p>The crash takes effect between two steps. A step that has started always completes. This matters for algorithms whose correctness depends on a crash <em>during</em> a sequence of sends, such as reliable broadcast: a process cannot crash after sending to p2 but before sending to p3 in the same loop. To reproduce that situation, add message loss and crash the sender before its retransmissions, as the <a href="examples.html#reliable-broadcast-when-the-sender-crashes">reliable broadcast example</a> does.</p>
+<p>A process that crashes and never recovers is <em>faulty</em>; the others are <em>correct</em>. Most properties in the literature talk about correct processes only.</p>
+<h2 id="recovery">Recovery<a class="anchor" href="#recovery" aria-label="Link to this section">#</a></h2>
+<p>A recovery restarts a crashed process:</p>
+<ol><li>variables declared <code>stable</code> keep their values;</li><li>every other state variable is reset to the value in its declaration;</li><li>pending timers are cancelled;</li><li>each module receives <code>Recovery</code> if it has a handler for it, otherwise <code>Init</code>, starting from the bottom of the stack.</li></ol>
+<p>Messages that arrived while the process was down are gone. If the algorithm needs them, it must ask for them again.</p>
+<pre class="code lang-upon"><code><span class="t-kw">interface</span> <span class="t-ty">Counter</span>
+  <span class="t-kw">request</span> <span class="t-ty">Tick</span>()
+  <span class="t-kw">indication</span> <span class="t-ty">Count</span>(volatile, durable)
+<span class="t-kw">end</span>
+
+<span class="t-kw">algorithm</span> <span class="t-ty">Survivor</span>
+  <span class="t-kw">implements</span> <span class="t-ty">Counter</span> <span class="t-kw">as</span> c
+  <span class="t-kw">uses</span> <span class="t-ty">Net</span> <span class="t-kw">as</span> net
+  <span class="t-kw">state</span>
+    volatile := <span class="t-num">0</span>
+    <span class="t-kw">stable</span> durable := <span class="t-num">0</span>
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>c, <span class="t-ty">Tick</span><span class="t-op">⟩</span> <span class="t-kw">do</span>
+    volatile := volatile + <span class="t-num">1</span>
+    durable := durable + <span class="t-num">1</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>c, <span class="t-ty">Count</span> | volatile, durable<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>c, <span class="t-ty">Recovery</span><span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">log</span> <span class="t-str">&quot;back online, total so far:&quot;</span>, durable
+  <span class="t-kw">end</span>
+<span class="t-kw">end</span></code></pre>
+<p>With ticks before and after a crash and a recovery, the first number starts again from 1 while the second keeps counting.</p>
+<p>Declaring something <code>stable</code> is a statement about the system: it says this value is on disk and survives a crash. The playground takes you at your word. Nothing else persists.</p>
+<p>A recovery scheduled for a process that is running is ignored, with a warning in the log.</p>
+<h2 id="link-failure">Link failure<a class="anchor" href="#link-failure" aria-label="Link to this section">#</a></h2>
+<p>A link failure interrupts the channel between two processes, in both directions, from a start time until an end time. With no end time, it lasts until the end of the run.</p>
+<p>A message is dropped if the channel is down when it is sent, or when it would arrive. So a message already travelling when the link goes down is lost too.</p>
+<p>On the graph, an interrupted link turns into a dashed red line with a ✂ mark. On the diagram, the rows between the two processes are shaded for the duration.</p>
+<p>A link does not have to exist in the topology to be the subject of a link failure, but a failure on a pair without a link has no effect.</p>
+<h2 id="partition">Partition<a class="anchor" href="#partition" aria-label="Link to this section">#</a></h2>
+<p>A partition splits the processes into groups. During the partition, messages between different groups are dropped; messages within a group flow normally.</p>
+<p>Groups are written as process numbers separated by <code>|</code>:</p>
+<div class="table"><table><thead><tr><th>Groups</th><th>Meaning with processes p1 to p5</th></tr></thead><tbody><tr><td><code>1 2 \| 3 4 5</code></td><td>{p1, p2} and {p3, p4, p5}</td></tr><tr><td><code>1 2 \| 3</code></td><td>{p1, p2}, {p3}, and {p4, p5} together</td></tr><tr><td><code>3</code></td><td>p3 alone against everybody else</td></tr></tbody></table></div>
+<p>Processes not listed form one additional group, which is why <code>3</code> isolates p3. A process may appear in only one group.</p>
+<p>From the inside, a partition looks exactly like a crash of the other side: messages stop arriving. That is the heart of many impossibility results, and the <a href="examples.html#failure-detector-across-a-partition-and-a-recovery">partition example</a> shows it with a failure detector.</p>
+<h2 id="unreliable-channels">Unreliable channels<a class="anchor" href="#unreliable-channels" aria-label="Link to this section">#</a></h2>
+<p>Channel faults are set in the <em>Timing</em> tab and apply to every message independently:</p>
+<ul><li><strong>Loss</strong>: the message disappears.</li><li><strong>Duplication</strong>: the message is delivered twice, each copy with its own delay.</li><li><strong>Delay and spikes</strong>: the message arrives late, possibly very late.</li><li><strong>Non-FIFO channels</strong>: later messages can overtake earlier ones.</li></ul>
+<p>A link can have its own loss and delay distribution. Select it on the graph and fill in the fields.</p>
+<p><strong>Enabled</strong>, in the same place, disables a link for the whole run. It is the simplest way to cut a topology permanently.</p>
+<h2 id="adding-faults">Adding faults<a class="anchor" href="#adding-faults" aria-label="Link to this section">#</a></h2>
+<p>**In the <em>Scenario</em> tab.** Choose the type, fill in the fields, press <em>Add fault</em>. The list above the form shows every fault in words; <em>Remove</em> deletes one.</p>
+<div class="table"><table><thead><tr><th>Type</th><th>Fields</th></tr></thead><tbody><tr><td>Crash</td><td>process, time</td></tr><tr><td>Recovery</td><td>process, time</td></tr><tr><td>Link failure</td><td>two processes, from, until (empty for forever)</td></tr><tr><td>Partition</td><td>groups, from, until (empty for forever)</td></tr></tbody></table></div>
+<p>The form rejects unknown processes, an end before the start, and a process listed in two groups.</p>
+<p><strong>During playback.</strong> Pause where you want the fault to happen, then:</p>
+<ul><li>select a process and press <strong>Crash here</strong>, or <strong>Recover here</strong> if it is down;</li><li>select a process, type a duration and press <strong>Isolate here</strong> to cut it off from everybody else;</li><li>select a link, type a duration and press <strong>Cut here</strong>.</li></ul>
+<p>The run is recomputed and playback continues from the same instant. Everything before that instant stays exactly as it was, so you can compare the two futures. The fault is added to the list in the <em>Scenario</em> tab; remove it there to undo it.</p>
+<p><strong>In an exported scenario.</strong> Faults are plain JSON:</p>
+<pre class="code lang-json"><code>[
+  { &quot;type&quot;: &quot;crash&quot;, &quot;node&quot;: 2, &quot;at&quot;: &quot;1.5s&quot; },
+  { &quot;type&quot;: &quot;recover&quot;, &quot;node&quot;: 2, &quot;at&quot;: &quot;2.5s&quot; },
+  { &quot;type&quot;: &quot;link&quot;, &quot;a&quot;: 1, &quot;b&quot;: 3, &quot;from&quot;: &quot;0ms&quot;, &quot;to&quot;: &quot;1s&quot; },
+  { &quot;type&quot;: &quot;partition&quot;, &quot;groups&quot;: &quot;1 2 | 3 4 5&quot;, &quot;from&quot;: &quot;500ms&quot;, &quot;to&quot;: &quot;&quot; }
+]</code></pre>
+<h2 id="seeing-faults-in-a-run">Seeing faults in a run<a class="anchor" href="#seeing-faults-in-a-run" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Graph:</strong> a crashed process is dashed and crossed out, with a violet flash when it goes down and a green one when it recovers. Interrupted links are dashed red.</li><li><strong>Diagram:</strong> a process line becomes violet and dashed while the process is down, with a cross at the crash and a green circle at the recovery. Partitions shade the whole diagram, link failures the rows between the two processes.</li><li><strong>Event log:</strong> the <em>Faults</em> filter shows when each fault starts and ends. The <em>Dropped messages</em> filter lists messages lost by the network, dropped by a link failure or a partition, or sent without a link. Messages lost because their recipient was down do not appear there; look for them on the diagram, where they end with a gray cross.</li><li><strong>State tab:</strong> the status line says whether the process is running, since when it is down, or when it last recovered.</li></ul>
+<h2 id="recipes">Recipes<a class="anchor" href="#recipes" aria-label="Link to this section">#</a></h2>
+<p><strong>The sender crashes in the middle of a broadcast.</strong> Set loss to 0.3 or more, use perfect links with acknowledgements, and crash the sender shortly after it sends, before its first retransmission. Some processes got the message, some did not.</p>
+<p><strong>A leader loses contact with the majority.</strong> Use a partition such as <code>1 | 2 3 4 5</code> for a few seconds, where p1 is the leader.</p>
+<p><strong>A process comes back and has forgotten everything.</strong> Crash it, recover it later, and watch its state reset in the <em>State</em> tab. Then declare the important variables <code>stable</code> and compare.</p>
+<p><strong>A flaky link.</strong> Give one link a loss of 0.5 while the others stay reliable.</p>
+<p><strong>A network that gets better.</strong> Use the <em>Partially synchronous</em> preset: heavy delays before GST, bounded delays after.</p>
+<h2 id="what-is-not-modeled">What is not modeled<a class="anchor" href="#what-is-not-modeled" aria-label="Link to this section">#</a></h2>
+<ul><li>Byzantine processes, which lie or deviate from the algorithm.</li><li>Omission failures of a process, where a process silently skips some sends or receives.</li><li>Pauses of a running process, such as long garbage collections.</li><li>One-way link failures.</li><li>Corrupted messages.</li></ul>
+<p>See <a href="assumptions.html#failures">Assumptions and simplifications</a> for the reasoning behind these choices.</p>
+<nav class="pager"><a href="timing-model.html"><small>Previous</small>The timing model</a><a href="engine.html" style="text-align:right"><small>Next</small>How the engine works</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/faults.md" target="_blank" rel="noopener">docs/faults.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#overview">Overview</a><a class="l2" href="#crash">Crash</a><a class="l2" href="#recovery">Recovery</a><a class="l2" href="#link-failure">Link failure</a><a class="l2" href="#partition">Partition</a><a class="l2" href="#unreliable-channels">Unreliable channels</a><a class="l2" href="#adding-faults">Adding faults</a><a class="l2" href="#seeing-faults-in-a-run">Seeing faults in a run</a><a class="l2" href="#recipes">Recipes</a><a class="l2" href="#what-is-not-modeled">What is not modeled</a></aside>
+</div>
+</body>
+</html>

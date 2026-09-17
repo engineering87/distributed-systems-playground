@@ -67,10 +67,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 }
 .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
 .brand h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: -0.005em; }
-.logo { width: 40px; height: 28px; flex: none; }
-.logo line { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
-.logo .msg { stroke: var(--blue); stroke-width: 1.8; }
-.logo .late { stroke: var(--red); }
+.logo { width: 32px; height: 32px; flex: none; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* ---------- controlli ---------- */
@@ -420,4 +417,116 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
 /* small screens: the diagram legend already explains the colors */
 @media (max-width: 560px) {
   .topo-legend { display: none; }
+}
+
+/* ---------- layers, stack view, causality ---------- */
+:root { --layer-0: #2350a3; --layer-1: #0c7760; --layer-2: #7a3fa0; --layer-3: #0f7c9c; --layer-4: #4d7a0a; --layer-5: #5b5f97; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --layer-0: #86aef0; --layer-1: #4cc2a5; --layer-2: #c49af0; --layer-3: #5ccfe6; --layer-4: #a6d86a; --layer-5: #a9aee8; }
+}
+:root[data-theme="dark"] { --layer-0: #86aef0; --layer-1: #4cc2a5; --layer-2: #c49af0; --layer-3: #5ccfe6; --layer-4: #a6d86a; --layer-5: #a9aee8; }
+.layer-legend { flex-direction: column; gap: 2px; }
+.layer-legend span { white-space: nowrap; }
+.sw { display: inline-block; width: 12px; height: 8px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.stack svg { width: 100%; display: block; overflow: visible; }
+.stack .box rect { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1.4; rx: 7; }
+.stack .box.hot rect { stroke-width: 2.6; }
+.stack .box .t1 { font: 700 12.5px var(--ui); fill: var(--ink); }
+.stack .box .t2 { font: 11px var(--mono); fill: var(--muted); }
+.stack .box .cnt { font: 11px var(--mono); fill: var(--muted); text-anchor: end; }
+.stack .box.ext rect { fill: none; stroke-dasharray: 5 4; }
+.stack .edge { fill: none; stroke: var(--rule); stroke-width: 1.2; }
+.stack .flow { fill: none; stroke-width: 2.4; }
+.stack .flow.down { stroke: var(--blue); }
+.stack .flow.up { stroke: var(--green); }
+.stack .flow-label { font: 11px var(--mono); }
+.stack .flow-label.down { fill: var(--blue); }
+.stack .flow-label.up { fill: var(--green); }
+.stack .flow-bg { fill: var(--surface); opacity: .92; }
+.stack h4 { margin: 12px 0 4px; font-size: 13px; }
+.stack .recent { list-style: none; margin: 0; padding: 0; font: 12px/1.5 var(--mono); }
+.stack .recent li { display: grid; grid-template-columns: 70px 1fr; gap: 6px; padding: 2px 0; border-bottom: 1px solid var(--grid); }
+.stack .recent .d-down { color: var(--blue); }
+.stack .recent .d-up { color: var(--green); }
+.stack .recent .d-timer { color: var(--amber); }
+.stack .recent li { word-break: break-word; }
+.stack .pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.cone-info { padding: 5px 10px; font-size: 13px; border-bottom: 1px solid var(--grid); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cone-info .past { color: var(--blue); font-weight: 700; }
+.cone-info .future { color: var(--amber); font-weight: 700; }
+#topo .nd.cause .body { stroke: var(--blue); stroke-width: 3; stroke-dasharray: 2 2; }
+#topo .nd.influenced .body { stroke: var(--amber); stroke-width: 3.4; }
+#topo .nd.origin .body { stroke: var(--ink); stroke-width: 4; }
+body.cone-mode #st { cursor: crosshair; }
+
+/* five tabs on narrow screens */
+.tabs { overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { flex: none; }
+@media (max-width: 420px) {
+  .tabs button { padding-left: 9px; padding-right: 9px; }
+}
+@media (max-width: 360px) {
+  .tabs { padding: 0 2px; }
+  .tabs button { padding-left: 7px; padding-right: 7px; font-size: 13px; }
+}
+
+/* ---------- color vision deficiency palette (Okabe-Ito based) ---------- */
+:root[data-palette="cvd"] { --blue: #0072b2; --red: #d55e00; --amber: #b07a00; --green: #009e73; --violet: #cc79a7;
+  --layer-0: #0072b2; --layer-1: #009e73; --layer-2: #cc79a7; --layer-3: #56b4e9; --layer-4: #8a6d00; --layer-5: #6b6b6b; }
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="cvd"]:not([data-theme="light"]) { --blue: #56b4e9; --red: #ff8a3d; --amber: #f0e442; --green: #2fd1a0; --violet: #e59fc8;
+    --layer-0: #56b4e9; --layer-1: #2fd1a0; --layer-2: #e59fc8; --layer-3: #9fd8f5; --layer-4: #f0e442; --layer-5: #bdbdbd; }
+}
+:root[data-theme="dark"][data-palette="cvd"] { --blue: #56b4e9; --red: #ff8a3d; --amber: #f0e442; --green: #2fd1a0; --violet: #e59fc8;
+  --layer-0: #56b4e9; --layer-1: #2fd1a0; --layer-2: #e59fc8; --layer-3: #9fd8f5; --layer-4: #f0e442; --layer-5: #bdbdbd; }
+
+/* ---------- dialogs: settings, shortcuts, gallery ---------- */
+dialog.wide { width: min(980px, 96vw); }
+.btn-link { align-self: center; color: var(--blue); font-weight: 700; }
+.keys { border-collapse: collapse; width: 100%; font-size: 14px; }
+.keys td { padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+.keys td:first-child { white-space: nowrap; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+.chips-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 12px; }
+.chip-btn { border-radius: 20px; padding: 3px 12px; }
+.chip-btn.on { background: var(--blue-soft); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; max-height: 64vh; overflow: auto; padding: 2px; }
+.card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 10px; border-radius: 10px; background: var(--surface-2); min-height: 0; }
+.card:hover { border-color: var(--blue); }
+.card .thumb { width: 100%; height: 96px; background: var(--paper); border-radius: 6px; }
+.card .thumb line { stroke: var(--muted); stroke-width: 1.2; }
+.card .thumb circle { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
+.card-title { font-weight: 700; line-height: 1.25; }
+.card-text { font-size: 13px; color: var(--muted); }
+.card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+.tag { font-size: 11.5px; border: 1px solid var(--rule); border-radius: 12px; padding: 0 8px; color: var(--muted); }
+
+/* ---------- welcome tour ---------- */
+.tour { position: fixed; inset: 0; z-index: 30; }
+.tour-shade { position: absolute; inset: 0; }
+.tour-ring { position: fixed; border-radius: 10px; border: 2px solid var(--blue);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--ink) 45%, transparent); pointer-events: none; transition: all .2s ease; }
+.tour-card { position: fixed; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 12px 14px; box-shadow: 0 8px 28px color-mix(in srgb, var(--ink) 25%, transparent); transition: top .2s ease, left .2s ease; }
+.tour-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tour-card p { margin: 6px 0 10px; }
+@media (prefers-reduced-motion: reduce) { .tour-ring, .tour-card { transition: none; } }
+
+/* ---------- presentation mode ---------- */
+.present-exit { position: fixed; right: 14px; top: 10px; z-index: 25; }
+body.present { font-size: 16px; }
+body.present .side, body.present .log-col, body.present .panel-bar, body.present .props,
+body.present .toolbar, body.present .legend, body.present .st-bar .zoom, body.present .cone-info { display: none !important; }
+body.present .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "topo" "timeline"; }
+body.present .st-area { grid-template-columns: minmax(0, 1fr); }
+body.present .st-col { border-right: 0; }
+body.present .brand h1 { font-size: 22px; }
+body.present .transport { padding: 10px 14px; }
+body.present .chip { font-size: 14px; }
+body.present .tlabel { font-size: 15px; }
+body.present .nd .name { font-size: 16px; }
+body.present .pk text { font-size: 12px; }
+@media (min-width: 960px) {
+  body.present .app { grid-template-rows: minmax(0, 1fr) clamp(220px, 36vh, 560px); }
 }

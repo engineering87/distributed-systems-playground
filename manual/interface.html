@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The interface · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: The interface.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html" aria-current="page">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="the-interface">The interface<a class="anchor" href="#the-interface" aria-label="Link to this section">#</a></h1>
+<p>A tour of every panel and control. For a guided first session, see <a href="getting-started.html">Getting started</a>.</p>
+<h2 id="layout">Layout<a class="anchor" href="#layout" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Area</th><th>Position on a wide screen</th><th>Content</th></tr></thead><tbody><tr><td>Top bar</td><td>top</td><td>examples, seed, run, export and import</td></tr><tr><td>Topology</td><td>top left</td><td>the graph and its animation, editing tools, properties of the selection</td></tr><tr><td>Side panel</td><td>top right</td><td><em>Code</em>, <em>Timing</em>, <em>Scenario</em>, <em>State</em> and <em>Stack</em> tabs</td></tr><tr><td>Run</td><td>bottom</td><td>playback controls, summary, space-time diagram, event log</td></tr></tbody></table></div>
+<p>On screens narrower than 960 pixels the areas stack in one column: graph, run, side panel.</p>
+<h2 id="top-bar">Top bar<a class="anchor" href="#top-bar" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Example</strong> loads a ready-made scenario and runs it. The notification that appears offers <strong>Undo</strong>, which restores what you had before. See <a href="examples.html">Examples</a>.</li><li><strong>Gallery</strong> shows the same examples as cards, with a thumbnail of the topology, a short description, the topic and the timing model. The buttons above the cards filter by topic.</li><li><strong>?</strong> lists the keyboard shortcuts; <strong>⚙</strong> opens the <a href="#settings">settings</a>.</li><li><strong>Seed</strong> fixes every random choice of the run. The same scenario with the same seed always gives the same run.</li><li><strong>⚄</strong> picks a random seed and runs again.</li><li><strong>Run</strong> simulates the current scenario. It is highlighted when the scenario has changed since the last run.</li><li><strong>Export</strong> and <strong>Import</strong> are described under <a href="#saving-and-sharing">Saving and sharing</a>.</li></ul>
+<h2 id="topology">Topology<a class="anchor" href="#topology" aria-label="Link to this section">#</a></h2>
+<h3 id="tools">Tools<a class="anchor" href="#tools" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>Tool</th><th>Click on empty space</th><th>Click on a process</th><th>Click on a link</th></tr></thead><tbody><tr><td><strong>Select</strong></td><td>clears the selection</td><td>selects it; drag to move it</td><td>selects it</td></tr><tr><td><strong>Node</strong></td><td>adds a process</td><td>selects it</td><td></td></tr><tr><td><strong>Link</strong></td><td>cancels</td><td>first click chooses the source, second the destination</td><td></td></tr><tr><td><strong>Delete</strong></td><td></td><td>deletes it with its links and faults</td><td>deletes it</td></tr></tbody></table></div>
+<p><strong>Directed</strong> makes new links one-way. A pair of opposite directed links is drawn as two curves.</p>
+<p><strong>Generate</strong> replaces the topology with a ring, complete graph, star, grid, line, random connected graph or binary tree with the given number of processes (2 to 40). <em>Ring</em>, <em>star</em>, <em>line</em> and <em>tree</em> respect <strong>Directed</strong>.</p>
+<p><strong>Fit</strong> zooms the graph to its processes.</p>
+<p><strong>Labels</strong> shows the type of each message on its packet.</p>
+<p><strong>Layers</strong> colors packets and diagram arrows by the module that originated them, and replaces the color legend with a list of those modules.</p>
+<p>Changing the topology discards the last run. Moving processes does not.</p>
+<h3 id="properties-bar">Properties bar<a class="anchor" href="#properties-bar" aria-label="Link to this section">#</a></h3>
+<p>The bar under the graph shows the selection.</p>
+<p><strong>A process:</strong> its neighbors, the number of faults that concern it, and <strong>Delete</strong>. After a run it also offers, at the cursor time:</p>
+<ul><li><strong>Inject event</strong>: send a request of the main algorithm, with arguments written in Upon, for example <code>&quot;hello&quot;</code> or <code>2, [PING]</code>;</li><li><strong>Crash here</strong>, or <strong>Recover here</strong> if the process is down at the cursor;</li><li><strong>Isolate here</strong>: cut the process off from all others for the given duration, or for good if the field is empty.</li></ul>
+<p><strong>A link:</strong> <em>Enabled</em> (unchecked means the link is down for the whole run), <em>Directed</em>, its own <em>Loss</em> and <em>Delay</em> (empty means the global value), and <strong>Delete</strong>. After a run it also offers <strong>Cut here</strong>, which takes the link down for the given duration from the cursor.</p>
+<p><strong>A message</strong> (click a packet, or an arrow on the diagram): sender, recipient, payload, status, send and arrival times, and buttons to jump to the send or the arrival.</p>
+<p>Every <em>here</em> action adds an input or a fault to the scenario, re-runs, and continues from the cursor. The history before the cursor stays the same. See <a href="engine.html#randomness-and-determinism">How the engine works</a>.</p>
+<h2 id="code-tab">Code tab<a class="anchor" href="#code-tab" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Main algorithm</strong> chooses the top of the module stack. Its interface decides which inputs you can send and which outputs appear.</li><li><strong>Add module</strong> inserts a module from the <a href="library.html">library</a>, with what it depends on. A short description of the module appears below.</li><li><strong>Symbol buttons</strong> insert <code>⟨ ⟩ ∪ ∩ \ ∈ ∉ ∅ ≠ ≤ ≥ Π ⊆</code> at the cursor.</li><li><strong>Editor.</strong> <code>Tab</code> inserts two spaces; <code>Enter</code> keeps the indentation and adds a level after <code>do</code>, <code>then</code>, <code>else</code>, <code>state</code>, <code>params</code>, <code>interface</code> and <code>algorithm</code> lines.</li><li><strong>Diagnostics</strong> under the editor list errors (red) and warnings (amber), updated as you type. Click one to jump to its line. Runtime errors from the last run appear here too.</li><li><strong>Language quick reference</strong> summarizes the syntax. The full reference is <a href="language.html">The Upon language</a>.</li></ul>
+<h2 id="timing-tab">Timing tab<a class="anchor" href="#timing-tab" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Presets</strong> set the whole timing model at once. Editing any field afterwards shows <em>Custom</em>.</li><li><strong>Assumed model:</strong> synchrony, <code>DELTA</code>, <code>PHI</code>, <code>RHO</code>, round execution and what to do when reality exceeds the assumption.</li><li><strong>Actual model:</strong> delays with a live histogram, bound, FIFO, spikes, loss, duplication, step duration, clock offset and drift, GST, and the order of simultaneous events.</li></ul>
+<p>Invalid values are outlined in red with an explanation. The histogram line reports the median, the 99th percentile and the share of messages above <code>DELTA</code>.</p>
+<p>Everything is explained in <a href="timing-model.html">The timing model</a>.</p>
+<h2 id="scenario-tab">Scenario tab<a class="anchor" href="#scenario-tab" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>External inputs</strong>, one per line: <code>TIME NODE Event | arguments</code>. <code>NODE</code> is a number or <code>*</code> for every process. Arguments are Upon expressions evaluated on the target process. Lines added with <strong>Inject event</strong> appear here.</li><li><strong>Faults</strong>: the list of scheduled faults, each with <strong>Remove</strong>, and a form to add crashes, recoveries, link failures and partitions. See <a href="faults.html">Faults</a>.</li><li><strong>Simulated duration</strong>: when the run stops at the latest.</li><li><strong>Stop at the first failed assertion</strong>: turns <code>assert</code> into a hard stop.</li></ul>
+<h2 id="state-tab">State tab<a class="anchor" href="#state-tab" aria-label="Link to this section">#</a></h2>
+<p>Select a process to see, at the cursor time:</p>
+<ul><li>whether it is running, since when it is down, or when it last recovered;</li><li>its local clock, clock offset and drift, and its round if rounds are used;</li><li>the variables of each module instance, labelled with the instance path (such as <code>app/rb/beb</code>) and the algorithm name. Values that changed in the latest step are highlighted;</li><li>its latest outputs.</li></ul>
+<h2 id="stack-tab">Stack tab<a class="anchor" href="#stack-tab" aria-label="Link to this section">#</a></h2>
+<p>Shows the module tree of a process: the application on top, the modules in the middle, the network at the bottom.</p>
+<ul><li>Blue arrows are requests going down, green arrows are indications coming up. The latest group of events of the process is always shown; older ones fade out.</li><li>The number in a box counts the events that module has received so far.</li><li>Box borders use the same colors as <strong>Layers</strong>.</li><li>Below the drawing, the latest fourteen events of the process are listed with their direction and arguments. <code>⏱</code> marks a timeout.</li></ul>
+<p>Choose the process with the menu at the top, or by selecting it on the graph. Step through a run with <strong>Event by event</strong> to follow a message from the network up to the application.</p>
+<h2 id="playback">Playback<a class="anchor" href="#playback" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Control</th><th>Effect</th></tr></thead><tbody><tr><td>⏮ ⏭</td><td>go to the start or the end of the run</td></tr><tr><td>◀ ▶|</td><td>previous or next moment when something happens</td></tr><tr><td>▶</td><td>play or pause</td></tr><tr><td>Speed</td><td><em>Event by event</em> animates each step at a constant pace; <em>Auto speed</em> plays the interesting part of the run in about 25 seconds; the other values are simulated time per real second</td></tr><tr><td>Autoplay</td><td>start playing after every run</td></tr><tr><td>Scrubber</td><td>move to any time</td></tr></tbody></table></div>
+<p>Playback stops shortly after the last message, output or fault, even if timers or rounds keep the run going. <strong>End</strong> and the <em>All</em> view still reach the real end.</p>
+<p>The summary shows messages sent, delivered and lost, violations and outputs.</p>
+<h2 id="space-time-diagram">Space-time diagram<a class="anchor" href="#space-time-diagram" aria-label="Link to this section">#</a></h2>
+<p>One horizontal line per process, time from left to right.</p>
+<div class="table"><table><thead><tr><th>Mark</th><th>Meaning</th></tr></thead><tbody><tr><td>blue arrow</td><td>a delivered message</td></tr><tr><td>red arrow</td><td>a message that broke the assumed model</td></tr><tr><td>amber dashed arrow ending in a cross</td><td>a message lost or dropped</td></tr><tr><td>gray dashed arrow ending in a cross</td><td>a message that reached a crashed process</td></tr><tr><td>small cross on a line</td><td>a message dropped as it was sent: no link, or the link was down</td></tr><tr><td>light bar on a line</td><td>the process handling an event</td></tr><tr><td>green diamond with text</td><td>an output</td></tr><tr><td>red circle</td><td>a violation at that process</td></tr><tr><td>red square</td><td>a failed assertion or a runtime error</td></tr><tr><td>violet dashed line, cross, green circle</td><td>the process is down, the crash, the recovery</td></tr><tr><td>red shading</td><td>a partition (full height) or a link failure (between two rows)</td></tr><tr><td>dashed vertical lines, <code>r1</code>, <code>r2</code></td><td>lockstep rounds</td></tr><tr><td>short ticks on a line</td><td>emulated round starts of that process</td></tr><tr><td>amber vertical line</td><td>GST</td></tr><tr><td>blue vertical line</td><td>the cursor</td></tr></tbody></table></div>
+<p><strong>Interaction.</strong> Click to move the cursor; click an arrow to select its message. Drag horizontally to pan. <code>Ctrl</code> + wheel zooms around the pointer. <strong>−</strong> and <strong>+</strong> zoom around the cursor, <strong>Action</strong> fits the interesting part of the run, <strong>All</strong> shows all of it. <strong>Follow</strong> keeps the cursor in view. <strong>Future</strong> shows events after the cursor, faded. Hovering an arrow shows the message.</p>
+<p><strong>Causality.</strong> With <strong>Causality</strong> checked, a click selects the nearest event of the clicked process and computes its causal cone. Blue shading covers what could have caused the event, amber shading what it could affect, and unrelated messages fade. A line above the diagram gives the counts, with <strong>Clear</strong>. On the graph, the origin gets a thick border, processes whose current events could still affect the origin are dashed blue, and processes the event has already reached are amber. The rules are in <a href="assumptions.html#analysis-and-visualization">Assumptions</a>.</p>
+<h2 id="event-log">Event log<a class="anchor" href="#event-log" aria-label="Link to this section">#</a></h2>
+<p>Entries in time order: inputs, outputs, faults, dropped messages, violations, warnings, errors, <code>log</code> and failed <code>assert</code> statements. Entries after the cursor are faded, and the current one is highlighted.</p>
+<p>Click an entry to move the cursor there. The filter shows one kind at a time. The log shows up to 3,000 entries per filter.</p>
+<h2 id="reading-the-animation">Reading the animation<a class="anchor" href="#reading-the-animation" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>On the graph</th><th>Meaning</th></tr></thead><tbody><tr><td>blue packet</td><td>a message in transit</td></tr><tr><td>red packet</td><td>a message breaking the assumed model</td></tr><tr><td>amber packet</td><td>a message the network will drop</td></tr><tr><td>gray packet</td><td>a message to a process that is down</td></tr><tr><td>dashed outline on a packet</td><td>a duplicate</td></tr><tr><td>trail behind a packet</td><td>the path covered so far</td></tr><tr><td>expanding ring on a process</td><td>a message just arrived (red if late)</td></tr><tr><td>cross on a link</td><td>a message was dropped there</td></tr><tr><td>glow around a process</td><td>it is handling an event</td></tr><tr><td>⏱ next to a process</td><td>a timeout fired</td></tr><tr><td><code>r3</code> next to a process</td><td>its current round</td></tr><tr><td>bubble above a process</td><td>an output</td></tr><tr><td>text under a process</td><td>its latest output</td></tr><tr><td>dashed, crossed-out process</td><td>the process is down</td></tr><tr><td>violet or green flash</td><td>a crash or a recovery</td></tr><tr><td>dashed red link with ✂</td><td>the link is interrupted</td></tr></tbody></table></div>
+<p>Packets are placed on the part of the link away from the processes, so that labels stay readable. With more than 120 packets in flight, labels are hidden; with more than 200, trails too; at most 400 are drawn.</p>
+<h2 id="saving-and-sharing">Saving and sharing<a class="anchor" href="#saving-and-sharing" aria-label="Link to this section">#</a></h2>
+<p><strong>Automatic saving.</strong> The scenario is saved in the browser after every change and restored when you come back. It stays on that browser only.</p>
+<p><strong>Export</strong> shows:</p>
+<ul><li>the scenario as JSON, with <strong>Copy JSON</strong> and <strong>Save file</strong>;</li><li><strong>images of the current view</strong>: the space-time diagram as SVG or PNG (twice the screen resolution), and the graph as SVG. They show what is on screen at the cursor, with the current zoom, theme and colors, which makes them ready for slides and handouts;</li><li>a <strong>link</strong> that contains the whole scenario, compressed. Opening it loads the scenario, even in a tab where the playground is already open.</li></ul>
+<p><strong>Import</strong> accepts a JSON file or pasted JSON. The scenario is checked before loading; if it is not valid, nothing changes.</p>
+<p>An exported scenario includes topology, code, main algorithm, timing model, inputs, faults, seed and duration. It does not include the run itself: the run is recomputed on opening, identically.</p>
+<h2 id="keyboard-shortcuts">Keyboard shortcuts<a class="anchor" href="#keyboard-shortcuts" aria-label="Link to this section">#</a></h2>
+<p>Shortcuts work everywhere except while typing in a text field.</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>Ctrl</code> / <code>Cmd</code> + <code>Enter</code></td><td>run (also while typing)</td></tr><tr><td><code>?</code></td><td>list of shortcuts</td></tr><tr><td><code>P</code></td><td>presentation mode</td></tr><tr><td><code>F</code></td><td>full screen</td></tr><tr><td><code>Page Up</code>, <code>Page Down</code></td><td>previous or next event, as a clicker sends them</td></tr><tr><td><code>Space</code></td><td>play or pause</td></tr><tr><td><code>←</code> <code>→</code></td><td>previous or next event</td></tr><tr><td><code>Home</code> <code>End</code></td><td>start or end of the run</td></tr><tr><td><code>V</code> <code>N</code> <code>L</code> <code>D</code></td><td>Select, Node, Link, Delete tools</td></tr><tr><td><code>Delete</code>, <code>Backspace</code></td><td>delete the selected process or link</td></tr><tr><td><code>Esc</code></td><td>leave presentation mode, cancel a link in progress, or clear the selection</td></tr><tr><td><code>Ctrl</code> + wheel on the diagram</td><td>zoom</td></tr></tbody></table></div>
+<h2 id="settings">Settings<a class="anchor" href="#settings" aria-label="Link to this section">#</a></h2>
+<p>The <strong>⚙</strong> button opens:</p>
+<ul><li><strong>Theme</strong>: follow the system, or always light, or always dark.</li><li><strong>Colors</strong>: the standard palette, or one based on the Okabe-Ito colors, easier to tell apart with a color vision deficiency. Messages keep their dash patterns in both, so status never depends on color alone.</li><li><strong>Language</strong>: English or Italian. The Italian setting translates the interface, including status messages, the event log and the tour. Code, diagnostics from the checker, the quick reference examples and the documentation stay in English.</li><li>Buttons for presentation mode, keyboard shortcuts, the welcome tour, and the documentation.</li></ul>
+<p>Settings are saved in the browser.</p>
+<h2 id="presentation-mode">Presentation mode<a class="anchor" href="#presentation-mode" aria-label="Link to this section">#</a></h2>
+<p>Press <code>P</code>, or use the button in the settings. The side panel, the event log, the editing tools and the top bar controls are hidden; the graph and the diagram take the whole screen, with larger text and wider rows. The browser switches to full screen when it allows it.</p>
+<p><code>→</code>, <code>Page Down</code> and most presentation clickers move to the next event; <code>←</code> and <code>Page Up</code> go back. <code>Space</code> plays and pauses. <code>P</code>, <code>Esc</code> or the <strong>Exit presentation</strong> button leave the mode.</p>
+<p>A tip for lessons: select <em>Event by event</em> speed and a process before entering, so that its state and the next steps are what the audience sees.</p>
+<h2 id="welcome-tour">Welcome tour<a class="anchor" href="#welcome-tour" aria-label="Link to this section">#</a></h2>
+<p>On the first visit, a short tour points at the graph, the code, the timing model, inputs and faults, <strong>Run</strong>, playback, the diagram and the gallery. Use <strong>Next</strong>, <strong>Back</strong> or the arrow keys, and <strong>Skip</strong> or <code>Esc</code> to close it. It does not open again unless you choose <em>Welcome tour</em> in the settings.</p>
+<h2 id="screens-and-devices">Screens and devices<a class="anchor" href="#screens-and-devices" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Desktop and laptop, 960 pixels wide or more:</strong> the playground fills the window and only the panels scroll.</li><li><strong>Tablets and phones:</strong> one column, with the graph first. The page scrolls; a swipe on an empty part of the graph or the diagram scrolls it too. Dragging a process moves the process.</li><li><strong>Touch:</strong> controls are at least 40 pixels tall, and text fields use a 16-pixel font so that the browser does not zoom in.</li><li><strong>Themes:</strong> the playground follows the light or dark setting of your system.</li></ul>
+<nav class="pager"><a href="examples.html"><small>Previous</small>Examples</a><a href="language.html" style="text-align:right"><small>Next</small>The Upon language</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/interface.md" target="_blank" rel="noopener">docs/interface.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#layout">Layout</a><a class="l2" href="#top-bar">Top bar</a><a class="l2" href="#topology">Topology</a><a class="l3" href="#tools">Tools</a><a class="l3" href="#properties-bar">Properties bar</a><a class="l2" href="#code-tab">Code tab</a><a class="l2" href="#timing-tab">Timing tab</a><a class="l2" href="#scenario-tab">Scenario tab</a><a class="l2" href="#state-tab">State tab</a><a class="l2" href="#stack-tab">Stack tab</a><a class="l2" href="#playback">Playback</a><a class="l2" href="#space-time-diagram">Space-time diagram</a><a class="l2" href="#event-log">Event log</a><a class="l2" href="#reading-the-animation">Reading the animation</a><a class="l2" href="#saving-and-sharing">Saving and sharing</a><a class="l2" href="#keyboard-shortcuts">Keyboard shortcuts</a><a class="l2" href="#settings">Settings</a><a class="l2" href="#presentation-mode">Presentation mode</a><a class="l2" href="#welcome-tour">Welcome tour</a><a class="l2" href="#screens-and-devices">Screens and devices</a></aside>
+</div>
+</body>
+</html>

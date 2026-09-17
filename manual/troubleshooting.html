@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: Troubleshooting.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html" aria-current="page">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="troubleshooting">Troubleshooting<a class="anchor" href="#troubleshooting" aria-label="Link to this section">#</a></h1>
+<p>Symptoms, likely causes and fixes. If your problem is not here, check <a href="assumptions.html">Assumptions and simplifications</a>: many surprising results are the model doing what it says.</p>
+<h2 id="the-run-does-not-start">The run does not start<a class="anchor" href="#the-run-does-not-start" aria-label="Link to this section">#</a></h2>
+<p>**The status says <em>The code contains errors</em>.** Open the <em>Code</em> tab. The list under the editor shows each error with its line; click it to jump there. The most common ones are listed under <a href="#error-messages">Error messages</a>.</p>
+<p><strong>The status mentions an input line.</strong> A line in <em>External inputs</em> does not follow <code>TIME NODE Event | arguments</code>, names an event that the main algorithm does not accept, or has the wrong number of arguments. The event must be a <code>request</code> of the main algorithm's interface.</p>
+<p><strong>The status mentions a distribution or a duration.</strong> A field in the <em>Timing</em> tab is invalid; it is outlined in red. Durations need a unit or are read as milliseconds: <code>50ms</code>, <code>2s</code>. Distributions look like <code>uniform(5ms, 30ms)</code>.</p>
+<p>**The status says <em>Emulated rounds need known DELTA and PHI</em>.** With synchronous rounds emulated on clocks, the round length is <code>DELTA + PHI</code>, so both must have a value.</p>
+<p>**The status says <em>No algorithm implements …</em> or <em>Circular dependency</em>.** A <code>uses</code> clause names an interface that no algorithm in the code implements, or two algorithms use each other. Add the missing module (<em>Add module</em> may have it) or break the cycle.</p>
+<h2 id="the-run-stops-early">The run stops early<a class="anchor" href="#the-run-stops-early" aria-label="Link to this section">#</a></h2>
+<p>**The status says <em>Runtime error</em>.** The line is highlighted in the editor and listed under it. Scrub to the end of the run and open <em>State</em> to see the values that led to it.</p>
+<p>**The status says <em>Limit of 150000 events reached</em>.** Something produces a lot of events: a timer that fires too often, retransmissions to a crashed process, a gossip with a large fanout. Shorten the simulated duration in the <em>Scenario</em> tab, lengthen the timer, or reduce the parameters.</p>
+<p>**The status says <em>Timing violation (policy: halt)</em>.** The policy in the <em>Timing</em> tab is <em>Stop the simulation</em>. That is intended: the run stops at the first broken promise.</p>
+<p>**The status says <em>Assertion failed</em>.** <em>Stop at the first failed assertion</em> is checked and an <code>assert</code> failed. The log says which one.</p>
+<h2 id="nothing-happens">Nothing happens<a class="anchor" href="#nothing-happens" aria-label="Link to this section">#</a></h2>
+<p><strong>No input.</strong> Most algorithms do nothing until the application asks. Add a line to <em>External inputs</em>, such as <code>0ms 1 Start</code>.</p>
+<p><strong>The event has no handler.</strong> The log shows a warning such as <em>event ⟨app, Start⟩ has no handler</em>. Check the spelling of the event and of the instance name in the handler.</p>
+<p><strong>The wrong main algorithm.</strong> The <em>Main algorithm</em> menu decides which algorithm receives the inputs. With several algorithms in the code, make sure the right one is selected.</p>
+<p><strong>The run is over.</strong> Playback stops where the action ends. Press ⏮ and play again, or check that <strong>Autoplay</strong> is on.</p>
+<p><strong>The speed is too high.</strong> With <em>Auto speed</em> on a long run, short events flash by. Use <em>Event by event</em>.</p>
+<h2 id="messages-disappear">Messages disappear<a class="anchor" href="#messages-disappear" aria-label="Link to this section">#</a></h2>
+<p>Filter the log by <em>Dropped messages</em>, or hover the arrow on the diagram to read the status.</p>
+<div class="table"><table><thead><tr><th>Status</th><th>Cause</th><th>Fix</th></tr></thead><tbody><tr><td>no link</td><td>the recipient is not a neighbor</td><td>add a link, or use a complete graph</td></tr><tr><td>lost by the network</td><td><em>Loss</em> is above zero</td><td>use perfect links from the library, or set loss to 0</td></tr><tr><td>dropped by a link failure or a partition</td><td>a fault in the <em>Scenario</em> tab</td><td>check the fault list</td></tr><tr><td>discarded because late</td><td>a violation with the <em>Discard</em> policy</td><td>raise <code>DELTA</code>, change the policy, or change the actual delays</td></tr><tr><td>recipient crashed</td><td>the recipient was down</td><td>check the fault list</td></tr><tr><td>still in transit</td><td>the run ended first</td><td>lengthen the simulated duration</td></tr></tbody></table></div>
+<p>Library broadcast modules send to every process in <code>Π</code>. On a topology that is not complete, the messages to non-neighbors end up as <em>no link</em>.</p>
+<h2 id="the-algorithm-misbehaves">The algorithm misbehaves<a class="anchor" href="#the-algorithm-misbehaves" aria-label="Link to this section">#</a></h2>
+<p><strong>A handler never runs.</strong> Handlers for the same event are tried in order, and only the first match runs. An earlier, more general handler may catch everything. Move the specific one up or add <code>where</code> clauses.</p>
+<p><strong>A tag is treated as a variable.</strong> Atoms need at least two capital letters. <code>A</code> is a variable name; <code>AB</code> is an atom. A state variable written in capitals hides the atom with the same name.</p>
+<p><strong>A division gives a whole number.</strong> Division between two whole numbers truncates. Use <code>mean</code> for averages, or multiply first.</p>
+<p><strong>The algorithm works only with one seed.</strong> Try others with the dice button, and <em>random order</em> for simultaneous events in the <em>Timing</em> tab. If it still works only sometimes, the algorithm probably depends on a timing or ordering assumption.</p>
+<p><strong>The algorithm depends on set order.</strong> <code>forall</code>, <code>choose</code> and <code>upon exists</code> follow sorted order. Replace <code>choose</code> with <code>pick</code> to check whether the order matters.</p>
+<p><strong>A timer never fires.</strong> It was cancelled, restarted, or the process crashed. After a recovery all timers are cleared; start them again in the <code>Init</code> or <code>Recovery</code> handler.</p>
+<p><strong>State is lost after a recovery.</strong> Only variables declared <code>stable</code> survive. That is intended.</p>
+<p><strong>A crash in the middle of a broadcast has no effect.</strong> A step is never interrupted. Add message loss so that some sends need retransmission, and crash the sender before it retransmits.</p>
+<p><strong>FloodSet never disagrees under realistic timing.</strong> Disagreement needs a particular combination of late messages and is rare. Try several seeds; the FloodSet example uses one where it happens.</p>
+<h2 id="the-display">The display<a class="anchor" href="#the-display" aria-label="Link to this section">#</a></h2>
+<p><strong>The graph is too small or off-center.</strong> Press <strong>Fit</strong>.</p>
+<p><strong>Packets have no labels.</strong> With more than 120 packets in flight, labels are hidden automatically. Zoom into time with a slower speed, or use a smaller scenario.</p>
+<p><strong>The diagram is empty on the right.</strong> The <em>Action</em> view fits the part of the run where things happen. Press <strong>All</strong> to see the whole run.</p>
+<p><strong>The diagram does not follow the cursor.</strong> Dragging the diagram turns <strong>Follow</strong> off. Tick it again.</p>
+<p><strong>Colors are hard to distinguish.</strong> Turn off <strong>Layers</strong>; colors then only indicate the status of messages. The playground follows the system's light or dark theme.</p>
+<p><strong>On a phone, the page does not scroll over the graph.</strong> Start the swipe on an empty part of the graph. A swipe that starts on a process moves the process, and with the <em>Node</em>, <em>Link</em> or <em>Delete</em> tool active the graph captures all touches.</p>
+<p><strong>Part of the interface is still in English.</strong> With the Italian language, code, checker diagnostics, examples inside the quick reference and the documentation are not translated. That is intended.</p>
+<p><strong>Presentation mode does not go full screen.</strong> Some browsers and embedded viewers do not allow it. The mode works anyway; press <code>F</code> to try again, or use the browser's own full-screen command.</p>
+<p><strong>The image export does not download.</strong> In embedded viewers, downloads may need your confirmation or may be blocked. Open the playground from GitHub Pages or from a local copy.</p>
+<h2 id="saving-and-sharing">Saving and sharing<a class="anchor" href="#saving-and-sharing" aria-label="Link to this section">#</a></h2>
+<p><strong>My work is gone.</strong> The scenario is saved in the browser where you edited it, per site. A different browser, a private window, or clearing site data starts fresh. Export important scenarios.</p>
+<p><strong>The link does not open my scenario.</strong> The link must be copied whole: the scenario is in the part after <code>#</code>. Some chat applications cut long links; share the exported JSON file instead.</p>
+<p><strong>Save file does nothing.</strong> Some embedded viewers block downloads. Use <strong>Copy JSON</strong> and paste it into a file.</p>
+<p>**Import says <em>not a scenario</em>.** The JSON must contain at least <code>nodes</code> and <code>code</code>. Export a scenario to see the full format.</p>
+<h2 id="error-messages">Error messages<a class="anchor" href="#error-messages" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Message</th><th>Meaning</th></tr></thead><tbody><tr><td><code>Expected &quot;⟩&quot; (or &quot;&gt;&quot;), found …</code></td><td>an event is not closed, often because of a <code>&gt;</code> comparison inside an ASCII <code>trigger</code>; wrap it in parentheses</td></tr><tr><td><code>Expected &quot;:=&quot; (statements start with a keyword or an assignment)</code></td><td>a line starts with a name that is not assigned, often a missing <code>trigger</code> or <code>call</code></td></tr><tr><td><code>Variable &quot;x&quot; is not declared</code></td><td>declare it in <code>state</code> or <code>params</code>, assign it first, or check the spelling</td></tr><tr><td><code>&quot;DELTA&quot; is not available</code></td><td>the assumed model does not know <code>DELTA</code>; set it in the <em>Timing</em> tab or avoid it</td></tr><tr><td><code>&quot;Rounds&quot; is only available when the assumed model is &quot;synchronous rounds&quot;</code></td><td>switch the synchrony model, or use <code>Net</code></td></tr><tr><td><code>&quot;X&quot; is not an indication of I (only indications can be emitted upwards)</code></td><td><code>trigger ⟨myAlias, X⟩</code> must use an indication of your own interface</td></tr><tr><td><code>&quot;X&quot; is not a request of I (only requests can be sent downwards)</code></td><td><code>trigger ⟨usedAlias, X⟩</code> must use a request of the used interface</td></tr><tr><td><code>Unknown instance &quot;x&quot; in this algorithm</code></td><td>the instance name does not match <code>implements … as</code> or <code>uses … as</code></td></tr><tr><td><code>&quot;return&quot; can only be used inside a function</code></td><td>handlers do not return; restructure with <code>if</code></td></tr><tr><td><code>&quot;call&quot; is for your own functions</code></td><td>built-in functions are used in expressions: <code>x := size(S)</code></td></tr><tr><td><code>Expected a boolean, found …</code></td><td>a condition or <code>where</code> clause is not true or false</td></tr><tr><td><code>Variable &quot;x&quot; is not defined</code> (while running)</td><td>a local variable was read on a path where it was never assigned; assign it before every use</td></tr><tr><td><code>while loop exceeded 100000 iterations</code></td><td>the loop condition never becomes false</td></tr><tr><td><code>A guard stays true forever</code></td><td>an <code>upon condition</code> or <code>upon exists</code> handler must make its condition false</td></tr><tr><td><code>Function calls nested deeper than 200</code></td><td>a recursive function never stops</td></tr><tr><td><code>Too many statements in a single step</code></td><td>a loop does not terminate</td></tr><tr><td><code>min of an empty set</code> (and similar)</td><td>check that the collection is not empty first</td></tr></tbody></table></div>
+<nav class="pager"><a href="assumptions.html"><small>Previous</small>Assumptions and simplifications</a><a href="teaching.html" style="text-align:right"><small>Next</small>Teaching</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/troubleshooting.md" target="_blank" rel="noopener">docs/troubleshooting.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#the-run-does-not-start">The run does not start</a><a class="l2" href="#the-run-stops-early">The run stops early</a><a class="l2" href="#nothing-happens">Nothing happens</a><a class="l2" href="#messages-disappear">Messages disappear</a><a class="l2" href="#the-algorithm-misbehaves">The algorithm misbehaves</a><a class="l2" href="#the-display">The display</a><a class="l2" href="#saving-and-sharing">Saving and sharing</a><a class="l2" href="#error-messages">Error messages</a></aside>
+</div>
+</body>
+</html>

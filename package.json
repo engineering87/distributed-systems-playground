@@ -1,6 +1,6 @@
 {
   "name": "distributed-systems-playground",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "description": "Web app to simulate distributed algorithms with an interactive topology, upon-event pseudocode and a parametric timing model",
   "private": true,
   "homepage": "https://engineering87.github.io/distributed-systems-playground/",
@@ -12,8 +12,8 @@
   "author": "Francesco Del Re",
   "engines": { "node": ">=18" },
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "check": "node scripts/build.mjs --check",
-    "test": "node --test test/core.test.cjs"
+    "build": "node scripts/build.mjs && node scripts/build-docs.mjs",
+    "check": "node scripts/build.mjs --check && node scripts/build-docs.mjs --check",
+    "test": "node --test test/core.test.cjs test/docs.test.cjs"
   }
 }

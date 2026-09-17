@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use Distributed Systems Playground in teaching or research, please cite it as below."
+title: "Distributed Systems Playground"
+abstract: "A browser-based environment for writing distributed algorithms in event-driven pseudocode and running them on a simulated network whose timing and faults are configured separately from the assumptions of the algorithm."
+type: software
+authors:
+  - family-names: "Del Re"
+    given-names: "Francesco"
+repository-code: "https://github.com/engineering87/distributed-systems-playground"
+url: "https://engineering87.github.io/distributed-systems-playground/"
+license: MIT
+version: "0.6.0"
+keywords:
+  - distributed systems
+  - distributed algorithms
+  - simulation
+  - education
+  - failure detectors
+  - consensus

@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPEC — Distributed Systems Playground · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: SPEC — Distributed Systems Playground.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html" aria-current="page">Specification</a></li></ul></nav>
+<main>
+<h1 id="spec--distributed-systems-playground">SPEC — Distributed Systems Playground<a class="anchor" href="#spec--distributed-systems-playground" aria-label="Link to this section">#</a></h1>
+<p>Version: 0.5 (draft) · Status: proposal, partially implemented (see Appendix B)</p>
+<h2 id="1-purpose">1. Purpose<a class="anchor" href="#1-purpose" aria-label="Link to this section">#</a></h2>
+<p>A fully client-side web app, deployable on GitHub Pages, to:</p>
+<ol><li>draw a topology of processes and channels interactively;</li><li>write distributed algorithms in executable pseudocode in the <em>upon event / trigger</em> style of Cachin, Guerraoui and Rodrigues;</li><li>run them in a deterministic, reproducible discrete-event simulation, and watch the run as an animation in which messages visibly travel between processes;</li><li>compare the <strong>timing model the algorithm assumes</strong> with the <strong>timing model the network actually follows</strong>, and show the consequences of the gap.</li></ol>
+<p>Primary audience: teaching (students and instructors). Secondary goal: experimenting with protocols under realistic conditions.</p>
+<h3 id="11-non-goals-v1">1.1 Non-goals (v1)<a class="anchor" href="#11-non-goals-v1" aria-label="Link to this section">#</a></h3>
+<ul><li>Running on a real network or across machines.</li><li>Exhaustive formal verification (model checking): v1 checks invariants on individual runs.</li><li>Byzantine faults (on the roadmap).</li></ul>
+<hr>
+<h2 id="2-core-principle-assumed-model-vs-actual-model">2. Core principle: assumed model vs actual model<a class="anchor" href="#2-core-principle-assumed-model-vs-actual-model" aria-label="Link to this section">#</a></h2>
+<p>Teaching often starts from the synchronous model, but a real network never is synchronous. The simulator makes the distinction explicit with <strong>two separate configurations</strong>:</p>
+<div class="table"><table><thead><tr><th>Configuration</th><th>Visible to</th><th>Defines</th></tr></thead><tbody><tr><td><strong>Assumed model</strong> (<code>assumed</code>)</td><td>the algorithm (DSL)</td><td>the guarantees the algorithm may rely on: rounds, <code>DELTA</code>, <code>PHI</code>, GST</td></tr><tr><td><strong>Actual model</strong> (<code>actual</code>)</td><td>the simulator only</td><td>how channels, processes and clocks really behave</td></tr></tbody></table></div>
+<p>The assumed model determines <strong>which constructs are legal</strong> in the code (static checks, §5.6). The actual model determines <strong>what happens</strong> during the run.</p>
+<p>When the two coincide, the run is the textbook one. When they differ, every <strong>violation</strong> of the assumption (a message beyond <code>DELTA</code>, a step beyond <code>PHI</code>, clock drift beyond <code>RHO</code>) is:</p>
+<ul><li>recorded as a <code>TimingViolation</code> event in the log;</li><li>highlighted on the topology animation and on the space-time diagram;</li><li>handled according to a configurable policy (§3.5).</li></ul>
+<p>The key teaching point: in a system that believes it is synchronous, a timing violation turns into an <strong>omission</strong> (or performance) <strong>failure</strong> that the algorithm did not plan for.</p>
+<hr>
+<h2 id="3-parametric-timing-model">3. Parametric timing model<a class="anchor" href="#3-parametric-timing-model" aria-label="Link to this section">#</a></h2>
+<p>Synchrony models are not rigid modes but <strong>points in a parameter space</strong>. The classical models are presets.</p>
+<h3 id="31-virtual-time">3.1 Virtual time<a class="anchor" href="#31-virtual-time" aria-label="Link to this section">#</a></h3>
+<ul><li>Global time is an integer number of <strong>microseconds</strong> (a JavaScript <code>number</code>, safe up to 2^53 µs ≈ 285 years). No floats in the engine's event ordering.</li><li>Duration literals in the DSL and in scenarios accept <code>us</code>, <code>ms</code>, <code>s</code> (e.g. <code>150ms</code>).</li></ul>
+<h3 id="32-actual-model-parameters-actual">3.2 Actual model parameters (<code>actual</code>)<a class="anchor" href="#32-actual-model-parameters-actual" aria-label="Link to this section">#</a></h3>
+<p><strong>Channels</strong> (global default, overridable per link):</p>
+<div class="table"><table><thead><tr><th>Parameter</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>delay</code></td><td>distribution (§3.4)</td><td>transmission delay</td></tr><tr><td><code>bound</code></td><td>duration | <code>none</code></td><td>upper truncation of the delay; <code>none</code> = unbounded</td></tr><tr><td><code>loss</code></td><td>[0,1]</td><td>loss probability</td></tr><tr><td><code>dup</code></td><td>[0,1]</td><td>duplication probability</td></tr><tr><td><code>fifo</code></td><td>bool</td><td>if <code>true</code>, no overtaking on the same link</td></tr><tr><td><code>spikeProb</code>, <code>spikeExtra</code></td><td>probability, duration</td><td>occasional delay spikes added to <code>delay</code></td></tr></tbody></table></div>
+<p><strong>Processes</strong> (global default, overridable per node in later versions):</p>
+<div class="table"><table><thead><tr><th>Parameter</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>step</code></td><td>distribution</td><td>time taken to execute one handler step</td></tr><tr><td><code>pauses</code></td><td><code>{prob, duration}</code></td><td>arbitrary pauses such as stop-the-world GC (roadmap)</td></tr></tbody></table></div>
+<p><strong>Local clocks</strong> (per node): <code>C_i(t) = offset_i + (1 + rho_i) · t</code></p>
+<div class="table"><table><thead><tr><th>Parameter</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>offset</code></td><td>distribution</td><td>initial offset</td></tr><tr><td><code>rho</code></td><td>distribution</td><td>drift, sampled once per node</td></tr></tbody></table></div>
+<p>Timers (<code>starttimer</code>) are expressed in <strong>local time</strong>: with non-zero drift, a timeout of <code>DELTA</code> is not exactly <code>DELTA</code> of global time.</p>
+<p><strong>Stabilization</strong> (partial synchrony, DLS model):</p>
+<div class="table"><table><thead><tr><th>Parameter</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>gst</code></td><td>duration | <code>none</code></td><td>Global Stabilization Time</td></tr><tr><td><code>preGstDelay</code></td><td>distribution</td><td>delay before GST (e.g. heavy-tailed)</td></tr></tbody></table></div>
+<p>After GST the regular <code>delay</code> and <code>bound</code> apply. Messages sent before GST still arrive by <code>GST + bound</code>.</p>
+<h3 id="33-assumed-model-parameters-assumed">3.3 Assumed model parameters (<code>assumed</code>)<a class="anchor" href="#33-assumed-model-parameters-assumed" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>Parameter</th><th>Values</th><th>Effect in the DSL</th></tr></thead><tbody><tr><td><code>timing</code></td><td><code>synchronous-rounds</code> | <code>synchronous-timed</code> | <code>partial</code> | <code>asynchronous</code></td><td>enables or disables constructs</td></tr><tr><td><code>DELTA</code></td><td>duration | <code>unknown</code></td><td>exposes the constant <code>DELTA</code> if known</td></tr><tr><td><code>PHI</code></td><td>duration | <code>unknown</code></td><td>exposes the constant <code>PHI</code> if known</td></tr><tr><td><code>RHO</code></td><td>number | <code>unknown</code></td><td>exposes the constant <code>RHO</code> if known</td></tr><tr><td><code>failures</code></td><td><code>none</code> | <code>crash</code> | <code>crash-recovery</code> | <code>omission</code></td><td>informative; used for invariants and warnings (roadmap)</td></tr></tbody></table></div>
+<h3 id="34-distributions">3.4 Distributions<a class="anchor" href="#34-distributions" aria-label="Link to this section">#</a></h3>
+<p><code>const(d)</code> · <code>uniform(a, b)</code> · <code>exp(mean)</code> · <code>normal(mu, sigma)</code> (truncated at 0) · <code>lognormal(mu, sigma)</code> (in log ms) · <code>pareto(xm, alpha)</code> · <code>empirical(d1, d2, ...)</code></p>
+<p>Unitless arguments are milliseconds, except shape parameters. Every sample comes from a <strong>dedicated PRNG substream</strong> derived from <code>(seed, source)</code>, where the source is a link, a node or a clock. Changing one link does not alter the randomness of the others, so runs stay comparable.</p>
+<h3 id="35-violation-policies">3.5 Violation policies<a class="anchor" href="#35-violation-policies" aria-label="Link to this section">#</a></h3>
+<p>Applied when <code>actual</code> exceeds <code>assumed</code>:</p>
+<div class="table"><table><thead><tr><th>Policy</th><th>Behavior</th></tr></thead><tbody><tr><td><code>deliver-late</code></td><td>the message is delivered anyway, late (default for timed models)</td></tr><tr><td><code>drop</code></td><td>the late message is discarded and recorded as an omission</td></tr><tr><td><code>next-round</code></td><td>rounds only: deliver in the next round (with emulated rounds, <code>deliver-late</code> already has this effect)</td></tr><tr><td><code>halt</code></td><td>the run stops at the first violation (useful in class)</td></tr></tbody></table></div>
+<h3 id="36-presets">3.6 Presets<a class="anchor" href="#36-presets" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>Preset</th><th><code>assumed.timing</code></th><th><code>actual</code></th><th>Use</th></tr></thead><tbody><tr><td><strong>Ideal synchronous</strong></td><td><code>synchronous-rounds</code></td><td>perfect lockstep, no violation possible</td><td>explain the algorithm</td></tr><tr><td><strong>Realistic synchronous</strong></td><td><code>synchronous-rounds</code></td><td>rounds emulated on local clocks; <code>lognormal</code> delays with spikes; <code>rho</code> ≠ 0</td><td>show what breaks</td></tr><tr><td><strong>Timed synchronous</strong></td><td><code>synchronous-timed</code></td><td><code>bound</code> = <code>DELTA</code>, <code>rho</code> = 0</td><td>algorithms with exact timeouts</td></tr><tr><td><strong>Partially synchronous</strong></td><td><code>partial</code> (<code>DELTA</code> unknown)</td><td><code>gst</code> = 3s, heavy-tailed before, bounded after</td><td>◇P, Paxos, Raft</td></tr><tr><td><strong>Asynchronous</strong></td><td><code>asynchronous</code></td><td><code>bound: none</code></td><td>FLP, reliable broadcast</td></tr></tbody></table></div>
+<p>In the UI a preset is only a starting point: every parameter stays editable, and any edit turns the preset into &quot;Custom&quot;.</p>
+<h3 id="37-round-execution">3.7 Round execution<a class="anchor" href="#37-round-execution" aria-label="Link to this section">#</a></h3>
+<ul><li><strong>Lockstep (ideal):</strong> round <code>r</code> consists of <code>RoundStart(r)</code>, sending, delivery of every message of round <code>r</code>, then <code>RoundEnd(r)</code>. It is atomic with respect to virtual time.</li><li><strong>Emulated (realistic):</strong> each node opens round <code>r</code> when its local clock reaches <code>r · R</code>, with <code>R = DELTA + PHI</code>. A round-<code>r</code> message that arrives after the recipient's local end of round <code>r</code> is a violation (§3.5).</li></ul>
+<hr>
+<h2 id="4-simulation-engine">4. Simulation engine<a class="anchor" href="#4-simulation-engine" aria-label="Link to this section">#</a></h2>
+<ul><li>Discrete-event simulation with a priority queue.</li><li>Ordering key: <code>(time, class, node, sequence)</code>.</li><li>Configurable tie-break:<ul><li><code>stable</code>: deterministic by id;</li><li><code>shuffle(seed)</code>: explores different interleavings of simultaneous events.</li></ul></li><li>Handlers are <strong>atomic</strong>: no other event of the same node runs while a handler executes. A node busy with a step defers its next events until the step ends.</li><li>Guards (<code>upon condition</code>) are re-evaluated after every step of the node, with weak round-robin fairness among enabled guards.</li><li><strong>Reproducibility:</strong> same scenario and same seed produce the same trace, byte for byte. Verified in CI.</li><li><strong>What-if:</strong> adding an input or a fault at time <code>t</code> does not change the trace before <code>t</code>, so the UI can inject events at the playback cursor and re-run from there.</li><li>The engine records, besides messages and log entries, an <strong>activity trace</strong> (<code>t</code>, <code>end</code>, node, event type) that the UI uses to animate processing.</li></ul>
+<h3 id="41-faults">4.1 Faults<a class="anchor" href="#41-faults" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>Type</th><th>Fields</th><th>Semantics</th></tr></thead><tbody><tr><td><code>crash</code></td><td><code>node</code>, <code>at</code></td><td>the node stops; deliveries to it are recorded as <code>lost-crash</code>; pending timers are discarded</td></tr><tr><td><code>recover</code></td><td><code>node</code>, <code>at</code></td><td>the node restarts: non-<code>stable</code> state variables are re-initialized, timers are cleared, and each instance receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise, bottom-up; ignored with a warning if the node is running</td></tr><tr><td><code>link</code></td><td><code>a</code>, <code>b</code>, <code>from</code>, <code>to</code></td><td>the channel between <code>a</code> and <code>b</code> is down in both directions during <code>[from, to)</code>; <code>to</code> empty means forever</td></tr><tr><td><code>partition</code></td><td><code>groups</code>, <code>from</code>, <code>to</code></td><td>during <code>[from, to)</code> messages between different groups are dropped; nodes not listed form one more group</td></tr></tbody></table></div>
+<ul><li>A message is dropped (<code>dropped-cut</code>) if its channel is interrupted at send time or at arrival time. Random samples for the message are drawn before the check, so a fault never changes the random streams.</li><li>Each fault start and end is logged with kind <code>fault</code>.</li><li>Links can also be disabled for the whole run from the topology.</li><li><strong>Interactive injection</strong> during playback: crash, recover or isolate a node, cut a link, or inject an event at the cursor time. The cursor is rounded up to a whole microsecond, so that the fault is in effect at the cursor after the re-run.</li><li>The result exposes <code>downs</code> (per node, a list of <code>{from, to}</code> intervals) and <code>netFaults</code> (links and partitions in microseconds) for the UI.</li><li>Roadmap: node pauses, send and receive omissions, one-way link failures.</li></ul>
+<hr>
+<h2 id="5-language-dsl">5. Language (DSL)<a class="anchor" href="#5-language-dsl" aria-label="Link to this section">#</a></h2>
+<h3 id="51-lexical-structure">5.1 Lexical structure<a class="anchor" href="#51-lexical-structure" aria-label="Link to this section">#</a></h3>
+<p>Every Unicode symbol has an ASCII equivalent:</p>
+<div class="table"><table><thead><tr><th>Unicode</th><th>ASCII</th><th></th><th>Unicode</th><th>ASCII</th></tr></thead><tbody><tr><td><code>⟨</code> <code>⟩</code></td><td><code>&lt;</code> <code>&gt;</code></td><td></td><td><code>∈</code> <code>∉</code></td><td><code>in</code> <code>notin</code></td></tr><tr><td><code>∪</code> <code>∩</code> <code>\</code></td><td><code>union</code> <code>inter</code> <code>minus</code></td><td></td><td><code>∅</code></td><td><code>{}</code></td></tr><tr><td><code>≠</code> <code>≤</code> <code>≥</code></td><td><code>!=</code> <code>&lt;=</code> <code>&gt;=</code></td><td></td><td><code>∧</code> <code>∨</code> <code>¬</code></td><td><code>and</code> <code>or</code> <code>not</code></td></tr><tr><td><code>Π</code></td><td><code>Procs</code></td><td></td><td><code>⊆</code></td><td><code>subseteq</code></td></tr><tr><td><code>←</code> / <code>:=</code></td><td><code>:=</code></td><td></td><td><code>∀</code></td><td><code>forall</code></td></tr></tbody></table></div>
+<ul><li>Comments: <code>// ...</code> and <code>/* ... */</code>.</li><li>Undeclared all-uppercase identifiers of at least two characters are <strong>atoms</strong> (symbolic constants), e.g. <code>HEARTBEAT</code>.</li><li><code>_</code> is the wildcard in patterns.</li></ul>
+<h3 id="52-grammar-ebnf">5.2 Grammar (EBNF)<a class="anchor" href="#52-grammar-ebnf" aria-label="Link to this section">#</a></h3>
+<pre class="code lang-ebnf"><code>program        = { interface | algorithm } ;
+
+(* ---------- Interfaces ---------- *)
+interface      = &quot;interface&quot; IDENT { iface_event } &quot;end&quot; ;
+iface_event    = ( &quot;request&quot; | &quot;indication&quot; ) IDENT [ &quot;(&quot; [ ident_list ] &quot;)&quot; ] ;
+
+(* ---------- Algorithms ---------- *)
+algorithm      = &quot;algorithm&quot; IDENT
+                 &quot;implements&quot; IDENT &quot;as&quot; IDENT
+                 { &quot;uses&quot; IDENT &quot;as&quot; IDENT [ &quot;via&quot; IDENT ] }
+                 [ params ] [ state ]
+                 { handler | function }
+                 &quot;end&quot; ;
+
+function       = &quot;function&quot; IDENT &quot;(&quot; [ ident_list ] &quot;)&quot; block &quot;end&quot; ;
+
+params         = &quot;params&quot; { IDENT &quot;:=&quot; expr [ &quot;;&quot; ] } ;
+state          = &quot;state&quot; { [ &quot;stable&quot; ] IDENT &quot;:=&quot; expr [ &quot;;&quot; ] } ;
+
+handler        = &quot;upon&quot; trigger_cond &quot;do&quot; block &quot;end&quot; ;
+trigger_cond   = &quot;event&quot; event_pat [ &quot;where&quot; expr ]
+               | &quot;condition&quot; expr
+               | &quot;exists&quot; IDENT &quot;in&quot; expr &quot;where&quot; expr ;
+
+event_pat      = LANGLE IDENT &quot;,&quot; IDENT [ &quot;|&quot; pattern { &quot;,&quot; pattern } ] RANGLE ;
+pattern        = &quot;_&quot; | IDENT | literal
+               | &quot;[&quot; [ pattern { &quot;,&quot; pattern } ] &quot;]&quot; ;
+
+(* ---------- Statements ---------- *)
+block          = { stmt [ &quot;;&quot; ] } ;
+stmt           = assign | trigger | if | forall | while
+               | timer | assert | log | &quot;skip&quot;
+               | &quot;call&quot; IDENT &quot;(&quot; [ expr_list ] &quot;)&quot;
+               | &quot;return&quot; [ expr ] ;                        (* only inside functions *)
+assign         = IDENT { &quot;[&quot; expr &quot;]&quot; } &quot;:=&quot; expr ;
+trigger        = &quot;trigger&quot; LANGLE IDENT &quot;,&quot; IDENT [ &quot;|&quot; expr { &quot;,&quot; expr } ] RANGLE ;
+if             = &quot;if&quot; expr &quot;then&quot; block
+                 { &quot;elif&quot; expr &quot;then&quot; block }
+                 [ &quot;else&quot; block ] &quot;end&quot; ;
+forall         = &quot;forall&quot; IDENT &quot;in&quot; expr [ &quot;where&quot; expr ] &quot;do&quot; block &quot;end&quot; ;
+while          = &quot;while&quot; expr &quot;do&quot; block &quot;end&quot; ;
+timer          = &quot;starttimer&quot; &quot;(&quot; IDENT &quot;,&quot; expr &quot;)&quot;
+               | &quot;canceltimer&quot; &quot;(&quot; IDENT &quot;)&quot; ;
+assert         = &quot;assert&quot; expr [ &quot;,&quot; expr ] ;
+log            = &quot;log&quot; expr { &quot;,&quot; expr } ;
+
+(* ---------- Expressions (increasing precedence) ---------- *)
+expr           = or_expr ;
+or_expr        = and_expr { &quot;or&quot; and_expr } ;
+and_expr       = not_expr { &quot;and&quot; not_expr } ;
+not_expr       = &quot;not&quot; not_expr | cmp_expr ;
+cmp_expr       = set_expr [ cmp_op set_expr ] ;          (* no chaining *)
+cmp_op         = &quot;=&quot; | &quot;!=&quot; | &quot;&lt;&quot; | &quot;&lt;=&quot; | &quot;&gt;&quot; | &quot;&gt;=&quot;
+               | &quot;in&quot; | &quot;notin&quot; | &quot;subseteq&quot; ;
+set_expr       = add_expr { ( &quot;union&quot; | &quot;inter&quot; | &quot;minus&quot; ) add_expr } ;
+add_expr       = mul_expr { ( &quot;+&quot; | &quot;-&quot; ) mul_expr } ;
+mul_expr       = unary { ( &quot;*&quot; | &quot;/&quot; | &quot;%&quot; ) unary } ;
+unary          = ( &quot;-&quot; | &quot;#&quot; ) unary | postfix ;          (* # = cardinality *)
+postfix        = primary { &quot;[&quot; expr &quot;]&quot; | &quot;(&quot; [ expr_list ] &quot;)&quot; } ;
+primary        = literal | IDENT | &quot;(&quot; expr &quot;)&quot;
+               | &quot;{&quot; [ expr_list ] &quot;}&quot;                     (* set *)
+               | &quot;{&quot; IDENT &quot;in&quot; expr &quot;where&quot; expr &quot;}&quot;      (* comprehension *)
+               | &quot;[&quot; [ expr_list ] &quot;]&quot; ;                   (* tuple / message *)
+
+literal        = NUMBER | DURATION | STRING | &quot;true&quot; | &quot;false&quot; | &quot;nil&quot; ;
+expr_list      = expr { &quot;,&quot; expr } ;
+ident_list     = IDENT { &quot;,&quot; IDENT } ;
+
+(* ---------- Terminals ---------- *)
+DURATION       = NUMBER ( &quot;us&quot; | &quot;ms&quot; | &quot;s&quot; ) ;
+LANGLE         = &quot;&lt;&quot; | &quot;⟨&quot; ;
+RANGLE         = &quot;&gt;&quot; | &quot;⟩&quot; ;</code></pre>
+<p>Implementation note: inside a <code>trigger</code>, the ASCII <code>&gt;</code> closes the event, so comparisons in <code>trigger</code> arguments must be wrapped in parentheses. With <code>⟨ ⟩</code> there is no ambiguity. Error messages mention this.</p>
+<h3 id="53-semantics">5.3 Semantics<a class="anchor" href="#53-semantics" aria-label="Link to this section">#</a></h3>
+<ul><li><strong>State:</strong> each algorithm instance has local state per node. <code>stable</code> variables survive recovery; the others are reinitialized from their declaration.</li><li><strong>Instances and composition:</strong> <code>implements X as a</code> names the instance the algorithm exposes to upper layers; <code>uses Y as b</code> binds a lower-layer instance. v0.x binds automatically (§6).</li><li><strong>Events:</strong><ul><li><code>trigger ⟨b, Req | ...⟩</code> sends a <em>request</em> downwards;</li><li><code>trigger ⟨a, Ind | ...⟩</code> emits an <em>indication</em> upwards;</li><li>the checker verifies direction and arity against the interface.</li></ul></li><li><strong>Init and Recovery:</strong> each instance receives <code>⟨a, Init⟩</code> at start-up, bottom-up. After a recovery it receives <code>⟨a, Recovery⟩</code> if it has a handler for it, and <code>⟨a, Init⟩</code> otherwise.</li><li><strong>Pattern matching:</strong><ul><li>new identifiers bind;</li><li>already bound identifiers and atoms must be equal;</li><li>in <code>⟨timer, Timeout | t⟩</code>, <code>t</code> is the timer name and matches literally;</li><li>an event with no matching handler is logged once as a warning.</li></ul></li><li><strong>Values:</strong> integers, booleans, strings, atoms, durations, sets, tuples (0-indexed) and maps (<code>map()</code>, <code>m[k]</code>). All immutable; assignment rebuilds the value, which keeps snapshots cheap.</li><li><strong>Deterministic choice:</strong> <code>choose(S)</code> returns the minimum of <code>S</code> in a total order defined over all values.</li><li><strong>Functions:</strong> declared inside an algorithm, they see its state and parameters, have their own local variables, may assign state, trigger events and start timers, and may recurse (up to 200 nested calls). A function used in an expression returns the value of <code>return</code>, or <code>nil</code>.</li><li><strong>Binding:</strong> <code>uses X as a via Y</code> binds <code>a</code> to algorithm <code>Y</code>, which must implement <code>X</code>. Without <code>via</code>, the first algorithm implementing <code>X</code> is used, with a warning when there are several.</li><li><strong>Origin of messages:</strong> every request carries the module that started its chain. A module handling a request from above keeps that origin; a module reacting to an indication, a timer or an input starts a new chain. Network messages record their origin, which the UI uses to color them by layer.</li></ul>
+<h3 id="54-built-ins">5.4 Built-ins<a class="anchor" href="#54-built-ins" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>Name</th><th>Availability</th><th>Meaning</th></tr></thead><tbody><tr><td><code>self</code></td><td>always</td><td>node id</td></tr><tr><td><code>Π</code> / <code>Procs</code></td><td>always</td><td>set of processes</td></tr><tr><td><code>neighbors</code></td><td>always</td><td>out-neighbors in the topology</td></tr><tr><td><code>N</code></td><td>always</td><td>number of processes</td></tr><tr><td><code>now()</code></td><td>timed models</td><td><strong>local</strong> clock</td></tr><tr><td><code>DELTA</code>, <code>PHI</code>, <code>RHO</code></td><td>if known in <code>assumed</code></td><td>synchrony constants</td></tr><tr><td><code>round</code></td><td><code>synchronous-rounds</code></td><td>current round</td></tr><tr><td><code>random(a, b)</code></td><td>always</td><td>from the node's PRNG substream</td></tr><tr><td><code>min</code>, <code>max</code>, <code>choose</code>, <code>size</code>, <code>keys</code>, <code>values</code>, <code>map</code>, <code>append</code>, <code>toset</code>, <code>str</code>, <code>abs</code></td><td>always</td><td>pure functions</td></tr><tr><td><code>head</code>, <code>last</code>, <code>tail</code>, <code>sort</code>, <code>reverse</code>, <code>slice</code>, <code>range</code>, <code>get</code>, <code>remove</code>, <code>sum</code>, <code>mean</code>, <code>argmin</code>, <code>argmax</code>, <code>sqrt</code>, <code>ln</code>, <code>exp</code>, <code>pow</code>, <code>floor</code>, <code>ceil</code>, <code>round</code></td><td>always</td><td>pure functions on sequences, collections and numbers</td></tr><tr><td><code>pick(S)</code></td><td>always</td><td>random element from the node's PRNG substream</td></tr></tbody></table></div>
+<h3 id="55-modules-provided-by-the-simulator">5.5 Modules provided by the simulator<a class="anchor" href="#55-modules-provided-by-the-simulator" aria-label="Link to this section">#</a></h3>
+<ul><li><code>Net</code>: raw channel with <code>Send(q, m)</code> / <code>Deliver(p, m)</code>, whose properties come from <code>actual</code>. It behaves as a <em>fair-loss link</em> when <code>loss &gt; 0</code>.</li><li><code>timer</code>: implicit instance with the indication <code>Timeout(id)</code>.</li><li><code>Rounds</code> (only with <code>synchronous-rounds</code>): <code>RoundStart(r)</code>, <code>RoundEnd(r)</code>, <code>Send(q, m)</code>, <code>Deliver(p, m)</code>.</li></ul>
+<p>Every higher abstraction (stubborn link, perfect link, broadcast, failure detector, consensus) is <strong>written in the DSL</strong>. Its source code is part of the teaching material.</p>
+<h3 id="57-module-library">5.7 Module library<a class="anchor" href="#57-module-library" aria-label="Link to this section">#</a></h3>
+<p><code>src/library.js</code> holds modules written in Upon, each with the interface it implements, the interfaces it uses, a summary and its guarantees: <code>RetransmitLinks</code> (stubborn links, bounded retransmissions), <code>EliminateDuplicates</code> and <code>AckLinks</code> (perfect links), <code>SequencedFifoLinks</code> (FIFO perfect links), <code>BasicBroadcast</code>, <code>EagerReliableBroadcast</code>, <code>MajorityAckURB</code>, <code>BroadcastWithSequenceNumber</code> (FIFO reliable broadcast), <code>WaitingCausalBroadcast</code> (vector clocks) and <code>EagerGossip</code>. Adding a module inserts the missing interfaces and, for every used interface that the program does not implement yet, a default module that does.</p>
+<h3 id="56-static-checks">5.6 Static checks<a class="anchor" href="#56-static-checks" aria-label="Link to this section">#</a></h3>
+<ul><li>Using <code>DELTA</code>, <code>PHI</code> or <code>RHO</code> while <code>unknown</code> in <code>assumed</code>: error with an explanation (e.g. &quot;<code>DELTA</code> is not available: its value is unknown in the assumed model (asynchronous system)&quot;).</li><li>Using <code>Rounds</code> outside <code>synchronous-rounds</code>, or <code>Net</code> inside it; <code>now()</code> and timers in lockstep mode: error.</li><li>Triggering an event not declared in the interface, or in the wrong direction: error.</li><li>Undeclared variables, wrong arity: error.</li><li>Indications of lower layers without a handler; timers never started: warning.</li></ul>
+<hr>
+<h2 id="6-scenario-json-format">6. Scenario (JSON format)<a class="anchor" href="#6-scenario-json-format" aria-label="Link to this section">#</a></h2>
+<p>A scenario is self-contained and can be shared as a file or as a URL (deflate-compressed, base64url).</p>
+<pre class="code lang-json"><code>{
+  &quot;version&quot;: 1,
+  &quot;seed&quot;: 5,
+  &quot;nodes&quot;: [{ &quot;id&quot;: 1, &quot;x&quot;: 330, &quot;y&quot;: 80 }, { &quot;id&quot;: 2, &quot;x&quot;: 480, &quot;y&quot;: 230 }],
+  &quot;links&quot;: [{ &quot;a&quot;: 1, &quot;b&quot;: 2, &quot;directed&quot;: false, &quot;enabled&quot;: true, &quot;loss&quot;: &quot;&quot;, &quot;delay&quot;: &quot;&quot; }],
+  &quot;code&quot;: &quot;interface … algorithm … end&quot;,
+  &quot;top&quot;: &quot;IncreasingTimeout&quot;,
+  &quot;inputs&quot;: &quot;0ms * Start&quot;,
+  &quot;faults&quot;: [
+    { &quot;type&quot;: &quot;crash&quot;, &quot;node&quot;: 2, &quot;at&quot;: &quot;6s&quot; },
+    { &quot;type&quot;: &quot;recover&quot;, &quot;node&quot;: 2, &quot;at&quot;: &quot;8s&quot; },
+    { &quot;type&quot;: &quot;link&quot;, &quot;a&quot;: 1, &quot;b&quot;: 2, &quot;from&quot;: &quot;1s&quot;, &quot;to&quot;: &quot;2s&quot; },
+    { &quot;type&quot;: &quot;partition&quot;, &quot;groups&quot;: &quot;1 2 | 3&quot;, &quot;from&quot;: &quot;3s&quot;, &quot;to&quot;: &quot;&quot; }
+  ],
+  &quot;preset&quot;: &quot;partial&quot;,
+  &quot;assumed&quot;: { &quot;timing&quot;: &quot;partial&quot;, &quot;DELTA&quot;: &quot;unknown&quot;, &quot;PHI&quot;: &quot;unknown&quot;, &quot;RHO&quot;: &quot;unknown&quot; },
+  &quot;actual&quot;: {
+    &quot;delay&quot;: &quot;uniform(5ms, 40ms)&quot;, &quot;bound&quot;: &quot;50ms&quot;, &quot;loss&quot;: 0, &quot;dup&quot;: 0, &quot;fifo&quot;: true,
+    &quot;spikeProb&quot;: 0, &quot;spikeExtra&quot;: &quot;0ms&quot;, &quot;step&quot;: &quot;uniform(100us, 1ms)&quot;,
+    &quot;offset&quot;: &quot;uniform(0ms, 20ms)&quot;, &quot;rho&quot;: &quot;uniform(-0.0001, 0.0001)&quot;,
+    &quot;gst&quot;: &quot;3s&quot;, &quot;preGstDelay&quot;: &quot;pareto(20ms, 1.1)&quot;, &quot;roundMode&quot;: &quot;lockstep&quot;, &quot;roundLen&quot;: &quot;1s&quot;
+  },
+  &quot;violationPolicy&quot;: &quot;deliver-late&quot;,
+  &quot;tieBreak&quot;: &quot;stable&quot;,
+  &quot;haltOnAssert&quot;: false,
+  &quot;stopAt&quot;: &quot;12s&quot;
+}</code></pre>
+<ul><li><code>inputs</code> holds external events, one per line: <code>TIME NODE Event | arguments</code>, where <code>NODE</code> is a number or <code>*</code> and the arguments are DSL expressions.</li><li><code>faults</code> follows §4.1; <code>groups</code> may also be an array of arrays of node ids.</li><li><code>top</code> is the main algorithm; its interface requests are the events accepted as inputs. For each <code>uses X</code>, the first algorithm implementing <code>X</code> is instantiated.</li><li>An explicit <code>stack</code> of instances and global <code>invariants</code> are planned (Appendix B).</li></ul>
+<hr>
+<h2 id="7-user-interface">7. User interface<a class="anchor" href="#7-user-interface" aria-label="Link to this section">#</a></h2>
+<ol><li><strong>Topology editor:</strong> add and remove processes and links, drag, generators (ring, grid, complete, star, line, binary tree, random), a properties bar per node and per link.</li><li><strong>Code editor:</strong> syntax highlighting, inline diagnostics, a symbol palette, a quick reference.</li><li><strong>Timing panel:</strong> presets, <code>assumed</code> and <code>actual</code> parameters, a delay histogram with <code>bound</code> and <code>DELTA</code> markers and the share of messages exceeding <code>DELTA</code>.</li><li><strong>Animated execution on the topology:</strong><ul><li>messages travel along links as labeled packets (the first atom of the payload, e.g. <code>FLOOD</code>) with a trail; red for violations, amber for messages the network will lose, gray for messages to a crashed process;</li><li>arrival ripples on the recipient, ✕ marks where a message is lost or discarded;</li><li>processing glow while a node executes a step, a timer icon when a timeout fires, a round badge;</li><li>an output bubble when a process emits an indication, a flash when it crashes or recovers;</li><li>links interrupted by a failure or a partition drawn as dashed red lines with a ✂ mark;</li><li>clicking a packet pauses and shows its details, with shortcuts to its send and arrival times.</li></ul></li><li><strong>Playback:</strong> play, pause, previous and next event, time scrubber; speeds from 2 ms to 5 s of simulated time per second, &quot;auto&quot; (the interesting part of the run in about 25 s), and <strong>event by event</strong> (each step animated at a constant pace regardless of the time scale). Optional autoplay after each run.</li><li><strong>Interaction during playback:</strong> with a process selected, inject an event (a request of the main algorithm), a crash, a recovery or an isolation at the cursor time; with a link selected, take it down for a given duration. The simulation re-runs and continues from that point.</li><li><strong>Faults list</strong> in the Scenario tab, with a form for every fault type.</li><li><strong>Stack view:</strong> the module tree of a process with the application on top and the network at the bottom; the latest requests (down) and indications (up) between modules at the cursor, event counts per module, and a list of recent local events.</li><li><strong>Layer colors:</strong> messages and packets colored by the module that originated them, with a legend.</li><li><strong>Causality mode:</strong> clicking an event computes its causal past and future (the happened-before relation over delivered messages); the diagram shades both, fades unrelated messages and reports how many events precede, follow or are concurrent with it; the graph marks the processes the event has reached at the cursor.</li><li><strong>Space-time diagram</strong> synchronized with the cursor: processing bars, messages, violations, outputs, round lines, GST, down intervals with crash and recovery markers, shaded partitions and link failures; pan, zoom, &quot;Action&quot; and &quot;All&quot; views; hovering shows message details, clicking selects the message.</li><li><strong>State inspector:</strong> local clock, round and every variable of every instance at the cursor, with changes highlighted.</li><li><strong>Event log:</strong> filterable; clicking an entry moves the cursor.</li><li><strong>Comparison</strong> of two runs side by side (roadmap).</li></ol>
+<hr>
+<h2 id="8-architecture-and-repository">8. Architecture and repository<a class="anchor" href="#8-architecture-and-repository" aria-label="Link to this section">#</a></h2>
+<p>Target architecture (see Appendix B for what v0.x does instead):</p>
+<ul><li>TypeScript, Vite, React.</li><li>Parser: Lezer, sharing the grammar with CodeMirror 6 highlighting.</li><li>Graph: React Flow for editing, a dedicated canvas for animation beyond a few hundred nodes.</li><li>Engine in a Web Worker; PRNG <code>xoshiro128**</code> with substreams derived via <code>splitmix32</code>.</li><li>Deployment on GitHub Pages.</li></ul>
+<p>The parser and the engine have no DOM dependencies and also run under Node, which the CI uses for automated tests.</p>
+<hr>
+<h2 id="9-acceptance-criteria-mvp">9. Acceptance criteria (MVP)<a class="anchor" href="#9-acceptance-criteria-mvp" aria-label="Link to this section">#</a></h2>
+<ul><li>Same scenario and seed produce identical traces, verified in CI on every example.</li><li>With the &quot;Ideal synchronous&quot; preset no <code>TimingViolation</code> ever occurs.</li><li>With &quot;Realistic synchronous&quot; and FloodSet, some seeds produce disagreement, and the trace that causes it can be replayed.</li><li>The static checker rejects <code>DELTA</code> in the asynchronous model.</li><li>Injecting an event or a fault at time <code>t</code> leaves the trace before <code>t</code> unchanged.</li><li>Under a partition, each side of the ◇P example suspects the other side, and the suspicions are withdrawn after the partition heals and after a crashed process recovers.</li><li>Examples include at least: flooding, Chang-Roberts, FloodSet, IncreasingTimeout (◇P).</li></ul>
+<h2 id="10-roadmap">10. Roadmap<a class="anchor" href="#10-roadmap" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Version</th><th>Content</th></tr></thead><tbody><tr><td><strong>v0.1</strong></td><td>DSL, <code>Net</code>/<code>timer</code>/<code>Rounds</code>, crashes, presets, space-time diagram, time travel</td></tr><tr><td><strong>v0.2</strong></td><td>English UI, animated execution on the topology, event-by-event playback, interactive injection</td></tr><tr><td><strong>v0.3</strong></td><td>crash-recovery with <code>stable</code>, link failures and partitions over time, fault injection at the cursor</td></tr><tr><td><strong>v0.4</strong></td><td>responsive layouts and touch support, faster rendering of large runs, robustness fixes</td></tr><tr><td><strong>v0.5</strong></td><td>functions and <code>via</code> in Upon, more built-ins, module library for links and broadcast, stack view, layer colors, causality mode, full user documentation</td></tr><tr><td><strong>v0.6</strong></td><td>failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics</td></tr><tr><td><strong>v0.7</strong></td><td>algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with automatic property checks</td></tr><tr><td><strong>v1.1</strong></td><td>global invariants, node pauses and omissions, one-way link failures, side-by-side comparison</td></tr><tr><td><strong>v1.2</strong></td><td>failure detector oracles (P, ◇P, Ω) as provided modules, to study consensus on top of the abstraction</td></tr><tr><td><strong>v2</strong></td><td>Byzantine faults (adversarial nodes written in the DSL), systematic exploration of interleavings, trace export</td></tr></tbody></table></div>
+<hr>
+<h2 id="appendix-a--examples">Appendix A — Examples<a class="anchor" href="#appendix-a--examples" aria-label="Link to this section">#</a></h2>
+<h3 id="a1-floodset-synchronous-rounds-complete-graph">A.1 FloodSet (synchronous rounds, complete graph)<a class="anchor" href="#a1-floodset-synchronous-rounds-complete-graph" aria-label="Link to this section">#</a></h3>
+<pre class="code"><code>interface Consensus
+  request Propose(v)
+  indication Decide(v)
+end
+
+algorithm FloodSet
+  implements Consensus as c
+  uses Rounds as net
+  params
+    f := 1
+  state
+    W := ∅
+    decided := false
+
+  upon event ⟨c, Propose | v⟩ do
+    W := W ∪ {v}
+  end
+
+  upon event ⟨net, RoundStart | r⟩ where r ≤ f + 1 do
+    forall q in neighbors do
+      trigger ⟨net, Send | q, [VALUES, W]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [VALUES, V]⟩ do
+    W := W ∪ V
+  end
+
+  upon event ⟨net, RoundEnd | r⟩ where r = f + 1 and not decided do
+    decided := true
+    trigger ⟨c, Decide | min(W)⟩
+  end
+end</code></pre>
+<h3 id="a2-eventually-perfect-failure-detector-with-increasing-timeout-partial-synchrony">A.2 Eventually perfect failure detector with increasing timeout (partial synchrony)<a class="anchor" href="#a2-eventually-perfect-failure-detector-with-increasing-timeout-partial-synchrony" aria-label="Link to this section">#</a></h3>
+<pre class="code"><code>interface EventuallyPerfectFailureDetector
+  indication Suspect(p)
+  indication Restore(p)
+end
+
+algorithm IncreasingTimeout
+  implements EventuallyPerfectFailureDetector as epfd
+  uses PerfectLinks as pl
+  params
+    DELTA0 := 100ms
+  state
+    alive := Π
+    suspected := ∅
+    delay := DELTA0
+
+  upon event ⟨epfd, Init⟩ do
+    starttimer(t, delay)
+  end
+
+  upon event ⟨timer, Timeout | t⟩ do
+    if alive ∩ suspected ≠ ∅ then
+      delay := delay + DELTA0
+    end
+    forall p in Π do
+      if p ∉ alive and p ∉ suspected then
+        suspected := suspected ∪ {p}
+        trigger ⟨epfd, Suspect | p⟩
+      elif p ∈ alive and p ∈ suspected then
+        suspected := suspected \ {p}
+        trigger ⟨epfd, Restore | p⟩
+      end
+      trigger ⟨pl, Send | p, [HEARTBEAT_REQUEST]⟩
+    end
+    alive := ∅
+    starttimer(t, delay)
+  end
+
+  upon event ⟨pl, Deliver | q, [HEARTBEAT_REQUEST]⟩ do
+    trigger ⟨pl, Send | q, [HEARTBEAT_REPLY]⟩
+  end
+
+  upon event ⟨pl, Deliver | p, [HEARTBEAT_REPLY]⟩ do
+    alive := alive ∪ {p}
+  end
+end</code></pre>
+<p><code>IncreasingTimeout</code> does not use <code>DELTA</code>, so it compiles with <code>DELTA: unknown</code>, which is exactly the point of the algorithm under partial synchrony.</p>
+<hr>
+<h2 id="appendix-b--implementation-status-v05">Appendix B — Implementation status (v0.5)<a class="anchor" href="#appendix-b--implementation-status-v05" aria-label="Link to this section">#</a></h2>
+<h3 id="implemented">Implemented<a class="anchor" href="#implemented" aria-label="Link to this section">#</a></h3>
+<ul><li>The full DSL of §5.2, including <code>condition</code> and <code>exists</code> guards, comprehensions, maps and the ASCII syntax.</li><li>The static checks of §5.6.</li><li>The parametric timing model of §3 with its five presets, violation policies (<code>next-round</code> is covered by <code>deliver-late</code> with emulated rounds), lockstep and emulated rounds, GST with the DLS constraint.</li><li>Deterministic engine with activity trace; crashes and recoveries; link failures and partitions over time; disabled links; per-link loss and delay.</li><li>The whole UI of §7 except side-by-side comparison, in English.</li></ul>
+<h3 id="differences-from-the-specification">Differences from the specification<a class="anchor" href="#differences-from-the-specification" aria-label="Link to this section">#</a></h3>
+<div class="table"><table><thead><tr><th>Specification</th><th>v0.2</th><th>Reason</th></tr></thead><tbody><tr><td>TypeScript, Vite, React, Lezer, CodeMirror, React Flow</td><td>dependency-free JavaScript, SVG and canvas, custom highlighting editor</td><td>one static file, no build step needed to use it</td></tr><tr><td>Engine in a Web Worker</td><td>engine on the main thread, capped at 150,000 events</td><td>simplicity; enough for teaching scenarios</td></tr><tr><td>Canvas for animation beyond a few hundred nodes</td><td>SVG with a static layer redrawn only on topology changes, a separate composited layer for animations, pooled elements, and batched canvas drawing for the diagram; packets switch to a compact form when many are in flight</td><td>keeps editing simple while playing large runs smoothly</td></tr><tr><td>Periodic snapshots for time travel</td><td>the whole run is computed first and then replayed; state recorded at every step that changes it</td><td>equivalent thanks to determinism, and simpler</td></tr><tr><td>Explicit <code>stack</code> in the scenario</td><td>binding in the code: <code>via</code> when needed, otherwise the first algorithm implementing <code>X</code></td><td>the choice lives next to the code that depends on it</td></tr><tr><td>Standard library in <code>.dalg</code> files</td><td>a library of Upon modules in <code>library.js</code>, added from the editor; <code>RetransmitLinks</code> retransmits a bounded number of times</td><td>textbook stubborn links retransmit forever and make traces grow too much</td></tr><tr><td>Global invariants</td><td>local <code>assert</code> only, with an optional halt</td><td>v1.1</td></tr><tr><td>Per-node process parameters, GC pauses, <code>pauses</code></td><td>global <code>step</code> distribution only</td><td>v1.1</td></tr><tr><td>Omission failures of a process</td><td>omissions come from channel loss only</td><td>v1.1</td></tr></tbody></table></div>
+<h3 id="suggested-next-steps">Suggested next steps<a class="anchor" href="#suggested-next-steps" aria-label="Link to this section">#</a></h3>
+<ol><li>Failure detectors (P, ◇P ping-pong, Ω, φ-accrual, simplified SWIM), a suspicion matrix over time and quality metrics.</li><li>An algorithm catalog grouped by topic, with automatic checks of agreement, validity, termination and mutual exclusion.</li><li>Global invariants written by the user, checked at every step and shown on the timeline.</li><li>Node pauses, send and receive omissions, one-way link failures.</li><li>Engine in a Web Worker for larger traces.</li></ol>
+<nav class="pager"><a href="changelog.html"><small>Previous</small>Changelog</a><span></span></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/SPEC.md" target="_blank" rel="noopener">docs/SPEC.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#1-purpose">1. Purpose</a><a class="l3" href="#11-non-goals-v1">1.1 Non-goals (v1)</a><a class="l2" href="#2-core-principle-assumed-model-vs-actual-model">2. Core principle: assumed model vs actual model</a><a class="l2" href="#3-parametric-timing-model">3. Parametric timing model</a><a class="l3" href="#31-virtual-time">3.1 Virtual time</a><a class="l3" href="#32-actual-model-parameters-actual">3.2 Actual model parameters (actual)</a><a class="l3" href="#33-assumed-model-parameters-assumed">3.3 Assumed model parameters (assumed)</a><a class="l3" href="#34-distributions">3.4 Distributions</a><a class="l3" href="#35-violation-policies">3.5 Violation policies</a><a class="l3" href="#36-presets">3.6 Presets</a><a class="l3" href="#37-round-execution">3.7 Round execution</a><a class="l2" href="#4-simulation-engine">4. Simulation engine</a><a class="l3" href="#41-faults">4.1 Faults</a><a class="l2" href="#5-language-dsl">5. Language (DSL)</a><a class="l3" href="#51-lexical-structure">5.1 Lexical structure</a><a class="l3" href="#52-grammar-ebnf">5.2 Grammar (EBNF)</a><a class="l3" href="#53-semantics">5.3 Semantics</a><a class="l3" href="#54-built-ins">5.4 Built-ins</a><a class="l3" href="#55-modules-provided-by-the-simulator">5.5 Modules provided by the simulator</a><a class="l3" href="#57-module-library">5.7 Module library</a><a class="l3" href="#56-static-checks">5.6 Static checks</a><a class="l2" href="#6-scenario-json-format">6. Scenario (JSON format)</a><a class="l2" href="#7-user-interface">7. User interface</a><a class="l2" href="#8-architecture-and-repository">8. Architecture and repository</a><a class="l2" href="#9-acceptance-criteria-mvp">9. Acceptance criteria (MVP)</a><a class="l2" href="#10-roadmap">10. Roadmap</a><a class="l2" href="#appendix-a--examples">Appendix A — Examples</a><a class="l3" href="#a1-floodset-synchronous-rounds-complete-graph">A.1 FloodSet (synchronous rounds, complete graph)</a><a class="l3" href="#a2-eventually-perfect-failure-detector-with-increasing-timeout-partial-synchrony">A.2 Eventually perfect failure detector with increasing timeout (partial synchrony)</a><a class="l2" href="#appendix-b--implementation-status-v05">Appendix B — Implementation status (v0.5)</a><a class="l3" href="#implemented">Implemented</a><a class="l3" href="#differences-from-the-specification">Differences from the specification</a><a class="l3" href="#suggested-next-steps">Suggested next steps</a></aside>
+</div>
+</body>
+</html>

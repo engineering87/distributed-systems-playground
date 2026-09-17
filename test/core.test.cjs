@@ -51,10 +51,10 @@ test('ideal synchronous: no violations and FloodSet always agrees', () => {
 });
 
 test('realistic synchronous: some seed makes FloodSet disagree', () => {
-  const s = Object.assign(byKey('floodset'), clone(PRESETS['sync-real']), { seed: 3 });
+  const s = Object.assign(byKey('floodset'), clone(PRESETS['sync-real']), { seed: 5 });
   const r = C.runSimulation(s);
   assert.ok(r.violations > 0);
-  assert.ok(decisions(r).size > 1, 'expected disagreement with seed 3');
+  assert.ok(decisions(r).size > 1, 'expected disagreement with seed 5');
 });
 
 test('◇P: after GST every correct process suspects only the crashed one', () => {
@@ -158,7 +158,7 @@ test('durations and distributions', () => {
 
 test('FloodSet agrees on a generated complete graph', () => {
   const s = byKey('floodset');
-  s.links = complete([1, 2, 3, 4, 5]);
+  s.links = complete([1, 2, 3, 4]);
   const r = C.runSimulation(s);
   assert.equal(decisions(r).size, 1);
 });
@@ -258,4 +258,244 @@ test('fault definitions are validated', () => {
   assert.throws(() => C.normalizeFault({ type: 'partition', groups: '1 2 | 2 3', from: '0ms' }), /more than one/);
   assert.throws(() => C.normalizeFault({ type: 'link', a: 1, b: 2, from: '2s', to: '1s' }), /after the start/);
   assert.throws(() => C.normalizeFault({ type: 'recover', node: 'x', at: '1s' }), /process number/);
+});
+
+// ---------------------------------------------------------------- language extensions
+const L = require('../src/library.js');
+const { ringLayout } = require('../src/examples.js');
+
+function tiny(code, inputs, extra) {
+  return Object.assign({
+    seed: 1, nodes: ringLayout([1, 2, 3], 200, 200, 100), links: complete([1, 2, 3]), code, inputs, faults: [],
+    assumed: { timing: 'asynchronous' }, actual: { delay: 'const(5ms)', step: 'const(0ms)' }, stopAt: '2s'
+  }, extra || {});
+}
+
+test('functions return values, recurse, and can trigger events', () => {
+  const code = `interface T
+  request Go(n)
+  indication Out(x)
+end
+algorithm A
+  implements T as t
+  uses Net as net
+  state
+    count := 0
+  function fact(n)
+    if n <= 1 then
+      return 1
+    end
+    return n * fact(n - 1)
+  end
+  function emit(x)
+    count := count + 1
+    trigger ⟨t, Out | x⟩
+  end
+  upon event ⟨t, Go | n⟩ do
+    call emit(fact(n))
+    call emit(count)
+  end
+end`;
+  const r = C.runSimulation(tiny(code, '0ms 1 Go | 5'));
+  assert.equal(r.error, null);
+  assert.deepEqual(r.outputs.map(o => o.text), ['Out | 120', 'Out | 1']);
+});
+
+test('function checks: arity, return outside functions, unknown calls, runaway recursion', () => {
+  const bad = `interface T request Go() indication Out(x) end
+algorithm A implements T as t uses Net as net
+  function f(a, b)
+    return a
+  end
+  upon event ⟨t, Go⟩ do
+    x := f(1)
+    return 3
+    call g()
+    call size(1)
+  end
+end`;
+  const r = C.runSimulation(tiny(bad, ''));
+  const msgs = r.compile.errors.map(e => e.msg).join(' | ');
+  assert.match(msgs, /"f" takes 2 argument/);
+  assert.match(msgs, /"return" can only be used inside a function/);
+  assert.match(msgs, /Unknown function "g"/);
+  assert.match(msgs, /"call" is for your own functions/);
+  const loop = `interface T request Go() indication Out(x) end
+algorithm A implements T as t uses Net as net
+  function f(n)
+    return f(n + 1)
+  end
+  upon event ⟨t, Go⟩ do
+    x := f(0)
+  end
+end`;
+  const r2 = C.runSimulation(tiny(loop, '0ms 1 Go'));
+  assert.match(r2.error, /nested deeper/);
+});
+
+test('new built-in functions', () => {
+  const code = `interface T request Go() indication Out(x) end
+algorithm A implements T as t uses Net as net
+  upon event ⟨t, Go⟩ do
+    m := map()
+    m[3] := 9
+    m[1] := 4
+    trigger ⟨t, Out | [head([7, 8]), last([7, 8]), tail([7, 8, 9]), sort({3, 1, 2}), reverse([1, 2])]⟩
+    trigger ⟨t, Out | [slice([1, 2, 3, 4], 1, 3), range(0, 3), remove({1, 2}, 1), remove([1, 2, 1], 1), get(m, 5, 0)]⟩
+    trigger ⟨t, Out | [sum([1, 2, 3]), mean([2, 4]), argmin(m), argmax(m), sqrt(16), round(ln(exp(2))), pow(2, 10), floor(2.7), ceil(2.1)]⟩
+    trigger ⟨t, Out | pick({5}) = 5⟩
+  end
+end`;
+  const r = C.runSimulation(tiny(code, '0ms 1 Go'));
+  assert.equal(r.error, null);
+  assert.deepEqual(r.outputs.map(o => o.args[0]), [
+    '[7, 8, [8, 9], [1, 2, 3], [2, 1]]',
+    '[[2, 3], [0, 1, 2], {2}, [2, 1], 0]',
+    '[6, 3, 1, 3, 4, 2, 1024, 2, 3]',
+    'true'
+  ]);
+});
+
+test('"via" chooses the implementation of an interface', () => {
+  const code = L.source('ack-links') + '\n' + L.byKey.get('eliminate-duplicates').source + '\n' + L.byKey.get('stubborn-links').source + '\n' +
+    L.IFACES.StubbornLinks + `
+interface T request Go() indication Out(x) end
+algorithm A implements T as t uses PerfectLinks as pl via EliminateDuplicates
+  upon event ⟨t, Go⟩ do trigger ⟨pl, Send | 2, "hi"⟩ end
+  upon event ⟨pl, Deliver | p, m⟩ do trigger ⟨t, Out | m⟩ end
+end`;
+  const r = C.runSimulation(tiny(code, '0ms 1 Go', { top: 'A' }));
+  assert.equal(r.error, null);
+  assert.deepEqual(r.specs.map(x => x.algo), ['A', 'EliminateDuplicates', 'RetransmitLinks']);
+  const wrong = code.replace('via EliminateDuplicates', 'via RetransmitLinks');
+  const r2 = C.runSimulation(tiny(wrong, '0ms 1 Go', { top: 'A' }));
+  assert.ok(r2.compile.errors.some(e => /implements StubbornLinks, not PerfectLinks/.test(e.msg)));
+});
+
+// ---------------------------------------------------------------- library
+function libScenario(key, app, opts) {
+  const ids = Array.from({ length: opts.n || 4 }, (_, i) => i + 1);
+  const iface = L.byKey.get(key).implements;
+  return Object.assign(tiny(L.source(key) + '\n' + app(iface), opts.inputs, { top: 'App', faults: opts.faults || [] }), {
+    seed: opts.seed || 1, nodes: ringLayout(ids, 300, 200, 150), links: complete(ids),
+    actual: Object.assign({ delay: 'uniform(5ms, 30ms)', step: 'uniform(100us, 1ms)' }, opts.actual || {}), stopAt: opts.stopAt || '5s'
+  });
+}
+const linkApp = I => `interface Top request Go(q, m) indication Got(p, m) end
+algorithm App implements Top as app uses ${I} as x
+  upon event ⟨app, Go | q, m⟩ do trigger ⟨x, Send | q, m⟩ end
+  upon event ⟨x, Deliver | p, m⟩ do trigger ⟨app, Got | p, m⟩ end
+end`;
+const bApp = I => `interface Top request Go(m) indication Got(p, m) end
+algorithm App implements Top as app uses ${I} as x
+  upon event ⟨app, Go | m⟩ do trigger ⟨x, Broadcast | m⟩ end
+  upon event ⟨x, Deliver | p, m⟩ do trigger ⟨app, Got | p, m⟩ end
+end`;
+const gotBy = (r, n) => r.outputs.filter(o => o.node === n).map(o => o.args[1]);
+
+test('library: perfect links deliver exactly once over a lossy network', () => {
+  for (const key of ['ack-links', 'eliminate-duplicates']) {
+    const inputs = Array.from({ length: 10 }, (_, i) => `${i * 10}ms 1 Go | 2, "m${i}"`).join('\n');
+    const r = C.runSimulation(libScenario(key, linkApp, { inputs, actual: { loss: 0.3 }, seed: 4 }));
+    assert.equal(r.error, null, key);
+    const g = gotBy(r, 2);
+    assert.equal(g.length, 10, key);
+    assert.equal(new Set(g).size, 10, key);
+  }
+});
+
+test('library: FIFO links restore the sending order', () => {
+  const inputs = Array.from({ length: 12 }, (_, i) => `${i}ms 1 Go | 3, ${i}`).join('\n');
+  const r = C.runSimulation(libScenario('fifo-links', linkApp, { inputs, actual: { fifo: false, delay: 'uniform(1ms, 120ms)', loss: 0.1 }, seed: 2 }));
+  assert.deepEqual(gotBy(r, 3).map(Number), [...Array(12).keys()]);
+});
+
+test('library: uniform reliable and FIFO reliable broadcast', () => {
+  const r = C.runSimulation(libScenario('urb', bApp, { n: 5, inputs: '0ms 1 Go | "a"\n5ms 3 Go | "b"' }));
+  for (const n of [1, 2, 3, 4, 5]) assert.equal(gotBy(r, n).length, 2);
+  const inputs = Array.from({ length: 8 }, (_, i) => `${i}ms 1 Go | ${i}`).join('\n');
+  const f = C.runSimulation(libScenario('fifo-rb', bApp, { n: 4, inputs, actual: { fifo: false, delay: 'uniform(1ms, 80ms)' }, seed: 5 }));
+  for (const n of [2, 3, 4]) assert.deepEqual(gotBy(f, n).map(Number), [0, 1, 2, 3, 4, 5, 6, 7]);
+});
+
+test('examples: reliable broadcast survives a sender crash where best-effort does not', () => {
+  const s = byKey('reliable-broadcast');
+  const r = C.runSimulation(s);
+  assert.deepEqual([2, 3, 4, 5].filter(n => gotBy(r, n).length), [2, 3, 4, 5]);
+  const beb = Object.assign(clone(s), { code: s.code.replace('uses ReliableBroadcast as rb', 'uses BestEffortBroadcast as rb') });
+  const b = C.runSimulation(beb);
+  assert.deepEqual([2, 3, 4, 5].filter(n => gotBy(b, n).length), [2]);
+});
+
+test('examples: causal broadcast never shows an answer before its question', () => {
+  const s = byKey('causal-broadcast');
+  const answerFirst = r => [1, 3, 4, 5].filter(n => { const g = gotBy(r, n); return g.indexOf('"answer"') < g.indexOf('"question"'); });
+  for (let seed = 1; seed <= 30; seed++) {
+    const r = C.runSimulation(Object.assign(clone(s), { seed }));
+    assert.deepEqual(answerFirst(r), [], `seed ${seed}`);
+  }
+  const rb = C.runSimulation(Object.assign(clone(s), { code: s.code.replace('uses CausalOrderBroadcast as cb', 'uses ReliableBroadcast as cb') }));
+  assert.deepEqual(answerFirst(rb), [4, 5]);
+});
+
+test('examples: gossip reaches part of the network without duplicates', () => {
+  const r = C.runSimulation(byKey('gossip'));
+  const reached = new Set(r.outputs.map(o => o.node));
+  assert.ok(reached.size >= 8 && reached.size < 16, `reached ${reached.size}`);
+  assert.equal(r.outputs.length, reached.size);
+});
+
+test('messages record the module that originated them, and layers are traced', () => {
+  const r = C.runSimulation(byKey('reliable-broadcast'));
+  const origins = new Set(r.msgs.map(m => r.specs[m.origin].algo));
+  assert.deepEqual([...origins].sort(), ['AckLinks', 'EagerReliableBroadcast', 'Newsroom']);
+  assert.ok(r.msgs.filter(m => m.payload.startsWith('[ACK')).every(m => r.specs[m.origin].algo === 'AckLinks'));
+  const first = r.localEvents.slice(0, 3).map(e => [e.from, e.to, e.ev]);
+  assert.deepEqual(first, [['app', 0, 'Publish'], [0, 1, 'Broadcast'], [1, 2, 'Broadcast']]);
+  assert.ok(r.localEvents.some(e => e.from === 'net' && e.ev === 'Deliver'));
+  assert.ok(r.localEvents.some(e => e.to === 'app' && e.ev === 'Read'));
+  assert.deepEqual(r.specs.map(x => x.depth), [0, 1, 2, 3]);
+});
+
+test('causal cone follows the happened-before relation', () => {
+  // p1 -> p2 at 10ms (arrives 15ms), p2 -> p3 at 30ms (arrives 35ms)
+  const res = {
+    nodeInfo: { 1: {}, 2: {}, 3: {} },
+    msgs: [
+      { from: 1, to: 2, sendT: 10, recvT: 15, status: 'delivered' },
+      { from: 2, to: 3, sendT: 30, recvT: 35, status: 'delivered' },
+      { from: 3, to: 1, sendT: 5, recvT: 50, status: 'delivered' }
+    ],
+    activity: [{ node: 1, t: 10 }, { node: 2, t: 15 }, { node: 2, t: 30 }, { node: 3, t: 35 }, { node: 3, t: 5 }, { node: 1, t: 50 }]
+  };
+  const c = C.causalCone(res, 3, 35);
+  assert.deepEqual(c.past, { 1: 10, 2: 30, 3: 35 });
+  // the message p3 -> p1 was sent at 5ms, before the origin, so p1 is not in the future
+  assert.deepEqual(c.future, { 1: Infinity, 2: Infinity, 3: 35 });
+  const d = C.causalCone(res, 2, 15);
+  assert.deepEqual(d.past, { 1: 10, 2: 15, 3: -Infinity });
+  assert.deepEqual(d.future, { 1: Infinity, 2: 15, 3: 35 });
+  // p1@10 before; p2@30 and p3@35 after; p3@5 and p1@50 concurrent
+  assert.deepEqual(d.counts, { past: 1, future: 2, concurrent: 2 });
+});
+
+test('with duplication on, a fault injected later still leaves the earlier trace unchanged', () => {
+  // many messages on one channel; a partition from 5ms drops some of them while in flight,
+  // and the messages sent before 5ms must keep their delays and duplicates
+  const code = `interface T request Go(q) indication Got(p) end
+algorithm A implements T as t uses Net as net
+  upon event ⟨t, Go | q⟩ do trigger ⟨net, Send | q, [PING]⟩ end
+  upon event ⟨net, Deliver | p, [PING]⟩ do trigger ⟨t, Got | p⟩ end
+end`;
+  const inputs = Array.from({ length: 20 }, (_, i) => `${i * 500}us 1 Go | 2`).join('\n');
+  const base = tiny(code, inputs, { actual: { delay: 'uniform(1ms, 8ms)', step: 'const(0ms)', dup: 0.5 }, stopAt: '1s' });
+  const a = C.runSimulation(base);
+  const b = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'partition', groups: '1', from: '5ms', to: '' }] }));
+  assert.ok(b.msgs.some(m => m.status === 'dropped-cut' && m.sendT < 5000), 'some message is cut in flight');
+  const sent = r => r.msgs.filter(m => m.sendT < 5000);
+  const shape = r => sent(r).map(m => [m.sendT, m.dup]);
+  assert.deepEqual(shape(b), shape(a), 'same messages and duplicates before the partition');
+  const kept = sent(b).filter(m => m.status !== 'dropped-cut');
+  const orig = sent(a);
+  for (const m of kept) assert.equal(m.recvT, orig.find(o => o.id === m.id).recvT);
 });

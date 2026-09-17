@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The module library · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: The module library.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html" aria-current="page">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="the-module-library">The module library<a class="anchor" href="#the-module-library" aria-label="Link to this section">#</a></h1>
+<p>The library contains communication abstractions written in Upon: links that hide message loss, and several kinds of broadcast. You add them from the <em>Add module</em> menu in the <em>Code</em> tab, and then build on them with a <code>uses</code> clause.</p>
+<p>Most modules follow the algorithms in Cachin, Guerraoui and Rodrigues, <em>Introduction to Reliable and Secure Distributed Programming</em> (2nd edition, Springer, 2011), where you will find the proofs. This page describes what each module does, what it sends over the network, what it guarantees, and where it departs from the book. The departures are also collected in <a href="assumptions.html#the-module-library">Assumptions and simplifications</a>.</p>
+<h2 id="using-the-library">Using the library<a class="anchor" href="#using-the-library" aria-label="Link to this section">#</a></h2>
+<p>Choosing a module in <em>Add module</em> appends to your code:</p>
+<ul><li>the interfaces it implements and uses, if they are not declared yet;</li><li>for every interface it uses that nothing in your code implements, a default module that does (for example, <em>EagerReliableBroadcast</em> brings <em>BasicBroadcast</em>, which brings <em>AckLinks</em>);</li><li>the module itself.</li></ul>
+<p>Then use it from your algorithm:</p>
+<pre class="code lang-upon"><code><span class="t-kw">interface</span> <span class="t-ty">ReliableBroadcast</span>
+  <span class="t-kw">request</span> <span class="t-ty">Broadcast</span>(m)
+  <span class="t-kw">indication</span> <span class="t-ty">Deliver</span>(p, m)
+<span class="t-kw">end</span>
+
+<span class="t-kw">interface</span> <span class="t-ty">Chat</span>
+  <span class="t-kw">request</span> <span class="t-ty">Say</span>(text)
+  <span class="t-kw">indication</span> <span class="t-ty">Heard</span>(from, text)
+<span class="t-kw">end</span>
+
+<span class="t-kw">algorithm</span> <span class="t-ty">ChatRoom</span>
+  <span class="t-kw">implements</span> <span class="t-ty">Chat</span> <span class="t-kw">as</span> app
+  <span class="t-kw">uses</span> <span class="t-ty">ReliableBroadcast</span> <span class="t-kw">as</span> rb
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>app, <span class="t-ty">Say</span> | text<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>rb, <span class="t-ty">Broadcast</span> | text<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>rb, <span class="t-ty">Deliver</span> | p, text<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>app, <span class="t-ty">Heard</span> | p, text<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+<span class="t-kw">end</span></code></pre>
+<p>Everything added is ordinary Upon. You can read it, change a parameter, add a <code>log</code> statement, or step through it in the <em>Stack</em> tab.</p>
+<p>If the code already contains an algorithm with the same name, the module is not added again. To keep two variants, rename one of them.</p>
+<h2 id="overview">Overview<a class="anchor" href="#overview" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Module</th><th>Implements</th><th>Uses</th><th>Guarantees</th><th>Messages per operation</th></tr></thead><tbody><tr><td>RetransmitLinks</td><td>StubbornLinks</td><td>Net</td><td>each message resent a fixed number of times</td><td>1 + retries</td></tr><tr><td>EliminateDuplicates</td><td>PerfectLinks</td><td>StubbornLinks</td><td>reliable delivery, no duplicates</td><td>as below it</td></tr><tr><td>AckLinks</td><td>PerfectLinks</td><td>Net</td><td>reliable delivery to correct processes, no duplicates</td><td>1 + retransmissions, plus acks</td></tr><tr><td>SequencedFifoLinks</td><td>FifoPerfectLinks</td><td>PerfectLinks</td><td>perfect links, delivered in sending order</td><td>as below it</td></tr><tr><td>BasicBroadcast</td><td>BestEffortBroadcast</td><td>PerfectLinks</td><td>everyone delivers if the sender stays correct</td><td>N</td></tr><tr><td>EagerReliableBroadcast</td><td>ReliableBroadcast</td><td>BestEffortBroadcast</td><td>all correct processes deliver, or none</td><td>up to N²</td></tr><tr><td>MajorityAckURB</td><td>UniformReliableBroadcast</td><td>BestEffortBroadcast</td><td>if anyone delivers, all correct processes deliver</td><td>up to N²</td></tr><tr><td>BroadcastWithSequenceNumber</td><td>FifoReliableBroadcast</td><td>ReliableBroadcast</td><td>reliable broadcast, FIFO per sender</td><td>as below it</td></tr><tr><td>WaitingCausalBroadcast</td><td>CausalOrderBroadcast</td><td>ReliableBroadcast</td><td>reliable broadcast, causal order</td><td>as below it</td></tr><tr><td>EagerGossip</td><td>ProbabilisticBroadcast</td><td>Net</td><td>most processes deliver, with high probability</td><td>at most FANOUT per forwarding process</td></tr></tbody></table></div>
+<p><em>N</em> is the number of processes. Counts are for one broadcast or one send on a reliable network; losses add retransmissions.</p>
+<h2 id="links">Links<a class="anchor" href="#links" aria-label="Link to this section">#</a></h2>
+<p><code>Net</code> is a <em>fair-loss</em> link: with loss enabled, any message can disappear. The link modules build stronger guarantees on top of it.</p>
+<h3 id="retransmitlinks">RetransmitLinks<a class="anchor" href="#retransmitlinks" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> StubbornLinks · <strong>Uses</strong> Net · <strong>Parameters</strong> <code>PERIOD := 100ms</code>, <code>RETRIES := 5</code></p>
+<p>Sends each message immediately, then again every <code>PERIOD</code>, <code>RETRIES</code> more times. It delivers everything it receives, duplicates included.</p>
+<p><strong>On the wire:</strong> the message itself, unchanged.</p>
+<p><strong>Guarantees:</strong> a message to a correct process is delivered many times, unless every copy is lost.</p>
+<p><strong>Differences from the book.</strong> The book's <em>Retransmit Forever</em> never stops resending, which gives <em>stubborn delivery</em>: a correct recipient receives the message infinitely often. Here retransmission stops after <code>RETRIES</code>, so runs stay finite. With a loss rate <em>p</em>, a message is lost for good with probability <em>p</em> raised to <code>RETRIES + 1</code>. Messages are identified by content, so sending the same message to the same process twice restarts its retransmission count instead of starting a second series.</p>
+<h3 id="eliminateduplicates">EliminateDuplicates<a class="anchor" href="#eliminateduplicates" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> PerfectLinks · <strong>Uses</strong> StubbornLinks</p>
+<p>Remembers every (sender, message) pair it has delivered and drops repeats.</p>
+<p><strong>On the wire:</strong> whatever the stubborn links send.</p>
+<p><strong>Guarantees:</strong> reliable delivery (within the limits of RetransmitLinks), no duplication, no creation.</p>
+<p><strong>Assumption:</strong> every message is unique, as in the book. If the application sends the same payload twice to the same process, the second one is taken for a duplicate. Add a sequence number to the payload, or use AckLinks.</p>
+<h3 id="acklinks">AckLinks<a class="anchor" href="#acklinks" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> PerfectLinks · <strong>Uses</strong> Net · <strong>Parameter</strong> <code>TIMEOUT := 150ms</code></p>
+<p>Numbers each outgoing message, keeps it until the recipient acknowledges it, and resends every pending message every <code>TIMEOUT</code>. The recipient acknowledges every copy and delivers each number only once.</p>
+<p><strong>On the wire:</strong> <code>[DATA, n, m]</code> for data, <code>[ACK, n]</code> for acknowledgements. <code>n</code> counts the messages sent by this process, across all recipients.</p>
+<p><strong>Guarantees:</strong> a message to a correct process is delivered exactly once, whatever the loss rate below 1. No creation.</p>
+<p><strong>Not in the book.</strong> This is the usual engineering version of perfect links, added because it handles repeated payloads and stops retransmitting once a message is acknowledged. It keeps resending to a crashed process until the end of the run, since it cannot tell a crash from a slow network. It has no flow control and no congestion control.</p>
+<p>It is the default implementation of PerfectLinks when a module needs one.</p>
+<h3 id="sequencedfifolinks">SequencedFifoLinks<a class="anchor" href="#sequencedfifolinks" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> FifoPerfectLinks · <strong>Uses</strong> PerfectLinks</p>
+<p>Numbers messages per destination. The recipient buffers what arrives and delivers the messages from each sender in order, without gaps.</p>
+<p><strong>On the wire:</strong> <code>[FIFO, n, m]</code> inside whatever the perfect links send, with <code>n</code> counted per destination from 0.</p>
+<p><strong>Guarantees:</strong> those of perfect links, plus FIFO order for each pair of processes.</p>
+<p><strong>Note:</strong> a gap blocks every later message from the same sender. With AckLinks underneath, gaps are always filled eventually, unless the sender crashes.</p>
+<h2 id="broadcast">Broadcast<a class="anchor" href="#broadcast" aria-label="Link to this section">#</a></h2>
+<p>All broadcast modules except EagerGossip send to every process in <code>Π</code>, including the sender. They need a <strong>complete graph</strong>: on other topologies, messages to non-neighbors are dropped by the network.</p>
+<p>Every broadcast module identifies a message by its original sender and a sequence number. The sequence numbers restart from zero after a recovery, because the modules do not declare them <code>stable</code>.</p>
+<h3 id="basicbroadcast">BasicBroadcast<a class="anchor" href="#basicbroadcast" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> BestEffortBroadcast · <strong>Uses</strong> PerfectLinks</p>
+<p>Sends the message to every process over perfect links, and delivers what it receives.</p>
+<p><strong>On the wire:</strong> the message, through the perfect links.</p>
+<p><strong>Guarantees:</strong> <em>validity</em> (if the sender is correct, every correct process delivers), <em>no duplication</em>, <em>no creation</em>.</p>
+<p><strong>What it does not guarantee:</strong> if the sender crashes before its message reaches everyone, some correct processes deliver and others never do. The <a href="examples.html#reliable-broadcast-when-the-sender-crashes">reliable broadcast example</a> shows this with BasicBroadcast in place of the reliable version.</p>
+<h3 id="eagerreliablebroadcast">EagerReliableBroadcast<a class="anchor" href="#eagerreliablebroadcast" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> ReliableBroadcast · <strong>Uses</strong> BestEffortBroadcast</p>
+<p>Delivers a message the first time it sees it and immediately rebroadcasts it, so every correct process becomes a relay.</p>
+<p><strong>On the wire:</strong> <code>[RB, s, n, m]</code>, where <code>s</code> is the original sender and <code>n</code> its sequence number.</p>
+<p><strong>Guarantees:</strong> <em>validity</em>, <em>no duplication</em>, <em>no creation</em>, and <em>agreement</em>: if a correct process delivers a message, every correct process delivers it. It needs no failure detector.</p>
+<p><strong>Cost:</strong> each process relays each message once, so up to N² messages per broadcast. The book's <em>Lazy Reliable Broadcast</em> relays only when the sender is suspected, which costs less but needs a perfect failure detector; it is not in the library yet.</p>
+<p><strong>What it does not guarantee:</strong> <em>uniform</em> agreement. A process may deliver a message and then crash before its relay reaches anyone. If nobody else got the message, the crashed process delivered something the others never will.</p>
+<h3 id="majorityackurb">MajorityAckURB<a class="anchor" href="#majorityackurb" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> UniformReliableBroadcast · <strong>Uses</strong> BestEffortBroadcast</p>
+<p>Relays every message once, like EagerReliableBroadcast, but delivers it only after more than half of the processes have relayed it.</p>
+<p><strong>On the wire:</strong> <code>[URB, s, n, m]</code>.</p>
+<p><strong>Guarantees:</strong> those of reliable broadcast, plus <em>uniform agreement</em>: if <strong>any</strong> process delivers a message, even one that crashes right after, every correct process delivers it.</p>
+<p><strong>Assumption:</strong> a majority of the processes is correct. If half or more crash, the remaining processes stop delivering new messages. That is the price of uniformity without a failure detector.</p>
+<p><strong>How it works:</strong> a relay reaching a majority means that at least one correct process has the message and will relay it to everyone.</p>
+<h3 id="broadcastwithsequencenumber">BroadcastWithSequenceNumber<a class="anchor" href="#broadcastwithsequencenumber" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> FifoReliableBroadcast · <strong>Uses</strong> ReliableBroadcast</p>
+<p>Numbers the messages of each sender, holds back messages that arrive early, and delivers each sender's messages in order.</p>
+<p><strong>On the wire:</strong> <code>[FIFO, n, m]</code> inside the reliable broadcast, with <code>n</code> counted per sender from 1.</p>
+<p><strong>Guarantees:</strong> those of reliable broadcast, plus <em>FIFO order</em>: two messages from the same sender are delivered in the order they were sent. Messages from different senders can interleave in any way.</p>
+<h3 id="waitingcausalbroadcast">WaitingCausalBroadcast<a class="anchor" href="#waitingcausalbroadcast" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> CausalOrderBroadcast · <strong>Uses</strong> ReliableBroadcast</p>
+<p>Attaches a vector clock to every message and delivers a message only after everything it causally depends on has been delivered.</p>
+<p><strong>On the wire:</strong> <code>[CRB, W, m]</code>, where <code>W</code> maps each process to the number of its messages the sender had delivered when broadcasting, plus the sender's own count.</p>
+<p><strong>Guarantees:</strong> those of reliable broadcast, plus <em>causal order</em>: if message <em>m1</em> may have influenced message <em>m2</em>, every process delivers <em>m1</em> before <em>m2</em>.</p>
+<p><strong>How it works:</strong> each process counts, per sender, how many messages it has delivered (<code>V</code>). A pending message with vector <code>W</code> can be delivered when <code>W ≤ V</code> in every entry.</p>
+<p><strong>Limitations:</strong> a message whose dependency is lost for good stays pending forever. Vector clocks grow with the number of processes and are never compacted.</p>
+<p>The <a href="examples.html#causal-order-broadcast-questions-before-answers">causal broadcast example</a> shows the difference from plain reliable broadcast.</p>
+<h3 id="eagergossip">EagerGossip<a class="anchor" href="#eagergossip" aria-label="Link to this section">#</a></h3>
+<p><strong>Implements</strong> ProbabilisticBroadcast · <strong>Uses</strong> Net · <strong>Parameters</strong> <code>FANOUT := 2</code>, <code>ROUNDS := 4</code></p>
+<p>The sender delivers the message and forwards it to <code>FANOUT</code> random neighbors. A process that receives it for the first time delivers it and forwards it to <code>FANOUT</code> random neighbors, until the message has travelled <code>ROUNDS</code> hops.</p>
+<p><strong>On the wire:</strong> <code>[GOSSIP, s, n, m, r]</code>, where <code>r</code> counts the hops left.</p>
+<p><strong>Guarantees:</strong> <em>probabilistic validity</em>: with suitable parameters, most correct processes deliver, with high probability. <em>No duplication</em> and <em>no creation</em> hold always.</p>
+<p><strong>Differences from the book.</strong> The book's <em>Eager Probabilistic Broadcast</em> picks targets among all processes over fair-loss links. This version picks among <code>neighbors</code>, so it works on sparse topologies, and it sends directly over <code>Net</code>. It never retries: a lost gossip message is simply one fewer path.</p>
+<p><strong>Tuning:</strong> raising <code>FANOUT</code> or <code>ROUNDS</code> reaches more processes and costs more messages. The <a href="examples.html#gossip-spreading-a-rumor">gossip example</a> is a good place to compare.</p>
+<h2 id="choosing-a-module">Choosing a module<a class="anchor" href="#choosing-a-module" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>You need</th><th>Use</th></tr></thead><tbody><tr><td>to send to one process over a lossy network</td><td>AckLinks</td></tr><tr><td>the same, in order</td><td>SequencedFifoLinks</td></tr><tr><td>to reach everyone while the sender stays up</td><td>BasicBroadcast</td></tr><tr><td>to reach all correct processes even if the sender crashes</td><td>EagerReliableBroadcast</td></tr><tr><td>the same, including messages delivered by processes that then crash</td><td>MajorityAckURB</td></tr><tr><td>each sender's messages in order</td><td>BroadcastWithSequenceNumber</td></tr><tr><td>replies never delivered before the messages they answer</td><td>WaitingCausalBroadcast</td></tr><tr><td>to reach most processes cheaply, on any topology</td><td>EagerGossip</td></tr></tbody></table></div>
+<h2 id="writing-your-own">Writing your own<a class="anchor" href="#writing-your-own" aria-label="Link to this section">#</a></h2>
+<p>A library module is an ordinary algorithm with a clear interface. To add one to <code>src/library.js</code>:</p>
+<ol><li>Write the interface, if it is new, in <code>IFACES</code>.</li><li>Add an entry to <code>MODULES</code> with its key, name, the interface it implements, the interfaces it uses, a one-line summary, its guarantees and its source.</li><li>If it should be the default for its interface, set it in <code>DEFAULT_FOR</code>.</li><li>Add a test in <code>test/core.test.cjs</code> that checks its guarantee under the conditions it is meant to survive: loss, reordering, crashes.</li><li>Document it on this page, including anything that differs from the textbook version.</li></ol>
+<p>See <a href="contributing.html">CONTRIBUTING.md</a> for the rest of the workflow.</p>
+<nav class="pager"><a href="language.html"><small>Previous</small>The Upon language</a><a href="timing-model.html" style="text-align:right"><small>Next</small>The timing model</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/library.md" target="_blank" rel="noopener">docs/library.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#using-the-library">Using the library</a><a class="l2" href="#overview">Overview</a><a class="l2" href="#links">Links</a><a class="l3" href="#retransmitlinks">RetransmitLinks</a><a class="l3" href="#eliminateduplicates">EliminateDuplicates</a><a class="l3" href="#acklinks">AckLinks</a><a class="l3" href="#sequencedfifolinks">SequencedFifoLinks</a><a class="l2" href="#broadcast">Broadcast</a><a class="l3" href="#basicbroadcast">BasicBroadcast</a><a class="l3" href="#eagerreliablebroadcast">EagerReliableBroadcast</a><a class="l3" href="#majorityackurb">MajorityAckURB</a><a class="l3" href="#broadcastwithsequencenumber">BroadcastWithSequenceNumber</a><a class="l3" href="#waitingcausalbroadcast">WaitingCausalBroadcast</a><a class="l3" href="#eagergossip">EagerGossip</a><a class="l2" href="#choosing-a-module">Choosing a module</a><a class="l2" href="#writing-your-own">Writing your own</a></aside>
+</div>
+</body>
+</html>

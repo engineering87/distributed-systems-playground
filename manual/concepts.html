@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concepts · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: Concepts.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html" aria-current="page">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="concepts">Concepts<a class="anchor" href="#concepts" aria-label="Link to this section">#</a></h1>
+<p>This page is a short course in the ideas the playground is built around. Each section explains a concept, points to the literature, and ends with <em>In the playground</em>: where you can see the concept at work. It does not replace a textbook; the <a href="#further-reading">references</a> at the end are good places to go deeper.</p>
+<h2 id="processes-and-messages">Processes and messages<a class="anchor" href="#processes-and-messages" aria-label="Link to this section">#</a></h2>
+<p>A distributed system is a set of <strong>processes</strong> that run independently and cooperate by exchanging <strong>messages</strong>. A process can be a program on a server, a phone, a sensor. What makes the system distributed is that processes share no memory: the only way to learn about another process is to receive a message from it.</p>
+<p>That single fact explains most of the difficulty. A message describes the sender's state at the moment it was sent; by the time it arrives, that state may have changed, or the sender may have stopped.</p>
+<p><strong>In the playground.</strong> Processes are the numbered circles on the graph; <code>Π</code> is the set of all of them. Messages travel along links as packets. A process only sees what arrives in its <code>Deliver</code> handlers.</p>
+<h2 id="events-and-handlers">Events and handlers<a class="anchor" href="#events-and-handlers" aria-label="Link to this section">#</a></h2>
+<p>Textbook distributed algorithms are usually written in an <strong>event-driven</strong> style. A process does nothing on its own: it reacts to events, such as a message arriving, a timer expiring or a request from the application, by updating its state and triggering new events.</p>
+<p>This style has two advantages. It matches how real systems are built, around event loops. And it makes the algorithm easy to reason about, because each handler is a small atomic piece of code.</p>
+<p><strong>In the playground.</strong> Upon is this style made executable. Each <code>upon event</code> block is a handler. A process handles one event at a time, as a <em>step</em>, and the diagram shows each step as a short bar on the process line. See <a href="engine.html#anatomy-of-a-step">How the engine works</a>.</p>
+<h2 id="time-without-a-shared-clock">Time without a shared clock<a class="anchor" href="#time-without-a-shared-clock" aria-label="Link to this section">#</a></h2>
+<h3 id="physical-clocks">Physical clocks<a class="anchor" href="#physical-clocks" aria-label="Link to this section">#</a></h3>
+<p>Every computer has a clock, and no two clocks agree. They start with different <strong>offsets</strong> and run at slightly different rates, called <strong>drift</strong>. Clock synchronization protocols reduce the difference, but cannot remove it. An algorithm that compares timestamps from different machines inherits this error.</p>
+<h3 id="causality">Causality<a class="anchor" href="#causality" aria-label="Link to this section">#</a></h3>
+<p>In 1978 Leslie Lamport observed that what usually matters is not <em>when</em> something happened but <em>what could have influenced what</em>. Event <em>a</em> <strong>happened before</strong> event <em>b</em> if <em>a</em> and <em>b</em> are on the same process and <em>a</em> came first, or if <em>a</em> sent a message that was received at or before <em>b</em>, directly or through a chain of such messages. When neither happened before the other, the two events are <strong>concurrent</strong>: no information could have flowed between them, so their order does not matter to the system.</p>
+<p>A <strong>space-time diagram</strong> draws exactly this: one line per process, arrows for messages. <em>a</em> happened before <em>b</em> if you can go from <em>a</em> to <em>b</em> moving forward along lines and arrows.</p>
+<h3 id="logical-clocks">Logical clocks<a class="anchor" href="#logical-clocks" aria-label="Link to this section">#</a></h3>
+<p>A <strong>Lamport clock</strong> is a counter that each process increments at every event and attaches to every message; on receipt, a process sets its counter above the one received. If <em>a</em> happened before <em>b</em>, <em>a</em> has the smaller timestamp. The converse does not hold.</p>
+<p>A <strong>vector clock</strong>, introduced independently by Fidge and Mattern, keeps one counter per process. Comparing two vectors tells exactly whether two events are causally related or concurrent.</p>
+<p><strong>In the playground.</strong></p>
+<ul><li>Each process has a local clock with its own offset and drift, readable with <code>now()</code>. See <a href="timing-model.html">The timing model</a>.</li><li>The diagram is a space-time diagram. <strong>Causality</strong> mode shades, for any event you click, the part of the history that happened before it and the part that happened after it; the rest is concurrent.</li><li><em>WaitingCausalBroadcast</em> in the <a href="library.html#waitingcausalbroadcast">library</a> uses vector clocks.</li></ul>
+<h2 id="failures">Failures<a class="anchor" href="#failures" aria-label="Link to this section">#</a></h2>
+<p>A distributed system can fail in part: some processes or links stop working while the rest continue. The literature classifies failures by how badly a component can misbehave.</p>
+<div class="table"><table><thead><tr><th>Model</th><th>A faulty process can</th></tr></thead><tbody><tr><td>Crash-stop</td><td>stop and never come back</td></tr><tr><td>Crash-recovery</td><td>stop, then restart, losing what was not on stable storage</td></tr><tr><td>Omission</td><td>fail to send or receive some messages</td></tr><tr><td>Byzantine</td><td>behave arbitrarily, including lying</td></tr></tbody></table></div>
+<p>Links are classified in the same spirit:</p>
+<div class="table"><table><thead><tr><th>Link</th><th>Guarantee</th></tr></thead><tbody><tr><td>Fair-loss</td><td>messages can be lost, but a message sent infinitely often is delivered infinitely often</td></tr><tr><td>Stubborn</td><td>a message sent once is delivered infinitely often</td></tr><tr><td>Perfect (reliable)</td><td>a message sent between correct processes is delivered exactly once</td></tr></tbody></table></div>
+<p>Stronger links are built on weaker ones with retransmission and duplicate elimination.</p>
+<p>A process is <strong>correct</strong> if it never fails during the run; otherwise it is <strong>faulty</strong>. Most properties are stated for correct processes only.</p>
+<p><strong>In the playground.</strong> Crashes, recoveries, link failures and partitions are described in <a href="faults.html">Faults</a>. <code>Net</code> behaves as a fair-loss link when loss is enabled; the library builds stubborn and perfect links on top of it. Byzantine and omission failures of processes are not modeled.</p>
+<h2 id="timing-models">Timing models<a class="anchor" href="#timing-models" aria-label="Link to this section">#</a></h2>
+<p>What an algorithm can do depends on what it may assume about time.</p>
+<p><strong>Synchronous.</strong> There are known bounds on message delay, on processing time and on clock drift. An algorithm can wait for a bounded time and conclude that a silent process has crashed. Many algorithms are written in <strong>rounds</strong>: in each round, every process sends, receives and computes.</p>
+<p><strong>Asynchronous.</strong> No bounds at all. This is the safest assumption, because it holds everywhere, but it is also very weak. Fischer, Lynch and Paterson proved in 1985 that in an asynchronous system no deterministic algorithm can guarantee consensus if even one process may crash. The reason is that a crashed process cannot be told apart from a slow one.</p>
+<p><strong>Partially synchronous.</strong> Bounds exist but are not known, or hold only after an unknown <strong>Global Stabilization Time</strong>. Dwork, Lynch and Stockmeyer introduced this model in 1988 and showed that consensus is possible in it. Practical protocols such as Paxos and Raft are designed for this setting: they never violate safety, and they make progress once the network behaves.</p>
+<p><strong>In the playground.</strong> The <em>Timing</em> tab separates the model the algorithm assumes from the behavior of the simulated network, so you can see what happens when the assumption is wrong. See <a href="timing-model.html">The timing model</a>.</p>
+<h2 id="failure-detectors">Failure detectors<a class="anchor" href="#failure-detectors" aria-label="Link to this section">#</a></h2>
+<p>Chandra and Toueg proposed in 1996 to package timing assumptions into a module, the <strong>failure detector</strong>, that tells each process which others it suspects of having crashed. A failure detector may be wrong; its classes are defined by how wrong.</p>
+<ul><li><strong>Completeness</strong>: crashed processes are eventually suspected. <em>Strong completeness</em>: every crashed process is eventually suspected forever by every correct process.</li><li><strong>Accuracy</strong>: correct processes are not suspected. <em>Strong accuracy</em>: never. <em>Eventual strong accuracy</em>: after some time, never again.</li></ul>
+<div class="table"><table><thead><tr><th>Detector</th><th>Completeness</th><th>Accuracy</th></tr></thead><tbody><tr><td>P (perfect)</td><td>strong</td><td>strong</td></tr><tr><td>◇P (eventually perfect)</td><td>strong</td><td>eventual strong</td></tr></tbody></table></div>
+<p>A perfect detector can be built in a synchronous system. An eventually perfect one can be built under partial synchrony: suspect a process after a timeout, and increase the timeout every time a suspicion turns out to be wrong. Chandra, Hadzilacos and Toueg later showed that <strong>Ω</strong>, a detector that eventually points every correct process to the same correct leader, is the weakest one that makes consensus solvable.</p>
+<p><strong>In the playground.</strong> The two ◇P examples implement the increasing-timeout detector. Before GST it makes mistakes; afterwards it stabilizes. The partition example shows that a partition looks exactly like a crash of the other side.</p>
+<h2 id="safety-and-liveness">Safety and liveness<a class="anchor" href="#safety-and-liveness" aria-label="Link to this section">#</a></h2>
+<p>Properties of distributed algorithms come in two kinds.</p>
+<ul><li>A <strong>safety</strong> property says that nothing bad ever happens: two processes never decide different values, a message is never delivered twice. If it is violated, there is a finite moment where it went wrong.</li><li>A <strong>liveness</strong> property says that something good eventually happens: every correct process eventually decides, every message is eventually delivered. It can never be violated at a finite moment, because the good thing might still happen later.</li></ul>
+<p>The distinction matters when reading a run. A single run can show that a safety property was violated. It can never prove that a liveness property holds, and it can only suggest that one fails, because the run ends.</p>
+<p><strong>In the playground.</strong> Agreement in FloodSet is a safety property; the <em>Realistic synchronous</em> run shows it violated. A run that ends before a process delivers does not by itself violate a liveness property; the simulated duration may simply be too short. See also <a href="assumptions.html#what-the-playground-is-not">What the playground is not</a>.</p>
+<h2 id="layers-of-abstraction">Layers of abstraction<a class="anchor" href="#layers-of-abstraction" aria-label="Link to this section">#</a></h2>
+<p>Complex algorithms are built from simpler ones. A module offers an <strong>interface</strong>, a set of requests it accepts and indications it emits, together with properties it guarantees. Modules above it rely on those properties and never look inside.</p>
+<p>A typical stack: fair-loss links, then perfect links, then best-effort broadcast, then reliable broadcast, then an application. Each layer adds a guarantee.</p>
+<p><strong>In the playground.</strong> Each Upon algorithm implements one interface and uses others. The <em>Stack</em> tab draws the resulting tree for any process and animates the events flowing between modules. <strong>Layers</strong> colors network messages by the module that started them.</p>
+<h2 id="broadcast">Broadcast<a class="anchor" href="#broadcast" aria-label="Link to this section">#</a></h2>
+<p>Broadcast sends a message to all processes. The guarantees vary:</p>
+<div class="table"><table><thead><tr><th>Abstraction</th><th>Adds</th></tr></thead><tbody><tr><td>Best-effort</td><td>if the sender is correct, every correct process delivers</td></tr><tr><td>Reliable</td><td>if any correct process delivers, every correct process delivers, even if the sender crashed</td></tr><tr><td>Uniform reliable</td><td>if any process delivers, even one that then crashes, every correct process delivers</td></tr><tr><td>FIFO</td><td>messages of the same sender are delivered in sending order</td></tr><tr><td>Causal</td><td>a message is delivered after every message that may have influenced it</td></tr><tr><td>Total order</td><td>all processes deliver all messages in the same order</td></tr></tbody></table></div>
+<p>Total-order broadcast is as hard as consensus: each can be built from the other.</p>
+<p><strong>In the playground.</strong> The library has best-effort, reliable, uniform reliable, FIFO, causal and probabilistic broadcast. The examples compare reliable with best-effort broadcast when the sender crashes, and causal with reliable broadcast when channels reorder messages.</p>
+<h2 id="consensus">Consensus<a class="anchor" href="#consensus" aria-label="Link to this section">#</a></h2>
+<p>In <strong>consensus</strong>, each process proposes a value and all must decide one. The usual properties:</p>
+<ul><li><strong>Termination</strong>: every correct process eventually decides.</li><li><strong>Validity</strong>: the decided value was proposed by some process.</li><li><strong>Integrity</strong>: a process decides at most once.</li><li><strong>Agreement</strong>: no two correct processes decide differently. <em>Uniform agreement</em>: no two processes at all.</li></ul>
+<p>Consensus underlies replicated state machines, atomic commit and leader election. FloodSet solves it in synchronous systems with up to <em>f</em> crashes, using <em>f</em> + 1 rounds: in each round every process forwards all the values it knows, and at the end all correct processes know the same set. In partially synchronous systems, Paxos and its descendants are the standard answer.</p>
+<p><strong>In the playground.</strong> The FloodSet example runs the algorithm in ideal and in realistic rounds. Paxos and other consensus algorithms are on the roadmap.</p>
+<h2 id="quorums">Quorums<a class="anchor" href="#quorums" aria-label="Link to this section">#</a></h2>
+<p>A <strong>quorum</strong> is a set of processes large enough that any two quorums intersect. With majorities, any two sets of more than half the processes share at least one process. That shared process carries information from one operation to the next, which is how many algorithms survive failures without knowing which processes failed.</p>
+<p>The price is availability: if half or more of the processes are unreachable, no majority can be formed, and the algorithm waits.</p>
+<p><strong>In the playground.</strong> <em>MajorityAckURB</em> delivers a message only after a majority relayed it, so at least one correct process has it. Crash half the processes and it stops delivering, as it should.</p>
+<h2 id="partitions">Partitions<a class="anchor" href="#partitions" aria-label="Link to this section">#</a></h2>
+<p>A <strong>network partition</strong> splits the processes into groups that cannot communicate. Each group sees the others as crashed.</p>
+<p>The CAP theorem, stated by Brewer in 2000 and proved by Gilbert and Lynch in 2002, says that during a partition a replicated system must choose between consistency (all replicas agree) and availability (every request gets an answer). Quorum-based systems choose consistency: the minority side stops.</p>
+<p><strong>In the playground.</strong> Partitions are scheduled in the <em>Scenario</em> tab or injected with <strong>Isolate here</strong>. The partition example shows two groups suspecting each other.</p>
+<h2 id="glossary">Glossary<a class="anchor" href="#glossary" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Term</th><th>Meaning</th></tr></thead><tbody><tr><td>Atom</td><td>in Upon, a constant written in capitals, such as <code>ACK</code></td></tr><tr><td>Causal cone</td><td>the events that happened before and after a given event</td></tr><tr><td>Correct process</td><td>a process that never fails during the run</td></tr><tr><td>Drift</td><td>the rate at which a clock gains or loses time</td></tr><tr><td>GST</td><td>Global Stabilization Time, after which a partially synchronous system behaves synchronously</td></tr><tr><td>Handler</td><td>code that runs when an event matches</td></tr><tr><td>Indication</td><td>an event a module sends to the module above it</td></tr><tr><td>Instance</td><td>one copy of a module inside one process</td></tr><tr><td>Interface</td><td>the requests and indications of a module</td></tr><tr><td>Lockstep</td><td>an idealized execution in which all processes share the same rounds</td></tr><tr><td>Offset</td><td>the difference between a clock and the global time at the start</td></tr><tr><td>Quorum</td><td>a set of processes that intersects every other quorum</td></tr><tr><td>Request</td><td>an event a module sends to the module below it</td></tr><tr><td>Round</td><td>one send-receive-compute cycle of a synchronous algorithm</td></tr><tr><td>Seed</td><td>the number that fixes all random choices of a run</td></tr><tr><td>Step</td><td>the handling of one event by one process</td></tr><tr><td>Violation</td><td>a moment where the actual system broke the assumed model</td></tr></tbody></table></div>
+<h2 id="further-reading">Further reading<a class="anchor" href="#further-reading" aria-label="Link to this section">#</a></h2>
+<ul><li>C. Cachin, R. Guerraoui, L. Rodrigues. <em>Introduction to Reliable and Secure Distributed Programming</em>, 2nd ed. Springer, 2011. The notation and most library modules come from here.</li><li>N. Lynch. <em>Distributed Algorithms</em>. Morgan Kaufmann, 1996. Synchronous algorithms, FloodSet, lower bounds.</li><li>M. van Steen, A. S. Tanenbaum. <em>Distributed Systems</em>. A broad introduction, available free from the authors.</li><li>M. Kleppmann. <em>Designing Data-Intensive Applications</em>. O'Reilly, 2017. The practical side: replication, partitions, consistency.</li><li>L. Lamport. Time, Clocks, and the Ordering of Events in a Distributed System. <em>Communications of the ACM</em> 21(7), 1978.</li><li>M. J. Fischer, N. A. Lynch, M. S. Paterson. Impossibility of Distributed Consensus with One Faulty Process. <em>Journal of the ACM</em> 32(2), 1985.</li><li>C. Dwork, N. Lynch, L. Stockmeyer. Consensus in the Presence of Partial Synchrony. <em>Journal of the ACM</em> 35(2), 1988.</li><li>T. D. Chandra, S. Toueg. Unreliable Failure Detectors for Reliable Distributed Systems. <em>Journal of the ACM</em> 43(2), 1996.</li><li>T. D. Chandra, V. Hadzilacos, S. Toueg. The Weakest Failure Detector for Solving Consensus. <em>Journal of the ACM</em> 43(4), 1996.</li><li>S. Gilbert, N. Lynch. Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services. <em>ACM SIGACT News</em> 33(2), 2002.</li></ul>
+<nav class="pager"><a href="getting-started.html"><small>Previous</small>Getting started</a><a href="examples.html" style="text-align:right"><small>Next</small>Examples</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/concepts.md" target="_blank" rel="noopener">docs/concepts.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#processes-and-messages">Processes and messages</a><a class="l2" href="#events-and-handlers">Events and handlers</a><a class="l2" href="#time-without-a-shared-clock">Time without a shared clock</a><a class="l3" href="#physical-clocks">Physical clocks</a><a class="l3" href="#causality">Causality</a><a class="l3" href="#logical-clocks">Logical clocks</a><a class="l2" href="#failures">Failures</a><a class="l2" href="#timing-models">Timing models</a><a class="l2" href="#failure-detectors">Failure detectors</a><a class="l2" href="#safety-and-liveness">Safety and liveness</a><a class="l2" href="#layers-of-abstraction">Layers of abstraction</a><a class="l2" href="#broadcast">Broadcast</a><a class="l2" href="#consensus">Consensus</a><a class="l2" href="#quorums">Quorums</a><a class="l2" href="#partitions">Partitions</a><a class="l2" href="#glossary">Glossary</a><a class="l2" href="#further-reading">Further reading</a></aside>
+</div>
+</body>
+</html>

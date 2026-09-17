@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Examples · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: Examples.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html" aria-current="page">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="examples">Examples<a class="anchor" href="#examples" aria-label="Link to this section">#</a></h1>
+<p>Each example is a complete scenario: topology, code, timing model, inputs and faults. Load one from the <em>Example</em> menu; the run starts playing right away. Loading an example replaces the current scenario, and the notification offers <strong>Undo</strong>.</p>
+<p>For every example this page gives the setup, what to watch, a few experiments, and the simplifications that matter for it. The numbers quoted come from the default seed; a different seed gives a different but equally reproducible run.</p>
+<h2 id="flooding-broadcast">Flooding broadcast<a class="anchor" href="#flooding-broadcast" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> broadcast on an arbitrary graph · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> 3×4 grid · <strong>Seed:</strong> 7</p>
+<p>Every process that receives a message for the first time delivers it and forwards it to all its neighbors except the one it came from. p1 broadcasts <code>&quot;hello&quot;</code> at time 0 and p12 broadcasts <code>&quot;ok&quot;</code> 40 ms later.</p>
+<p><strong>What to watch.</strong> The two waves spread across the grid and cross in the middle. Each process delivers each message exactly once; the second handler silently drops copies that arrive by another path. The run uses 46 messages and ends after about 200 ms.</p>
+<p><strong>Try this.</strong></p>
+<ul><li>Set <em>Loss</em> to <code>0.3</code> in the <em>Timing</em> tab. Flooding has no retransmission, so whether a process still gets a message depends on whether some path survived. With seed 7, ten processes deliver <code>&quot;hello&quot;</code> and eight deliver <code>&quot;ok&quot;</code>; with seed 2 everybody delivers both.</li><li>Disable two links with the <em>Enabled</em> checkbox and see which processes become unreachable.</li><li>Generate a random or tree topology with the same code. The algorithm needs no change.</li></ul>
+<p><strong>Keep in mind.</strong> Messages are identified by their content, so broadcasting the same text twice delivers it only once.</p>
+<h2 id="ring-leader-election-chang-roberts">Ring leader election, Chang-Roberts<a class="anchor" href="#ring-leader-election-chang-roberts" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> leader election · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> directed ring of 8, identifiers in the order 3, 7, 1, 5, 2, 8, 4, 6 · <strong>Seed:</strong> 11</p>
+<p>Every process starts an election by sending its own identifier clockwise. A process forwards identifiers larger than its own, replaces smaller ones with its own if it has not already done so, and declares itself leader when its own identifier comes back. The winner then circulates an <code>ELECTED</code> message.</p>
+<p><strong>What to watch.</strong> Small identifiers disappear quickly; 8 travels the whole ring. Every process outputs <code>Elected | 8</code>. The run uses 20 election messages and 8 announcement messages.</p>
+<p><strong>Try this.</strong></p>
+<ul><li>Change the input to <code>0ms 1 Start</code> so that only one process starts. Count the messages.</li><li>Give one link a slow delay distribution, such as <code>uniform(100ms, 200ms)</code>, and follow the election around it.</li><li>Rebuild the ring with identifiers in increasing order, using the ring generator with <em>Directed</em> checked, and compare the number of messages.</li></ul>
+<p><strong>Keep in mind.</strong> The algorithm assumes reliable FIFO channels and no crashes. A crash breaks the ring and the election never ends.</p>
+<h2 id="floodset-consensus">FloodSet consensus<a class="anchor" href="#floodset-consensus" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> consensus with crash failures · <strong>Model:</strong> synchronous rounds · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 5</p>
+<p>Each process proposes a random value from 1 to 9. In each of the first f + 1 rounds (f = 1 here) every process sends the set of values it knows to everybody; at the end of round f + 1 it decides the minimum of its set.</p>
+<p><strong>What to watch.</strong> With the <em>Ideal synchronous</em> preset, the proposals are 8, 7, 7 and 3, and every process decides 3. The dashed vertical lines on the diagram mark the rounds. No violation is possible.</p>
+<p><strong>Try this.</strong></p>
+<ul><li>Switch to <em>Realistic synchronous</em> and run with the same seed. Rounds are now built on drifting clocks, delays have a long tail, and late messages are discarded. The run records 11 violations and 9 discarded messages, and p2 decides 7 while everybody else decides 3: the value 3 never reached p2 in time. The algorithm is correct; its assumption is not.</li><li>Change the policy to <em>Deliver late</em> and run again. Late messages now reach processes in a later round, and with this seed everybody decides 3 again.</li><li>Try other seeds with the dice button. Disagreement is rare: the minimum has many paths to every process, and all of them must fail. It shows up in roughly 1 seed out of 50.</li><li>Back in <em>Ideal synchronous</em>, crash p4 at <code>0ms</code>. Its value never spreads, and the others agree on 7.</li></ul>
+<p><strong>Keep in mind.</strong> In lockstep rounds a process cannot crash in the middle of its sends, so the classic scenario where a crashing process reaches only some of the others is not reproduced by a crash alone. See <a href="faults.html#crash">Faults</a>.</p>
+<h2 id="failure-detector-p">Failure detector ◇P<a class="anchor" href="#failure-detector-p" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> failure detection under partial synchrony · <strong>Model:</strong> partially synchronous, GST at 3 s · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 5</p>
+<p>Every process periodically asks everybody for a heartbeat. A process that does not answer before the timeout is suspected; if an answer later arrives from a suspected process, the suspicion is withdrawn and the timeout grows by <code>DELTA0</code>. Process p3 crashes at 6 s.</p>
+<p><strong>What to watch.</strong></p>
+<ul><li>Before GST, heavy-tailed delays cause wrong suspicions: 44 <code>Suspect</code> and <code>Restore</code> outputs in the first three seconds.</li><li>After GST, a few corrections, then silence while the timeouts have grown enough.</li><li>After the crash, p1, p2 and p4 suspect p3 within a second, and nothing else.</li></ul>
+<p>Open the <em>State</em> tab on any process to follow <code>suspected</code> and <code>delay</code>.</p>
+<p><strong>Try this.</strong></p>
+<ul><li>Move GST to <code>8s</code>. The crash happens during the unstable period, and it becomes harder to tell apart from slowness.</li><li>Remove GST. Wrong suspicions continue for the whole run.</li><li>Lower <code>DELTA0</code> to <code>20ms</code> and watch the timeout grow more slowly.</li></ul>
+<p><strong>Keep in mind.</strong> The algorithm uses <code>DirectLinks</code>, a perfect link only because the network does not lose messages here. With loss, replace it with <code>AckLinks</code> from the library.</p>
+<h2 id="failure-detector-across-a-partition-and-a-recovery">Failure detector across a partition and a recovery<a class="anchor" href="#failure-detector-across-a-partition-and-a-recovery" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> partitions, crash-recovery · <strong>Model:</strong> partially synchronous, GST at 1 s · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 5</p>
+<p>The same detector runs on five processes, with three scheduled faults: the network splits into {p1, p2} and {p3, p4, p5} from 4 s to 7 s, p5 crashes at 9 s and recovers at 11 s.</p>
+<p><strong>What to watch.</strong></p>
+<ul><li>Just before the partition heals, p1 and p2 suspect {p3, p4, p5}, and p3, p4 and p5 suspect {p1, p2}. Each side believes the other crashed.</li><li>After the partition, the suspicions are withdrawn.</li><li>While p5 is down, everybody suspects p5.</li><li>p5 restarts with its state reset and its <code>Init</code> handler restarts the heartbeats. By the end of the run nobody suspects anybody.</li></ul>
+<p><strong>Try this.</strong></p>
+<ul><li>Make the partition permanent by emptying <em>Until</em>. Which suspicions never go away?</li><li>Add <code>stable</code> in front of <code>delay</code> in the code, rerun, and compare p5's timeout after the recovery.</li><li>Pause at 5 s, select p1 and press <strong>Isolate here</strong> to add a second partition from that moment.</li></ul>
+<p><strong>Keep in mind.</strong> Messages in flight when the partition starts are dropped when they arrive. The detector cannot distinguish a partition from a crash, which is exactly the point.</p>
+<h2 id="reliable-broadcast-when-the-sender-crashes">Reliable broadcast when the sender crashes<a class="anchor" href="#reliable-broadcast-when-the-sender-crashes" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> reliable broadcast, layering · <strong>Model:</strong> asynchronous, 40% message loss · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 4</p>
+<p>A newsroom application publishes through a stack of library modules: <em>EagerReliableBroadcast</em> on top of <em>BasicBroadcast</em> on top of <em>AckLinks</em>. p1 publishes <code>&quot;news&quot;</code> at time 0 and crashes at 40 ms, before its first retransmission.</p>
+<p><strong>What to watch.</strong></p>
+<ul><li>Many of p1's first messages are lost, and p1 is gone before it can resend them.</li><li>p2 received the news and relays it; the relays reach p3, p4 and p5.</li><li>Every process reads the news once.</li><li>Tick <strong>Layers</strong> to color messages by their origin: the application's broadcast, the relays, and the link layer's acknowledgements and retransmissions. Open the <em>Stack</em> tab to follow the events through the modules.</li></ul>
+<p><strong>Try this.</strong></p>
+<ul><li>In the first algorithm, replace <code>uses ReliableBroadcast</code> with <code>uses BestEffortBroadcast</code> and run with the same seed. Only p2 reads the news.</li><li>Remove the crash. With best-effort broadcast, everybody reads the news again: the difference only shows when the sender fails.</li><li>Replace <code>ReliableBroadcast</code> with <code>UniformReliableBroadcast</code> and add <em>MajorityAckURB</em> from <em>Add module</em>.</li></ul>
+<p><strong>Keep in mind.</strong> The crash has to happen before retransmissions, because a step is never interrupted (see <a href="faults.html#crash">Faults</a>). The loss rate is what makes the partial broadcast possible.</p>
+<h2 id="causal-order-broadcast-questions-before-answers">Causal order broadcast: questions before answers<a class="anchor" href="#causal-order-broadcast-questions-before-answers" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> causal order, vector clocks · <strong>Model:</strong> asynchronous, channels without FIFO, delays from 5 to 120 ms · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 5</p>
+<p>p1 posts a question. p2 answers as soon as it reads it. Everything goes through <em>WaitingCausalBroadcast</em>, which attaches a vector clock to each message.</p>
+<p><strong>What to watch.</strong> Every process reads the question before the answer, even when the answer arrives first: it waits in the pending set until the question has been delivered.</p>
+<p><strong>Try this.</strong></p>
+<ul><li>Replace <code>uses CausalOrderBroadcast</code> with <code>uses ReliableBroadcast</code> and run with the same seed. p4 and p5 read the answer before the question.</li><li>Tick <strong>Causality</strong>, click the event where p2 reads the question, and see which events it could have influenced. The answer is in its future everywhere.</li><li>Open the <em>State</em> tab on p4 and watch <code>pending</code> hold the answer for a while.</li></ul>
+<p><strong>Keep in mind.</strong> The test suite checks 30 seeds for this example: none delivers an answer before its question.</p>
+<h2 id="gossip-spreading-a-rumor">Gossip: spreading a rumor<a class="anchor" href="#gossip-spreading-a-rumor" aria-label="Link to this section">#</a></h2>
+<p><strong>Topic:</strong> probabilistic broadcast · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> 16 processes on a ring with chords, 4 neighbors each · <strong>Seed:</strong> 7</p>
+<p>p1 spreads a rumor. Each process that hears it for the first time forwards it to <code>FANOUT</code> random neighbors, for at most <code>ROUNDS</code> hops.</p>
+<p><strong>What to watch.</strong> With <code>FANOUT := 2</code> and <code>ROUNDS := 4</code>, 10 of the 16 processes hear the rumor, using 16 messages. Nobody hears it twice.</p>
+<p><strong>Try this.</strong> Change the parameters at the top of <em>EagerGossip</em>:</p>
+<div class="table"><table><thead><tr><th>FANOUT</th><th>ROUNDS</th><th>Processes reached</th><th>Messages</th></tr></thead><tbody><tr><td>2</td><td>4</td><td>10</td><td>16</td></tr><tr><td>2</td><td>6</td><td>14</td><td>24</td></tr><tr><td>3</td><td>4</td><td>16</td><td>39</td></tr><tr><td>4</td><td>4</td><td>16</td><td>64</td></tr></tbody></table></div>
+<p>Try several seeds with the dice button: coverage varies from run to run, which is what <em>probabilistic</em> means.</p>
+<p><strong>Keep in mind.</strong> Targets are chosen among neighbors, so the topology shapes the spread. Gossip never retries.</p>
+<h2 id="empty-scenario">Empty scenario<a class="anchor" href="#empty-scenario" aria-label="Link to this section">#</a></h2>
+<p>A ring of five processes and a small program that greets its neighbors and counts replies. Use it as a starting point for your own algorithms, and see <a href="getting-started.html">Getting started</a> for a guided first program.</p>
+<nav class="pager"><a href="concepts.html"><small>Previous</small>Concepts</a><a href="interface.html" style="text-align:right"><small>Next</small>The interface</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/examples.md" target="_blank" rel="noopener">docs/examples.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#flooding-broadcast">Flooding broadcast</a><a class="l2" href="#ring-leader-election-chang-roberts">Ring leader election, Chang-Roberts</a><a class="l2" href="#floodset-consensus">FloodSet consensus</a><a class="l2" href="#failure-detector-p">Failure detector ◇P</a><a class="l2" href="#failure-detector-across-a-partition-and-a-recovery">Failure detector across a partition and a recovery</a><a class="l2" href="#reliable-broadcast-when-the-sender-crashes">Reliable broadcast when the sender crashes</a><a class="l2" href="#causal-order-broadcast-questions-before-answers">Causal order broadcast: questions before answers</a><a class="l2" href="#gossip-spreading-a-rumor">Gossip: spreading a rumor</a><a class="l2" href="#empty-scenario">Empty scenario</a></aside>
+</div>
+</body>
+</html>

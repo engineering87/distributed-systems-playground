@@ -12,6 +12,8 @@ let html = read('template.html');
 for (const [marker, file] of [
   ['/*__CSS__*/', 'style.css'],
   ['/*__CORE__*/', 'core.js'],
+  ['/*__LIBRARY__*/', 'library.js'],
+  ['/*__I18N__*/', 'i18n.js'],
   ['/*__EXAMPLES__*/', 'examples.js'],
   ['/*__UI__*/', 'ui.js']
 ]) {

@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Upon language · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: The Upon language.">
+<link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root { --paper:#eef3f5; --surface:#fff; --surface-2:#f6f9fa; --rule:#c5d1d8; --grid:#dfe7eb; --ink:#17283a; --muted:#56687a; --blue:#2350a3; --blue-soft:#e3ebf8;
+  --code-kw:#2350a3; --code-at:#8a3f8f; --code-ty:#0c7760; --code-num:#a1560a; --code-str:#8a5a00; --code-cm:#7b8a96;
+  --ui:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; } }
+:root[data-theme="dark"] { --paper:#0f161d; --surface:#151f29; --surface-2:#1a2632; --rule:#2d3e4e; --grid:#1f2a34; --ink:#e2eaf1; --muted:#93a4b3; --blue:#86aef0; --blue-soft:#1d2d45;
+  --code-kw:#86aef0; --code-at:#d49ad8; --code-ty:#4cc2a5; --code-num:#e2a74a; --code-str:#e8c27a; --code-cm:#6f8292; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
+a { color: var(--blue); }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+header.top .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.logo { width: 30px; height: 30px; }
+header.top .grow { flex: 1; }
+.search { position: relative; }
+.search input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); width: min(280px, 40vw); }
+.results { position: absolute; right: 0; top: 40px; width: min(460px, 92vw); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results a { display: block; padding: 8px 12px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--grid); }
+.results a:hover, .results a.on { background: var(--blue-soft); }
+.results small { display: block; color: var(--muted); }
+.button { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 6px; background: var(--blue); color: var(--surface); text-decoration: none; white-space: nowrap; }
+.menu-toggle { display: none; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 220px; gap: 28px; max-width: 1320px; margin: 0 auto; padding: 0 18px; }
+nav.side { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 18px 0; font-size: 15px; }
+nav.side .group { margin: 16px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav.side ul { list-style: none; margin: 0; padding: 0; }
+nav.side a { display: block; padding: 4px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+nav.side a:hover { background: var(--surface-2); }
+nav.side a[aria-current] { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+main { padding: 26px 0 60px; min-width: 0; }
+main h1, main h2, main h3, main h4 { scroll-margin-top: 72px; }
+main h1 { font-size: 34px; line-height: 1.2; margin: 0 0 18px; }
+main h2 { font-size: 24px; margin: 40px 0 10px; padding-top: 6px; border-top: 1px solid var(--grid); }
+main h3 { font-size: 19px; margin: 28px 0 8px; }
+main h4 { font-size: 16px; margin: 20px 0 6px; }
+.anchor { margin-left: 8px; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+main code { font: .88em var(--mono); background: var(--surface-2); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 5px; }
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; font: 13.5px/1.55 var(--mono); }
+pre.code code { background: none; border: 0; padding: 0; font: inherit; }
+.t-kw { color: var(--code-kw); font-weight: 600; } .t-at { color: var(--code-at); } .t-ty { color: var(--code-ty); }
+.t-num { color: var(--code-num); } .t-str { color: var(--code-str); } .t-cm { color: var(--code-cm); font-style: italic; } .t-op { color: var(--code-kw); }
+.table { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; font-size: 15px; min-width: 60%; }
+th, td { border: 1px solid var(--rule); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface-2); }
+blockquote { margin: 14px 0; padding: 4px 14px; border-left: 4px solid var(--blue); background: var(--surface); }
+img { max-width: 100%; border-radius: 8px; }
+kbd { font: 12px var(--mono); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); }
+aside.toc { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 70px); overflow: auto; padding: 26px 0; font-size: 14px; }
+aside.toc p { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+aside.toc a { display: block; padding: 2px 0; color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+aside.toc a.l3 { padding-left: 12px; }
+aside.toc a:hover, aside.toc a.on { color: var(--blue); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.pager a { text-decoration: none; }
+.pager small { display: block; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; margin-top: 30px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } aside.toc { display: none; } }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu-toggle { display: inline-block; }
+  nav.side { display: none; position: static; max-height: none; }
+  body.menu-open nav.side { display: block; }
+  header.top .brand span { display: none; }
+  header.top { gap: 8px; padding: 8px 10px; }
+  .search input { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  header.top .grow { display: none; }
+  .button .long { display: none; }
+  main h1 { font-size: 28px; }
+}
+@media print { header.top, nav.side, aside.toc, .pager { display: none; } .layout { display: block; } }
+</style>
+<script>
+(function () {
+  try { var s = JSON.parse(localStorage.getItem('ds-playground:settings') || '{}'); if (s.theme === 'light' || s.theme === 'dark') document.documentElement.setAttribute('data-theme', s.theme); } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function () {
+  var toggle = document.querySelector('.menu-toggle');
+  if (toggle) toggle.addEventListener('click', function () { document.body.classList.toggle('menu-open'); });
+  var input = document.getElementById('q'), box = document.getElementById('results');
+  var idx = window.DOCS_INDEX || [];
+  function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function search(q) {
+    var words = norm(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    var hits = [];
+    idx.forEach(function (e) {
+      var t = norm(e.t), x = norm(e.x), score = 0;
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (t.indexOf(w) >= 0) score += 5; else if (x.indexOf(w) >= 0) score += 1; else return;
+      }
+      hits.push({ e: e, s: score });
+    });
+    return hits.sort(function (a, b) { return b.s - a.s; }).slice(0, 12);
+  }
+  var sel = -1;
+  function show() {
+    var list = search(input.value);
+    box.innerHTML = '';
+    sel = -1;
+    if (!input.value.trim()) { box.hidden = true; return; }
+    if (!list.length) { box.innerHTML = '<a>No results</a>'; box.hidden = false; return; }
+    list.forEach(function (h) {
+      var a = document.createElement('a');
+      a.href = h.e.u;
+      a.textContent = h.e.t;
+      var small = document.createElement('small');
+      var x = h.e.x, pos = norm(x).indexOf(norm(input.value.trim().split(/\s+/)[0]));
+      small.textContent = (h.e.p ? h.e.p + ' · ' : '') + (pos >= 0 ? '…' + x.slice(Math.max(0, pos - 40), pos + 90) + '…' : x.slice(0, 120));
+      a.appendChild(small);
+      box.appendChild(a);
+    });
+    box.hidden = false;
+  }
+  if (input) {
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (ev) {
+      var items = box.querySelectorAll('a[href]');
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sel = Math.max(0, Math.min(items.length - 1, sel + (ev.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach(function (a, i) { a.classList.toggle('on', i === sel); });
+      } else if (ev.key === 'Enter' && items.length) { location.href = items[Math.max(0, sel)].href; }
+      else if (ev.key === 'Escape') { input.value = ''; box.hidden = true; }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === '/' && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('.search')) box.hidden = true; });
+  }
+  var links = document.querySelectorAll('aside.toc a');
+  if (links.length && 'IntersectionObserver' in window) {
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { links.forEach(function (a) { a.classList.remove('on'); }); var a = map[en.target.id]; if (a) a.classList.add('on'); }
+      });
+    }, { rootMargin: '-60px 0px -70% 0px' });
+    Object.keys(map).forEach(function (id) { var h = document.getElementById(id); if (h) obs.observe(h); });
+  }
+});
+</script>
+<script src="search-index.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu-toggle" type="button" aria-label="Menu">☰</button>
+  <a class="brand" href="index.html"><svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Distributed Systems Playground">
+  <rect width="64" height="64" rx="14" fill="#17283a"/>
+  <g stroke="#dbe5ee" stroke-width="3" stroke-linecap="round">
+    <line x1="12" y1="18" x2="52" y2="18"/>
+    <line x1="12" y1="32" x2="52" y2="32"/>
+    <line x1="12" y1="46" x2="52" y2="46"/>
+  </g>
+  <g stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M18 18 L28 32" stroke="#86aef0"/>
+    <path d="M28 32 L38 46" stroke="#4cc2a5"/>
+    <path d="M30 18 L47 46" stroke="#f06a78" stroke-dasharray="3.5 3"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="18" r="3.2"/>
+    <circle cx="28" cy="32" r="3.2"/>
+    <circle cx="38" cy="46" r="3.2"/>
+  </g>
+  <circle cx="30" cy="18" r="3.2" fill="#f06a78"/>
+</svg>
+<span>Distributed Systems Playground</span></a>
+  <span class="grow"></span>
+  <div class="search"><input id="q" type="search" placeholder="Search the documentation (/)" aria-label="Search the documentation" autocomplete="off"><div id="results" class="results" hidden></div></div>
+  <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
+</header>
+<div class="layout">
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html" aria-current="page">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<main>
+<h1 id="the-upon-language">The Upon language<a class="anchor" href="#the-upon-language" aria-label="Link to this section">#</a></h1>
+<p>Upon is the language you write algorithms in. It follows the event-driven notation of Cachin, Guerraoui and Rodrigues closely enough that most textbook algorithms can be copied line by line, and it is strict enough to be checked and executed.</p>
+<p>This page is the complete reference. If you have never written Upon, start with <a href="getting-started.html">Getting started</a> and come back here when you need a detail. The full grammar is in <a href="spec.html#52-grammar-ebnf">section 5.2 of the specification</a>.</p>
+<h2 id="a-first-program">A first program<a class="anchor" href="#a-first-program" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-upon"><code><span class="t-kw">interface</span> <span class="t-ty">Greeting</span>
+  <span class="t-kw">request</span> <span class="t-ty">Greet</span>(name)
+  <span class="t-kw">indication</span> <span class="t-ty">Greeted</span>(from, name)
+<span class="t-kw">end</span>
+
+<span class="t-kw">algorithm</span> <span class="t-ty">Hello</span>
+  <span class="t-kw">implements</span> <span class="t-ty">Greeting</span> <span class="t-kw">as</span> g
+  <span class="t-kw">uses</span> <span class="t-ty">Net</span> <span class="t-kw">as</span> net
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>g, <span class="t-ty">Greet</span> | name<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">forall</span> q <span class="t-kw">in</span> neighbors <span class="t-kw">do</span>
+      <span class="t-kw">trigger</span> <span class="t-op">⟨</span>net, <span class="t-ty">Send</span> | q, [<span class="t-at">HELLO</span>, name]<span class="t-op">⟩</span>
+    <span class="t-kw">end</span>
+  <span class="t-kw">end</span>
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>net, <span class="t-ty">Deliver</span> | p, [<span class="t-at">HELLO</span>, name]<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>g, <span class="t-ty">Greeted</span> | p, name<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+<span class="t-kw">end</span></code></pre>
+<p>Read it from the top:</p>
+<ul><li><code>Greeting</code> is an <strong>interface</strong>: it says what the algorithm accepts from above (<code>Greet</code>) and what it reports upwards (<code>Greeted</code>).</li><li><code>Hello</code> <strong>implements</strong> it under the local name <code>g</code>, and <strong>uses</strong> the network under the name <code>net</code>.</li><li>The first <strong>handler</strong> reacts to a <code>Greet</code> request and sends a message to every neighbor.</li><li>The second reacts to a message from the network. The pattern <code>[HELLO, name]</code> matches a tuple whose first element is the atom <code>HELLO</code> and binds the second to <code>name</code>.</li><li><code>trigger</code> sends an event: down to <code>net</code>, or up through <code>g</code>.</li></ul>
+<p>With the input line <code>0ms 1 Greet | &quot;world&quot;</code>, the neighbors of p1 report <code>Greeted | 1, &quot;world&quot;</code>.</p>
+<h2 id="lexical-rules">Lexical rules<a class="anchor" href="#lexical-rules" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Comments</strong> start with <code>//</code> and run to the end of the line, or sit between <code>/*</code> and <code>*/</code>.</li><li><strong>Identifiers</strong> are letters, digits and underscores, starting with a letter or underscore. Case matters.</li><li><strong>Atoms</strong> are identifiers written in capital letters, at least two characters long, that are not declared as variables or parameters: <code>HELLO</code>, <code>ACK</code>, <code>HEARTBEAT_REQUEST</code>. They are symbolic constants, used mostly as message tags.</li><li><strong>Numbers</strong> are decimal: <code>3</code>, <code>0.25</code>, <code>1e-4</code>.</li><li><strong>Durations</strong> are numbers followed by <code>us</code>, <code>ms</code> or <code>s</code>, with no space: <code>300us</code>, <code>50ms</code>, <code>2s</code>. They become plain numbers of microseconds, so <code>50ms</code> equals <code>50000</code>.</li><li><strong>Strings</strong> are written between double quotes. A backslash takes the next character literally: <code>&quot;say \&quot;hi\&quot;&quot;</code>.</li><li><strong>Line breaks</strong> do not matter. Statements are recognized by their first word. A semicolon between statements is allowed and ignored.</li></ul>
+<p>Keywords:</p>
+<pre class="code lang-text"><code>interface request indication algorithm implements as uses via params state stable
+upon event where condition exists do end function return call
+trigger if then elif else forall in while starttimer canceltimer assert log skip
+and or not notin union inter minus subseteq true false nil</code></pre>
+<h2 id="interfaces">Interfaces<a class="anchor" href="#interfaces" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-text"><code>interface Name
+  request   EventName(param, param)
+  indication EventName(param)
+end</code></pre>
+<ul><li>A <strong>request</strong> travels from a module to the module below it.</li><li>An <strong>indication</strong> travels from a module to the module above it.</li><li>The parameter names are for documentation; only their number matters.</li><li>An event with no parameters can be written <code>Start()</code> or <code>Start</code>.</li></ul>
+<p>Two interfaces, <code>Net</code> and <code>Rounds</code>, are predefined (see <a href="#provided-modules">Provided modules</a>). You cannot redefine or implement them.</p>
+<h2 id="algorithms">Algorithms<a class="anchor" href="#algorithms" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-text"><code>algorithm Name
+  implements Interface as alias
+  uses OtherInterface as other          // zero or more
+  uses PerfectLinks as pl via AckLinks  // &quot;via&quot; picks the implementation
+  params
+    f := 1                              // evaluated once per process
+  state
+    seen := ∅                           // one copy per process
+    stable total := 0                   // survives a crash and recovery
+  function helper(x) … end              // zero or more, anywhere after state
+  upon event ⟨alias, Init⟩ do … end     // handlers
+end</code></pre>
+<p><strong><code>implements</code></strong> names the interface this algorithm provides and the local name under which it receives requests and emits indications.</p>
+<p><strong><code>uses</code></strong> names an interface this algorithm relies on and the local name to talk to it. Each <code>uses</code> creates its own instance of the chosen algorithm.</p>
+<p><strong><code>params</code></strong> are constants. Their initial expressions can use built-in names and earlier parameters. They cannot be assigned.</p>
+<p><strong><code>state</code></strong> variables belong to each process. Their initial expressions can use built-in names and parameters. <code>stable</code> variables keep their value across a crash and a recovery; the others are reset (see <a href="faults.html#recovery">Faults</a>).</p>
+<p>Every name in <code>params</code> and <code>state</code> must differ from the built-in names and from each other.</p>
+<h2 id="handlers">Handlers<a class="anchor" href="#handlers" aria-label="Link to this section">#</a></h2>
+<p>A handler runs when its trigger matches. There are three kinds.</p>
+<h3 id="event-handlers">Event handlers<a class="anchor" href="#event-handlers" aria-label="Link to this section">#</a></h3>
+<pre class="code lang-text"><code>upon event ⟨instance, Event | pattern, pattern⟩ do … end
+upon event ⟨instance, Event | pattern⟩ where condition do … end</code></pre>
+<p><code>instance</code> is one of:</p>
+<ul><li>the <code>implements</code> alias: the handler receives <strong>requests</strong> from above, or <code>Init</code> and <code>Recovery</code>;</li><li>a <code>uses</code> alias: the handler receives <strong>indications</strong> from below;</li><li><code>timer</code>: the handler receives <code>Timeout</code> (see <a href="#timers">Timers</a>).</li></ul>
+<p>When an event arrives, handlers are tried <strong>in the order they appear in the code</strong>. The first one whose patterns match and whose <code>where</code> condition is true runs; the others are skipped. If none matches, the event is ignored and a warning is logged once. <code>Init</code>, <code>Recovery</code>, <code>RoundStart</code> and <code>RoundEnd</code> without a handler are ignored silently.</p>
+<p>A common idiom uses two handlers with opposite conditions:</p>
+<pre class="code lang-text"><code>upon event ⟨net, Deliver | p, [DATA, m]⟩ where m ∉ seen do … end
+upon event ⟨net, Deliver | p, [DATA, m]⟩ where m ∈ seen do skip end</code></pre>
+<h3 id="condition-handlers">Condition handlers<a class="anchor" href="#condition-handlers" aria-label="Link to this section">#</a></h3>
+<pre class="code lang-text"><code>upon condition expression do … end</code></pre>
+<p>The handler runs whenever the expression is true, checked after every step of the process. Its body must make the condition false, directly or indirectly; a condition that stays true forever stops the run with an error.</p>
+<h3 id="exists-handlers">Exists handlers<a class="anchor" href="#exists-handlers" aria-label="Link to this section">#</a></h3>
+<pre class="code lang-text"><code>upon exists x in collection where condition do … end</code></pre>
+<p>The handler runs for the first element of the collection, in sorted order, that satisfies the condition, with that element bound to <code>x</code>. It is checked after every step, like a condition handler, and is the natural way to write &quot;when some pending message can be delivered&quot;:</p>
+<pre class="code lang-text"><code>upon exists e in pending where e[1] = next do
+  pending := pending \ {e}
+  next := next + 1
+  trigger ⟨app, Deliver | e[0], e[2]⟩
+end</code></pre>
+<p>When several condition or exists handlers of a module are enabled, they take turns.</p>
+<h2 id="patterns">Patterns<a class="anchor" href="#patterns" aria-label="Link to this section">#</a></h2>
+<p>Patterns appear in event handlers, one per event parameter.</p>
+<div class="table"><table><thead><tr><th>Pattern</th><th>Matches</th></tr></thead><tbody><tr><td><code>x</code> (a new name)</td><td>anything, and binds it to <code>x</code></td></tr><tr><td><code>x</code> (a name already known)</td><td>a value equal to the variable, parameter or built-in <code>x</code></td></tr><tr><td><code>HELLO</code> (an atom)</td><td>the atom <code>HELLO</code></td></tr><tr><td><code>42</code>, <code>-1</code>, <code>&quot;text&quot;</code>, <code>true</code>, <code>nil</code></td><td>that exact value</td></tr><tr><td><code>_</code></td><td>anything, without binding</td></tr><tr><td><code>[A, b, _]</code></td><td>a tuple of exactly three elements matching the three patterns</td></tr></tbody></table></div>
+<p>The same new name used twice must match equal values: <code>⟨net, Deliver | p, [ECHO, p]⟩</code> only matches when the message echoes its own sender.</p>
+<p>In <code>⟨timer, Timeout | t⟩</code>, <code>t</code> is the name of a timer, not a variable (see <a href="#timers">Timers</a>).</p>
+<h2 id="statements">Statements<a class="anchor" href="#statements" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Statement</th><th>Effect</th></tr></thead><tbody><tr><td><code>x := e</code></td><td>assigns a state variable, or creates a local variable</td></tr><tr><td><code>m[k] := e</code>, <code>t[i] := e</code></td><td>updates one entry of a map or tuple</td></tr><tr><td><code>trigger ⟨inst, Event \| a, b⟩</code></td><td>sends an event down or up</td></tr><tr><td><code>if c then … elif c then … else … end</code></td><td>conditional</td></tr><tr><td><code>forall x in c do … end</code></td><td>loop over a collection</td></tr><tr><td><code>forall x in c where cond do … end</code></td><td>loop over the elements that satisfy <code>cond</code></td></tr><tr><td><code>while c do … end</code></td><td>loop while <code>c</code> holds</td></tr><tr><td><code>starttimer(t, d)</code></td><td>starts or restarts timer <code>t</code> with duration <code>d</code></td></tr><tr><td><code>canceltimer(t)</code></td><td>cancels timer <code>t</code></td></tr><tr><td><code>call f(a, b)</code></td><td>calls one of your functions and ignores the result</td></tr><tr><td><code>return e</code>, <code>return</code></td><td>leaves a function (only inside functions)</td></tr><tr><td><code>assert c, &quot;message&quot;</code></td><td>logs a failed assertion if <code>c</code> is false</td></tr><tr><td><code>log a, b, c</code></td><td>writes a line to the event log</td></tr><tr><td><code>skip</code></td><td>does nothing</td></tr></tbody></table></div>
+<p><strong>Local variables.</strong> Assigning a name that is not a state variable creates a local variable, visible until the end of the handler or function. Reading it before the assignment is a runtime error. Loop variables and pattern variables are local too.</p>
+<p><strong>Triggers are asynchronous within the process.</strong> <code>trigger</code> puts the event in a queue; it is handled after the current handler finishes, within the same step. Code after a <code>trigger</code> does not see the effects of the event.</p>
+<p><strong><code>forall</code></strong> evaluates the collection once, before the loop starts. Assigning the collection inside the loop does not change the iteration.</p>
+<p><strong><code>assert</code></strong> does not stop the run unless <em>Stop at the first failed assertion</em> is checked in the <em>Scenario</em> tab.</p>
+<p><strong><code>log</code></strong> prints strings as they are and other values in their written form, separated by spaces.</p>
+<h2 id="expressions">Expressions<a class="anchor" href="#expressions" aria-label="Link to this section">#</a></h2>
+<p>From lowest to highest precedence:</p>
+<div class="table"><table><thead><tr><th>Level</th><th>Operators</th></tr></thead><tbody><tr><td>or</td><td><code>or</code>, <code>∨</code></td></tr><tr><td>and</td><td><code>and</code>, <code>∧</code></td></tr><tr><td>not</td><td><code>not</code>, <code>¬</code></td></tr><tr><td>comparison</td><td><code>=</code>, <code>≠</code>, <code>&lt;</code>, <code>≤</code>, <code>&gt;</code>, <code>≥</code>, <code>∈</code>, <code>∉</code>, <code>⊆</code></td></tr><tr><td>set</td><td><code>∪</code>, <code>∩</code>, <code>\</code></td></tr><tr><td>additive</td><td><code>+</code>, <code>-</code></td></tr><tr><td>multiplicative</td><td><code>*</code>, <code>/</code>, <code>%</code></td></tr><tr><td>unary</td><td><code>-</code>, <code>#</code></td></tr><tr><td>postfix</td><td><code>x[i]</code>, <code>f(args)</code></td></tr></tbody></table></div>
+<p>Comparisons do not chain: write <code>a &lt; b and b &lt; c</code>, not <code>a &lt; b &lt; c</code>. To compare the result of a membership test, use parentheses: <code>(x ∈ S) = false</code>.</p>
+<p><code>and</code> and <code>or</code> are short-circuit and require booleans. <code>if</code>, <code>while</code>, <code>where</code> and conditions also require booleans; there is no truthiness.</p>
+<div class="table"><table><thead><tr><th>Operator</th><th>Works on</th></tr></thead><tbody><tr><td><code>+</code></td><td>numbers; strings (with anything else converted to text); two tuples (concatenation)</td></tr><tr><td><code>-</code>, <code>*</code>, <code>%</code></td><td>numbers</td></tr><tr><td><code>/</code></td><td>numbers; between two integers the result is truncated</td></tr><tr><td><code>∪</code>, <code>∩</code>, <code>\</code>, <code>⊆</code></td><td>sets</td></tr><tr><td><code>∈</code>, <code>∉</code></td><td>an element of a set, of a tuple, or a key of a map</td></tr><tr><td><code>#x</code></td><td>the size of a set, map, tuple or string</td></tr><tr><td><code>=</code>, <code>≠</code></td><td>any two values, compared by content</td></tr><tr><td><code>&lt;</code>, <code>≤</code>, <code>&gt;</code>, <code>≥</code></td><td>any two values, with the order described in <a href="#values">Values</a></td></tr></tbody></table></div>
+<p>Literals:</p>
+<div class="table"><table><thead><tr><th>Form</th><th>Value</th></tr></thead><tbody><tr><td><code>[a, b, c]</code></td><td>a tuple</td></tr><tr><td><code>{a, b}</code>, <code>∅</code>, <code>{}</code></td><td>a set</td></tr><tr><td><code>{x in S where condition}</code></td><td>the elements of <code>S</code> that satisfy the condition</td></tr><tr><td><code>map()</code></td><td>an empty map</td></tr></tbody></table></div>
+<h2 id="values">Values<a class="anchor" href="#values" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Kind</th><th>Examples</th><th>Notes</th></tr></thead><tbody><tr><td>nil</td><td><code>nil</code></td><td>the value of a missing map entry</td></tr><tr><td>boolean</td><td><code>true</code>, <code>false</code></td><td></td></tr><tr><td>number</td><td><code>3</code>, <code>0.5</code>, <code>50ms</code></td><td>durations are numbers of microseconds</td></tr><tr><td>string</td><td><code>&quot;hello&quot;</code></td><td></td></tr><tr><td>atom</td><td><code>HELLO</code></td><td></td></tr><tr><td>tuple</td><td><code>[DATA, 3, &quot;x&quot;]</code></td><td>indexed from 0</td></tr><tr><td>set</td><td><code>{1, 2, 3}</code></td><td>no duplicates, kept sorted</td></tr><tr><td>map</td><td><code>m[k]</code></td><td>keys and values of any kind</td></tr></tbody></table></div>
+<p>All values are immutable. <code>m[k] := v</code> builds a new map and assigns it to <code>m</code>, so a copy taken earlier (<code>old := m</code>) does not change.</p>
+<p>Values of different kinds are ordered as in the table: <code>nil</code> before booleans, booleans before numbers, and so on. Within a kind the order is the natural one; tuples, sets and maps compare element by element. This total order is what makes <code>min</code>, <code>max</code>, <code>sort</code>, <code>choose</code> and set iteration deterministic.</p>
+<p>Process identifiers are numbers: <code>self</code> is <code>3</code> on process p3.</p>
+<h2 id="built-in-names">Built-in names<a class="anchor" href="#built-in-names" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Name</th><th>Value</th><th>Available</th></tr></thead><tbody><tr><td><code>self</code></td><td>this process's number</td><td>always</td></tr><tr><td><code>Π</code>, <code>Procs</code></td><td>the set of all processes</td><td>always</td></tr><tr><td><code>N</code></td><td>the number of processes</td><td>always</td></tr><tr><td><code>neighbors</code></td><td>processes this process has an outgoing link to</td><td>always</td></tr><tr><td><code>round</code></td><td>the current round</td><td>synchronous rounds only</td></tr><tr><td><code>DELTA</code>, <code>PHI</code>, <code>RHO</code></td><td>the synchrony constants</td><td>only when known in the assumed model</td></tr></tbody></table></div>
+<p><code>Π</code> contains every process, including those without a link to this one. Sending to a process that is not a neighbor drops the message.</p>
+<h2 id="built-in-functions">Built-in functions<a class="anchor" href="#built-in-functions" aria-label="Link to this section">#</a></h2>
+<p><strong>Collections</strong></p>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th><th>Errors</th></tr></thead><tbody><tr><td><code>size(c)</code></td><td>number of elements of a set, map, tuple or string</td><td></td></tr><tr><td><code>min(c)</code>, <code>max(c)</code></td><td>smallest or largest element of a set or tuple, or key of a map</td><td>empty collection</td></tr><tr><td><code>choose(c)</code></td><td>the smallest element: a deterministic choice</td><td>empty collection</td></tr><tr><td><code>pick(c)</code></td><td>a random element, from the process's seeded stream</td><td>empty collection</td></tr><tr><td><code>keys(m)</code>, <code>values(m)</code></td><td>set of keys, set of values</td><td>not a map</td></tr><tr><td><code>get(m, k, d)</code></td><td><code>m[k]</code>, or <code>d</code> if missing; also works on tuples by index, and on <code>nil</code></td><td></td></tr><tr><td><code>remove(c, x)</code></td><td>the set or map without <code>x</code>, or the tuple without the first <code>x</code></td><td></td></tr><tr><td><code>toset(c)</code></td><td>the elements of a tuple or set, or the keys of a map, as a set</td><td></td></tr><tr><td><code>sort(c)</code></td><td>the elements as a sorted tuple</td><td></td></tr><tr><td><code>argmin(m)</code>, <code>argmax(m)</code></td><td>the key with the smallest or largest value; ties go to the smallest key</td><td>empty map</td></tr></tbody></table></div>
+<p><strong>Sequences</strong> (a set is treated as its sorted tuple)</p>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th><th>Errors</th></tr></thead><tbody><tr><td><code>head(t)</code>, <code>last(t)</code></td><td>first or last element</td><td>empty</td></tr><tr><td><code>tail(t)</code></td><td>all but the first element</td><td></td></tr><tr><td><code>reverse(t)</code></td><td>elements in reverse order</td><td></td></tr><tr><td><code>slice(t, a, b)</code></td><td>elements from index <code>a</code> up to, not including, <code>b</code></td><td></td></tr><tr><td><code>append(t, x)</code></td><td>the tuple with <code>x</code> added at the end</td><td>not a tuple</td></tr><tr><td><code>range(a, b)</code></td><td>the tuple <code>[a, a+1, …, b-1]</code></td><td>more than 100,000 elements</td></tr></tbody></table></div>
+<p><strong>Numbers</strong></p>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th><th>Errors</th></tr></thead><tbody><tr><td><code>sum(c)</code>, <code>mean(c)</code></td><td>sum or average of the numbers in a set or tuple, or of the values of a map</td><td>non-numbers; <code>mean</code> of nothing</td></tr><tr><td><code>abs</code>, <code>floor</code>, <code>ceil</code>, <code>round</code></td><td>as usual</td><td></td></tr><tr><td><code>sqrt(x)</code></td><td>square root</td><td>negative <code>x</code></td></tr><tr><td><code>ln(x)</code>, <code>exp(x)</code>, <code>pow(x, y)</code></td><td>natural logarithm, exponential, power</td><td><code>ln</code> of a number ≤ 0</td></tr><tr><td><code>random(a, b)</code></td><td>a random integer between <code>a</code> and <code>b</code>, both included</td><td></td></tr></tbody></table></div>
+<p><strong>Other</strong></p>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>now()</code></td><td>the process's local clock, in microseconds (not in lockstep rounds)</td></tr><tr><td><code>str(v)</code></td><td>the written form of a value</td></tr></tbody></table></div>
+<p>The logarithm is <code>ln</code>, because <code>log</code> is the statement that writes to the event log.</p>
+<h2 id="functions">Functions<a class="anchor" href="#functions" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-upon"><code><span class="t-kw">interface</span> <span class="t-ty">Stats</span>
+  <span class="t-kw">request</span> <span class="t-ty">Add</span>(x)
+  <span class="t-kw">indication</span> <span class="t-ty">Summary</span>(count, average, spread)
+<span class="t-kw">end</span>
+
+<span class="t-kw">algorithm</span> <span class="t-ty">Collector</span>
+  <span class="t-kw">implements</span> <span class="t-ty">Stats</span> <span class="t-kw">as</span> s
+  <span class="t-kw">uses</span> <span class="t-ty">Net</span> <span class="t-kw">as</span> net
+  <span class="t-kw">state</span>
+    samples := []
+
+  <span class="t-kw">function</span> average()
+    <span class="t-kw">return</span> mean(samples)
+  <span class="t-kw">end</span>
+
+  <span class="t-cm">// standard deviation; mean() divides exactly, while &quot;/&quot; between</span>
+  <span class="t-cm">// two whole numbers would truncate</span>
+  <span class="t-kw">function</span> spread()
+    a := average()
+    squares := []
+    <span class="t-kw">forall</span> x <span class="t-kw">in</span> samples <span class="t-kw">do</span>
+      squares := append(squares, pow(x - a, <span class="t-num">2</span>))
+    <span class="t-kw">end</span>
+    <span class="t-kw">return</span> sqrt(mean(squares))
+  <span class="t-kw">end</span>
+
+  <span class="t-kw">function</span> record(x)
+    samples := append(samples, x)
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>s, <span class="t-ty">Summary</span> | #samples, average(), spread()<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>s, <span class="t-ty">Add</span> | x<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">call</span> record(x)
+  <span class="t-kw">end</span>
+<span class="t-kw">end</span></code></pre>
+<p>A function:</p>
+<ul><li>belongs to one algorithm and can be called only from that algorithm;</li><li>sees the algorithm's state, parameters and built-in names, but not the local variables of its caller;</li><li>has its own local variables, starting with its parameters;</li><li>may assign state, trigger events and start timers, exactly like a handler;</li><li>returns the value of the first <code>return</code> it executes, or <code>nil</code> if it reaches the end;</li><li>may call itself and other functions, up to 200 nested calls.</li></ul>
+<p>Use a function in an expression, <code>x := average()</code>, or as a statement with <code>call record(x)</code>. <code>call</code> is only for your own functions; built-in functions are used in expressions.</p>
+<p>A function name cannot be the name of a built-in function.</p>
+<h2 id="timers">Timers<a class="anchor" href="#timers" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-text"><code>starttimer(retry, 200ms)       // start, or restart, the timer named &quot;retry&quot;
+canceltimer(retry)             // cancel it
+upon event ⟨timer, Timeout | retry⟩ do … end</code></pre>
+<ul><li>Timer names are plain identifiers, local to the module. They are not variables.</li><li>Starting a timer that is already running restarts it; only the latest start fires.</li><li>The duration is measured on the process's <strong>local clock</strong>, so drift changes the real duration slightly.</li><li>In the <code>Timeout</code> handler, the pattern is the timer's name. <code>⟨timer, Timeout | _⟩</code> catches every timer of the module.</li><li>A recovery cancels every timer.</li><li>Timers are not available with lockstep rounds; use <code>RoundStart</code> and <code>RoundEnd</code> there.</li></ul>
+<p>The checker warns about a <code>Timeout</code> handler for a timer the module never starts.</p>
+<h2 id="provided-modules">Provided modules<a class="anchor" href="#provided-modules" aria-label="Link to this section">#</a></h2>
+<h3 id="net">Net<a class="anchor" href="#net" aria-label="Link to this section">#</a></h3>
+<pre class="code lang-text"><code>interface Net
+  request Send(q, m)
+  indication Deliver(p, m)
+end</code></pre>
+<p><code>Send(q, m)</code> sends <code>m</code> to process <code>q</code> over the link between them. <code>Deliver(p, m)</code> reports a message <code>m</code> from <code>p</code>. The network behaves as the actual model says: it can lose, duplicate, delay and reorder messages. See <a href="timing-model.html">The timing model</a>.</p>
+<p><code>Net</code> is available with every synchrony model except synchronous rounds.</p>
+<h3 id="rounds">Rounds<a class="anchor" href="#rounds" aria-label="Link to this section">#</a></h3>
+<pre class="code lang-text"><code>interface Rounds
+  request Send(q, m)
+  indication RoundStart(r)
+  indication Deliver(p, m)
+  indication RoundEnd(r)
+end</code></pre>
+<p>In each round, a module that uses <code>Rounds</code> receives <code>RoundStart(r)</code>, then the messages of that round, then <code>RoundEnd(r)</code>. Send in <code>RoundStart</code>, collect in <code>Deliver</code>, decide in <code>RoundEnd</code>. The built-in <code>round</code> holds the current round number.</p>
+<p><code>Rounds</code> is available only with synchronous rounds. How rounds are executed is described in <a href="timing-model.html#rounds">The timing model</a>.</p>
+<h3 id="timer">timer<a class="anchor" href="#timer" aria-label="Link to this section">#</a></h3>
+<p><code>timer</code> is not declared with <code>uses</code>: every module has it. It produces only <code>Timeout(t)</code>.</p>
+<h2 id="composing-modules">Composing modules<a class="anchor" href="#composing-modules" aria-label="Link to this section">#</a></h2>
+<p>A program can contain several algorithms. The <strong>Main algorithm</strong> selector in the <em>Code</em> tab chooses the top one; its interface defines the inputs you can send and the outputs you see.</p>
+<p>For each <code>uses X as a</code>, the playground creates an instance of an algorithm that implements <code>X</code>:</p>
+<ul><li>with <code>via Y</code>, the algorithm <code>Y</code>, which must implement <code>X</code>;</li><li>otherwise, the first algorithm in the code that implements <code>X</code>. If there are several, a warning tells you which one was chosen.</li></ul>
+<p>Instances form a tree, one per process. Every <code>uses</code> creates its own instance, so two modules that use <code>PerfectLinks</code> get two independent copies with separate state.</p>
+<p>A module talks only to its direct neighbors in the tree: it sends requests to the modules it uses and indications to the module that uses it. It never sees their state.</p>
+<pre class="code lang-upon"><code><span class="t-kw">interface</span> <span class="t-ty">PerfectLinks</span>
+  <span class="t-kw">request</span> <span class="t-ty">Send</span>(q, m)
+  <span class="t-kw">indication</span> <span class="t-ty">Deliver</span>(p, m)
+<span class="t-kw">end</span>
+
+<span class="t-kw">interface</span> <span class="t-ty">Echo</span>
+  <span class="t-kw">request</span> <span class="t-ty">Ping</span>(q)
+  <span class="t-kw">indication</span> <span class="t-ty">Pong</span>(p)
+<span class="t-kw">end</span>
+
+<span class="t-kw">algorithm</span> <span class="t-ty">DirectLinks</span>
+  <span class="t-kw">implements</span> <span class="t-ty">PerfectLinks</span> <span class="t-kw">as</span> pl
+  <span class="t-kw">uses</span> <span class="t-ty">Net</span> <span class="t-kw">as</span> net
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>pl, <span class="t-ty">Send</span> | q, m<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>net, <span class="t-ty">Send</span> | q, m<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>net, <span class="t-ty">Deliver</span> | p, m<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>pl, <span class="t-ty">Deliver</span> | p, m<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+<span class="t-kw">end</span>
+
+<span class="t-kw">algorithm</span> <span class="t-ty">Pinger</span>
+  <span class="t-kw">implements</span> <span class="t-ty">Echo</span> <span class="t-kw">as</span> e
+  <span class="t-kw">uses</span> <span class="t-ty">PerfectLinks</span> <span class="t-kw">as</span> pl <span class="t-kw">via</span> <span class="t-ty">DirectLinks</span>
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>e, <span class="t-ty">Ping</span> | q<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>pl, <span class="t-ty">Send</span> | q, [<span class="t-at">PING</span>]<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>pl, <span class="t-ty">Deliver</span> | p, [<span class="t-at">PING</span>]<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>pl, <span class="t-ty">Send</span> | p, [<span class="t-at">PONG</span>]<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+  <span class="t-kw">upon</span> <span class="t-kw">event</span> <span class="t-op">⟨</span>pl, <span class="t-ty">Deliver</span> | p, [<span class="t-at">PONG</span>]<span class="t-op">⟩</span> <span class="t-kw">do</span>
+    <span class="t-kw">trigger</span> <span class="t-op">⟨</span>e, <span class="t-ty">Pong</span> | p<span class="t-op">⟩</span>
+  <span class="t-kw">end</span>
+<span class="t-kw">end</span></code></pre>
+<p>Ready-made modules for links and broadcast are in the <a href="library.html">module library</a>.</p>
+<h2 id="what-the-checker-verifies">What the checker verifies<a class="anchor" href="#what-the-checker-verifies" aria-label="Link to this section">#</a></h2>
+<p>The checker runs while you type and again before every run. Errors stop the run; warnings do not.</p>
+<p><strong>Errors</strong></p>
+<ul><li>Syntax errors, with line and column.</li><li>An interface used or implemented but not declared; implementing <code>Net</code> or <code>Rounds</code>; two algorithms or interfaces with the same name.</li><li><code>Rounds</code> without the synchronous rounds model, or <code>Net</code> with it.</li><li><code>DELTA</code>, <code>PHI</code> or <code>RHO</code> when unknown in the assumed model; <code>round</code> outside the rounds model; <code>now()</code> or <code>starttimer</code> in lockstep rounds.</li><li>A variable that is not declared, not a parameter, not a built-in and not an atom.</li><li>An assignment to a parameter or a built-in name; a state variable or parameter named like a built-in.</li><li>A <code>trigger</code> to an unknown instance, an indication sent downwards, a request sent upwards, or the wrong number of arguments.</li><li>A handler for an event that the instance cannot produce, or with the wrong number of patterns; <code>Init</code> or <code>Recovery</code> with patterns; a <code>timer</code> handler for anything but <code>Timeout(t)</code>.</li><li>An unknown function, a call with the wrong number of arguments, <code>call</code> with a built-in function, <code>return</code> outside a function, a function with a built-in's name or a repeated parameter.</li><li><code>uses … via Y</code> where <code>Y</code> does not exist or implements another interface; <code>via</code> with <code>Net</code> or <code>Rounds</code>.</li></ul>
+<p><strong>Warnings</strong></p>
+<ul><li>An indication of a used module that no handler receives (its events will be ignored).</li><li>A <code>Timeout</code> handler for a timer the module never starts.</li><li>Timers in lockstep rounds.</li><li>Several algorithms implementing an interface used without <code>via</code>.</li></ul>
+<h2 id="runtime-errors">Runtime errors<a class="anchor" href="#runtime-errors" aria-label="Link to this section">#</a></h2>
+<p>Some problems can only be found while running. The run stops, keeps everything up to that point, and shows the line in the editor.</p>
+<ul><li>A value of the wrong kind: <code>Expected a boolean, found number (3)</code>.</li><li>An index outside a tuple, an indexed assignment on something that is not a map or tuple.</li><li>Division by zero.</li><li><code>min</code>, <code>max</code>, <code>choose</code>, <code>pick</code>, <code>head</code>, <code>last</code>, <code>mean</code>, <code>argmin</code> or <code>argmax</code> of an empty collection.</li><li><code>sqrt</code> of a negative number, <code>ln</code> of a number that is not positive.</li><li>A local variable read on a path where it was never assigned (<code>Variable &quot;x&quot; is not defined</code>).</li><li>More than 200 nested function calls, more than 100,000 iterations of a <code>while</code> loop, more than 200,000 statements or 20,000 internal events in one step, a guard that stays true.</li></ul>
+<h2 id="ascii-syntax">ASCII syntax<a class="anchor" href="#ascii-syntax" aria-label="Link to this section">#</a></h2>
+<p>Every symbol has a plain-text spelling, and you can mix both.</p>
+<div class="table"><table><thead><tr><th>Unicode</th><th>ASCII</th><th></th><th>Unicode</th><th>ASCII</th></tr></thead><tbody><tr><td><code>⟨</code> <code>⟩</code></td><td><code>&lt;</code> <code>&gt;</code></td><td></td><td><code>∈</code> <code>∉</code></td><td><code>in</code> <code>notin</code></td></tr><tr><td><code>∪</code> <code>∩</code> <code>\</code></td><td><code>union</code> <code>inter</code> <code>minus</code></td><td></td><td><code>∅</code></td><td><code>{}</code></td></tr><tr><td><code>≠</code> <code>≤</code> <code>≥</code></td><td><code>!=</code> <code>&lt;=</code> <code>&gt;=</code></td><td></td><td><code>∧</code> <code>∨</code> <code>¬</code></td><td><code>and</code> <code>or</code> <code>not</code></td></tr><tr><td><code>Π</code></td><td><code>Procs</code></td><td></td><td><code>⊆</code></td><td><code>subseteq</code></td></tr><tr><td><code>←</code></td><td><code>:=</code></td><td></td><td><code>∀</code></td><td><code>forall</code></td></tr></tbody></table></div>
+<p>With ASCII angle brackets, <code>&gt;</code> inside a <code>trigger</code> would close the event. Wrap comparisons in parentheses there:</p>
+<pre class="code lang-text"><code>trigger &lt;app, Result | (x &gt; 3)&gt;</code></pre>
+<p>The symbol buttons above the editor insert the Unicode characters at the cursor.</p>
+<h2 id="common-mistakes">Common mistakes<a class="anchor" href="#common-mistakes" aria-label="Link to this section">#</a></h2>
+<p><strong>A handler never runs.</strong> Handlers are tried in order and only the first match runs. An earlier, more general handler may be catching the event. Put the specific one first, or add <code>where</code> clauses.</p>
+<p><strong>&quot;Variable is not declared&quot; for a message tag.</strong> Atoms need at least two capital letters: <code>A</code> is a variable name, <code>AB</code> is an atom.</p>
+<p><strong>A tag matches a variable instead.</strong> If a state variable is called <code>DATA</code>, the pattern <code>[DATA, m]</code> compares with its value instead of the atom. Use lower-case names for variables.</p>
+<p><strong><code>5 / 2</code> gives 2.</strong> Division between two whole numbers truncates, and a value such as <code>4.0</code> counts as whole. Use <code>mean</code> for averages, or multiply first (<code>100 * a / b</code>) when you need a percentage.</p>
+<p><strong>Nothing arrives.</strong> The recipient may not be a neighbor; check the topology, or look for <em>no link</em> in the event log.</p>
+<p><strong>A broadcast reaches only some processes.</strong> Library broadcast modules send to every process in <code>Π</code>, which requires a complete graph.</p>
+<p><strong>A guard stops the run.</strong> An <code>upon condition</code> handler must make its condition false. If it only sends a message, it will fire again at once.</p>
+<p><strong>An algorithm works but depends on the order of a set.</strong> Sets are iterated in sorted order and <code>choose</code> is deterministic here. Real systems give no such guarantee; try <code>pick</code> to see whether the algorithm still works.</p>
+<nav class="pager"><a href="interface.html"><small>Previous</small>The interface</a><a href="library.html" style="text-align:right"><small>Next</small>The module library</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/language.md" target="_blank" rel="noopener">docs/language.md</a>. Released under the MIT License.</footer>
+</main>
+<aside class="toc"><p>On this page</p><a class="l2" href="#a-first-program">A first program</a><a class="l2" href="#lexical-rules">Lexical rules</a><a class="l2" href="#interfaces">Interfaces</a><a class="l2" href="#algorithms">Algorithms</a><a class="l2" href="#handlers">Handlers</a><a class="l3" href="#event-handlers">Event handlers</a><a class="l3" href="#condition-handlers">Condition handlers</a><a class="l3" href="#exists-handlers">Exists handlers</a><a class="l2" href="#patterns">Patterns</a><a class="l2" href="#statements">Statements</a><a class="l2" href="#expressions">Expressions</a><a class="l2" href="#values">Values</a><a class="l2" href="#built-in-names">Built-in names</a><a class="l2" href="#built-in-functions">Built-in functions</a><a class="l2" href="#functions">Functions</a><a class="l2" href="#timers">Timers</a><a class="l2" href="#provided-modules">Provided modules</a><a class="l3" href="#net">Net</a><a class="l3" href="#rounds">Rounds</a><a class="l3" href="#timer">timer</a><a class="l2" href="#composing-modules">Composing modules</a><a class="l2" href="#what-the-checker-verifies">What the checker verifies</a><a class="l2" href="#runtime-errors">Runtime errors</a><a class="l2" href="#ascii-syntax">ASCII syntax</a><a class="l2" href="#common-mistakes">Common mistakes</a></aside>
+</div>
+</body>
+</html>
