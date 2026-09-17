@@ -390,11 +390,23 @@ function restoreTree() {
     }
   }
 }
+// Blocks with markup: the English content is kept as cloned nodes, the translations are constant markup
+// parsed once into a template.
+const parsedBlocks = {};
+function blockNodes(k) {
+  if (!parsedBlocks[k]) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = BLOCKS[k];
+    parsedBlocks[k] = tpl.content;
+  }
+  return parsedBlocks[k].cloneNode(true);
+}
 function applyBlocks(to) {
   for (const el of document.querySelectorAll('[data-i18n-block]')) {
     const k = el.getAttribute('data-i18n-block');
-    if (el.__enHTML === undefined) el.__enHTML = el.innerHTML;
-    el.innerHTML = to === 'it' && BLOCKS[k] ? BLOCKS[k] : el.__enHTML;
+    if (el.__enNodes === undefined) el.__enNodes = [...el.childNodes].map(n => n.cloneNode(true));
+    if (to === 'it' && Object.prototype.hasOwnProperty.call(BLOCKS, k)) el.replaceChildren(blockNodes(k));
+    else el.replaceChildren(...el.__enNodes.map(n => n.cloneNode(true)));
   }
 }
 function setLang(l) {

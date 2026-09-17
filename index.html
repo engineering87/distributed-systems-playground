@@ -4051,11 +4051,23 @@ function restoreTree() {
     }
   }
 }
+// Blocks with markup: the English content is kept as cloned nodes, the translations are constant markup
+// parsed once into a template.
+const parsedBlocks = {};
+function blockNodes(k) {
+  if (!parsedBlocks[k]) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = BLOCKS[k];
+    parsedBlocks[k] = tpl.content;
+  }
+  return parsedBlocks[k].cloneNode(true);
+}
 function applyBlocks(to) {
   for (const el of document.querySelectorAll('[data-i18n-block]')) {
     const k = el.getAttribute('data-i18n-block');
-    if (el.__enHTML === undefined) el.__enHTML = el.innerHTML;
-    el.innerHTML = to === 'it' && BLOCKS[k] ? BLOCKS[k] : el.__enHTML;
+    if (el.__enNodes === undefined) el.__enNodes = [...el.childNodes].map(n => n.cloneNode(true));
+    if (to === 'it' && Object.prototype.hasOwnProperty.call(BLOCKS, k)) el.replaceChildren(blockNodes(k));
+    else el.replaceChildren(...el.__enNodes.map(n => n.cloneNode(true)));
   }
 }
 function setLang(l) {
@@ -4641,7 +4653,11 @@ function sv(tag, attrs, text) {
   if (text !== undefined) e.textContent = text;
   return e;
 }
-const clone = o => JSON.parse(JSON.stringify(o));
+// Keys that could reach an object's prototype are dropped from every JSON document that comes from outside
+// the page (imported files, shared links, local storage).
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function safeParse(text) { return JSON.parse(text, (k, v) => (UNSAFE_KEYS.has(k) ? undefined : v)); }
+const clone = o => safeParse(JSON.stringify(o));
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* browser storage unavailable */ } }
@@ -4708,6 +4724,7 @@ function blankScenario() {
 
 function ensureScenario(s) {
   if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('not a scenario object');
+  s = clone(s);
   if (!Array.isArray(s.nodes)) throw new Error('"nodes" must be a list');
   if (typeof s.code !== 'string') throw new Error('"code" must be text');
   if (s.links !== undefined && !Array.isArray(s.links)) throw new Error('"links" must be a list');
@@ -4740,8 +4757,33 @@ function ensureScenario(s) {
   return out;
 }
 
-function getPath(o, p) { return p.split('.').reduce((a, k) => (a === null || a === undefined) ? a : a[k], o); }
-function setPath(o, p, v) { const ks = p.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) a = a[ks[i]]; a[ks[ks.length - 1]] = v; }
+// Form fields are bound to scenario properties through data-bind paths written in the template.
+// Only own properties are followed, and keys that could reach a prototype are refused.
+function pathKeys(p) {
+  const ks = String(p).split('.');
+  if (ks.some(k => !k || UNSAFE_KEYS.has(k))) throw new Error('Invalid property path: ' + p);
+  return ks;
+}
+function getPath(o, p) {
+  let a = o;
+  for (const k of pathKeys(p)) {
+    if (a === null || typeof a !== 'object' || !Object.prototype.hasOwnProperty.call(a, k)) return undefined;
+    a = a[k];
+  }
+  return a;
+}
+function setPath(o, p, v) {
+  const ks = pathKeys(p);
+  let a = o;
+  for (let i = 0; i < ks.length - 1; i++) {
+    const k = ks[i];
+    if (!Object.prototype.hasOwnProperty.call(a, k) || a[k] === null || typeof a[k] !== 'object') {
+      Object.defineProperty(a, k, { value: {}, writable: true, enumerable: true, configurable: true });
+    }
+    a = a[k];
+  }
+  Object.defineProperty(a, ks[ks.length - 1], { value: v, writable: true, enumerable: true, configurable: true });
+}
 
 // ============================================================ validation
 function validate(kind, v) {
@@ -4848,27 +4890,31 @@ function scheduleSave() { clearTimeout(saveT); saveT = setTimeout(() => store.se
 // ============================================================ code editor
 const BI = new Set([...C.BUILTIN_VARS, ...Object.keys(C.BUILTIN_FUNS), 'timer']);
 function esc(s) { return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
-function span(cls, s) { return '<span class="' + cls + '">' + esc(s) + '</span>'; }
+// The highlighted copy of the editor is built as DOM nodes: the code is only ever used as text.
 function highlight(src, errLines) {
+  const frag = document.createDocumentFragment();
   const lines = src.split('\n');
   let inBlock = false;
-  let out = '';
   lines.forEach((line, i) => {
-    let html = '', j = 0;
+    const row = document.createElement('span');
+    row.className = 'ln' + (errLines.has(i + 1) ? ' e' : '');
+    const span = (cls, text) => { const s = document.createElement('span'); s.className = cls; s.textContent = text; row.append(s); };
+    const plain = text => row.append(text);
+    let j = 0;
     while (j < line.length) {
       if (inBlock) {
         const e = line.indexOf('*/', j);
         const end = e < 0 ? line.length : e + 2;
-        html += span('t-cm', line.slice(j, end));
+        span('t-cm', line.slice(j, end));
         j = end; if (e >= 0) inBlock = false;
         continue;
       }
       const rest = line.slice(j);
       let m;
-      if (rest.startsWith('//')) { html += span('t-cm', rest); break; }
-      if (rest.startsWith('/*')) { html += span('t-cm', '/*'); j += 2; inBlock = true; continue; }
-      if ((m = /^"(?:[^"\\]|\\.)*"?/.exec(rest))) { html += span('t-str', m[0]); j += m[0].length; continue; }
-      if ((m = /^\d+(?:\.\d+)?(?:[eE]-?\d+)?(?:us|ms|s)?(?![A-Za-z0-9_])/.exec(rest))) { html += span('t-num', m[0]); j += m[0].length; continue; }
+      if (rest.startsWith('//')) { span('t-cm', rest); break; }
+      if (rest.startsWith('/*')) { span('t-cm', '/*'); j += 2; inBlock = true; continue; }
+      if ((m = /^"(?:[^"\\]|\\.)*"?/.exec(rest))) { span('t-str', m[0]); j += m[0].length; continue; }
+      if ((m = /^\d+(?:\.\d+)?(?:[eE]-?\d+)?(?:us|ms|s)?(?![A-Za-z0-9_])/.exec(rest))) { span('t-num', m[0]); j += m[0].length; continue; }
       if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(rest))) {
         const w = m[0];
         let cls = '';
@@ -4876,29 +4922,38 @@ function highlight(src, errLines) {
         else if (BI.has(w)) cls = 't-bi';
         else if (C.isAtomName(w)) cls = 't-at';
         else if (/^[A-Z]/.test(w)) cls = 't-ty';
-        html += cls ? span(cls, w) : esc(w);
+        if (cls) span(cls, w); else plain(w);
         j += w.length; continue;
       }
       const c = rest[0];
-      if (c === 'Π') html += span('t-bi', c);
-      else if ('⟨⟩∪∩∈∉∅∧∨¬⊆≠≤≥←\\↦'.includes(c)) html += span('t-op', c);
-      else html += esc(c);
+      if (c === 'Π') span('t-bi', c);
+      else if ('⟨⟩∪∩∈∉∅∧∨¬⊆≠≤≥←\\↦'.includes(c)) span('t-op', c);
+      else plain(c);
       j++;
     }
-    out += '<span class="ln' + (errLines.has(i + 1) ? ' e' : '') + '">' + (html || ' ') + '</span>';
+    if (!row.childNodes.length) row.append(' ');
+    frag.append(row);
   });
-  return out + '<span class="ln"> </span>';
+  const last = document.createElement('span');
+  last.className = 'ln';
+  last.textContent = ' ';
+  frag.append(last);
+  return frag;
 }
 function refreshCode() {
   if (!S.scn) return;
   const src = S.scn.code;
   const errLines = new Set(S.diag.errors.map(e => e.line).filter(Boolean));
   if (S.runtimeErr && S.runtimeErr.line) errLines.add(S.runtimeErr.line);
-  $('#code-hl').innerHTML = highlight(src, errLines);
+  $('#code-hl').replaceChildren(highlight(src, errLines));
   const n = src.split('\n').length;
-  let g = '';
-  for (let i = 1; i <= n; i++) g += (errLines.has(i) ? '<span class="e">' + i + '</span>' : i) + '\n';
-  $('#gutter').innerHTML = g + '\n';
+  const gutter = document.createDocumentFragment();
+  for (let i = 1; i <= n; i++) {
+    if (errLines.has(i)) { const e = document.createElement('span'); e.className = 'e'; e.textContent = String(i); gutter.append(e, '\n'); }
+    else gutter.append(i + '\n');
+  }
+  gutter.append('\n');
+  $('#gutter').replaceChildren(gutter);
   syncScroll();
 }
 function syncScroll() {
@@ -6878,7 +6933,7 @@ async function fromHash() {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
     bytes = new Uint8Array(await new Response(stream).arrayBuffer());
   }
-  return JSON.parse(new TextDecoder().decode(bytes));
+  return safeParse(new TextDecoder().decode(bytes));
 }
 async function copyText(text, msgEl) {
   try { await navigator.clipboard.writeText(text); msgEl.textContent = 'Copied to the clipboard.'; }
@@ -6903,9 +6958,12 @@ async function saveFile(name, text, mime, msgEl) {
       }
       return;
     }
+    // the file is only downloaded, never opened by the page
+    const blob = text instanceof Blob ? text : new Blob([String(text)], { type: 'application/octet-stream' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(text instanceof Blob ? text : new Blob([text], { type: mime }));
+    a.href = URL.createObjectURL(blob);
     a.download = name;
+    a.rel = 'noopener';
     document.body.append(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -6935,7 +6993,7 @@ function bindDialogs() {
   $('#btn-import').addEventListener('click', openImport);
   $('#btn-copy-json').addEventListener('click', () => copyText($('#export-text').value, $('#export-msg')));
   $('#btn-copy-link').addEventListener('click', () => copyText($('#export-link').value, $('#export-msg')));
-  $('#btn-save-json').addEventListener('click', () => saveFile(fileName(), $('#export-text').value));
+  $('#btn-save-json').addEventListener('click', () => saveFile(fileName(), JSON.stringify(S.scn, null, 2)));
   $('#import-file').addEventListener('change', async e => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
@@ -6944,7 +7002,7 @@ function bindDialogs() {
   });
   $('#btn-do-import').addEventListener('click', () => {
     try {
-      const obj = JSON.parse($('#import-text').value);
+      const obj = safeParse($('#import-text').value);
       if (!obj || !Array.isArray(obj.nodes) || typeof obj.code !== 'string')
         throw new Error('This is not a scenario: "nodes" or "code" is missing.');
       loadScenario(obj, 'Scenario imported.');
@@ -7217,7 +7275,14 @@ async function exportImage(kind) {
 // ============================================================ settings
 const SETTINGS_KEY = 'ds-playground:settings';
 const SET = Object.assign({ theme: 'system', palette: 'standard', lang: 'en' }, (() => {
-  try { return JSON.parse(store.get(SETTINGS_KEY) || '{}'); } catch (e) { return {}; }
+  try {
+    const v = safeParse(store.get(SETTINGS_KEY) || '{}');
+    const out = {};
+    if (['system', 'light', 'dark'].includes(v.theme)) out.theme = v.theme;
+    if (['standard', 'cvd'].includes(v.palette)) out.palette = v.palette;
+    if (['en', 'it'].includes(v.lang)) out.lang = v.lang;
+    return out;
+  } catch (e) { return {}; }
 })());
 function applySettings() {
   const root = document.documentElement;
@@ -7374,7 +7439,7 @@ async function init() {
   catch (e) { toast('The link does not contain a valid scenario: loading the last saved one.'); }
   if (!initial) {
     const saved = store.get(STORE_KEY);
-    if (saved) { try { initial = JSON.parse(saved); } catch (e) { initial = null; } }
+    if (saved) { try { initial = safeParse(saved); } catch (e) { initial = null; } }
   }
   if (!initial) initial = EX.EXAMPLES.find(x => x.key === 'flooding').scenario;
   loadScenario(initial, null);

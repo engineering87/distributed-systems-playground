@@ -6,6 +6,16 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.6.1]
+
+### Security
+- The CI workflow runs with read-only repository permissions.
+- Downloaded scenario files are built from the application state instead of the text shown in the export dialog, and every download uses a generic content type.
+- JSON from imported files, shared links and local storage is parsed without `__proto__`, `constructor` and `prototype` keys; stored settings are checked against their allowed values.
+- Property paths used by form fields follow only own properties and refuse keys that could reach a prototype.
+- The editor's syntax highlighting and line numbers are built as DOM nodes, so code is never interpreted as HTML.
+- Translated blocks are restored from cloned nodes instead of re-parsed markup.
+
 ## [0.6.0]
 
 ### Added
