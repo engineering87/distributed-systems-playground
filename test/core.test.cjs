@@ -499,3 +499,77 @@ end`;
   const orig = sent(a);
   for (const m of kept) assert.equal(m.recvT, orig.find(o => o.id === m.id).recvT);
 });
+
+// ---------------------------------------------------------------- global properties
+test('properties see the state of every process and report the first violation', () => {
+  const code = `interface T
+  request Set(v)
+  indication Done(v)
+end
+algorithm A
+  implements T as t
+  uses Net as net
+  state
+    value := nil
+  upon event ⟨t, Set | v⟩ do
+    value := v
+    trigger ⟨t, Done | v⟩
+  end
+end
+
+property SameValue always
+  #toset(values(defined(value))) ≤ 1
+end
+
+property EveryoneSet eventually
+  keys(defined(value)) = correct
+end`;
+  const same = C.runSimulation(tiny(code, '0ms 1 Set | 7\n1ms 2 Set | 7\n2ms 3 Set | 7'));
+  assert.equal(same.error, null);
+  assert.deepEqual(same.properties.map(p => [p.name, p.kind, p.ok]), [['SameValue', 'always', true], ['EveryoneSet', 'eventually', true]]);
+
+  const differ = C.runSimulation(tiny(code, '0ms 1 Set | 7\n1ms 2 Set | 9'));
+  const [agreement, everyone] = differ.properties;
+  assert.equal(agreement.ok, false);
+  assert.equal(agreement.node, 2);
+  assert.equal(agreement.at, 1000);
+  assert.equal(everyone.ok, false, 'p3 never sets a value');
+  assert.ok(differ.log.some(e => e.kind === 'property' && e.text === 'SameValue is violated'));
+  assert.equal(differ.violations, 0, 'a broken property is not a timing violation');
+
+  const halted = C.runSimulation(Object.assign(tiny(code, '0ms 1 Set | 7\n1ms 2 Set | 9'), { haltOnProperty: true }));
+  assert.match(halted.stopReason, /Property violated: SameValue/);
+});
+
+test('a property can only name state variables and the globals it is given', () => {
+  const head = `interface T request Go() indication Out(x) end
+algorithm A implements T as t uses Net as net state d := nil upon event ⟨t, Go⟩ do skip end end
+`;
+  const errs = src => C.runSimulation(tiny(head + src, '')).compile.errors.map(e => e.msg).join(' | ');
+  assert.match(errs('property P always self = 1 end'), /"self" is not available in a property/);
+  assert.match(errs('property P always nope = 1 end'), /"nope" is not a state variable/);
+  assert.match(errs('property P always size(1, 2) end'), /"size" takes 1 argument/);
+  assert.match(errs('property P always now() = 0 end'), /"now" is not available in a property/);
+  assert.match(errs('property P always random(1, 2) = 1 end'), /must not depend on chance/);
+  assert.match(errs('property P always t ≥ 0 end'), /^$/, '"t" is available');
+  assert.match(errs('property P always true end\nproperty P always false end'), /Property "P" is already defined/);
+  // a property that is not a boolean is reported at runtime, without stopping the run
+  const r = C.runSimulation(tiny(head + 'property P always #d end', '0ms 1 Go'));
+  assert.equal(r.error, null);
+  assert.equal(r.properties[0].ok, false);
+  assert.match(r.properties[0].error, /not a boolean|Expected/);
+});
+
+test('the FloodSet example carries agreement, validity and termination', () => {
+  const s = byKey('floodset');
+  const ideal = C.runSimulation(s);
+  assert.deepEqual(ideal.properties.map(p => p.name + ':' + p.ok), ['Agreement:true', 'Validity:true', 'Termination:true']);
+  const real = C.runSimulation(Object.assign(clone(s), clone(PRESETS['sync-real']), { seed: 5 }));
+  const agreement = real.properties.find(p => p.name === 'Agreement');
+  assert.equal(agreement.ok, false);
+  assert.equal(real.properties.find(p => p.name === 'Validity').ok, true, 'processes still decide a proposed value');
+  for (let seed = 1; seed <= 20; seed++) {
+    const r = C.runSimulation(Object.assign(clone(s), { seed }));
+    assert.ok(r.properties.every(p => p.ok), 'ideal rounds keep every property, seed ' + seed);
+  }
+});

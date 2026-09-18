@@ -228,7 +228,8 @@ function typeName(v) {
 // ============================================================
 const KEYWORDS = new Set(('interface request indication algorithm implements as uses params state stable ' +
   'upon event where condition exists in do end trigger if then elif else forall while starttimer ' +
-  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil function return call via').split(' '));
+  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil function return call via ' +
+  'property always eventually').split(' '));
 
 const UNICODE_MAP = {
   '∪': ['kw', 'union'], '∩': ['kw', 'inter'], '∈': ['kw', 'in'], '∉': ['kw', 'notin'],
@@ -325,16 +326,31 @@ class Parser {
   skipSemis() { while (this.isOp(';')) this.p++; }
 
   program() {
-    const prog = { interfaces: new Map(), algorithms: [] };
+    const prog = { interfaces: new Map(), algorithms: [], properties: [] };
     while (!this.is('eof')) {
       if (this.isKw('interface')) {
         const it = this.iface();
         if (prog.interfaces.has(it.name)) this.err('Interface "' + it.name + '" is already defined', it.tok);
         prog.interfaces.set(it.name, it);
       } else if (this.isKw('algorithm')) prog.algorithms.push(this.algorithm());
-      else this.err('Expected "interface" or "algorithm", found ' + this.desc(this.tok));
+      else if (this.isKw('property')) prog.properties.push(this.property());
+      else this.err('Expected "interface", "algorithm" or "property", found ' + this.desc(this.tok));
     }
     return prog;
+  }
+
+  // property Name always <expression> end   |   property Name eventually <expression> end
+  property() {
+    this.kw('property');
+    const name = this.ident('the property name');
+    let kind;
+    if (this.isKw('always')) kind = 'always';
+    else if (this.isKw('eventually')) kind = 'eventually';
+    else this.err('Expected "always" or "eventually", found ' + this.desc(this.tok));
+    this.p++;
+    const expr = this.expr();
+    this.kw('end');
+    return { name: name.v, kind, expr, tok: name, line: name.line };
   }
 
   iface() {
@@ -737,9 +753,13 @@ function builtinIfaces() {
 }
 
 const BUILTIN_VARS = new Set(['self', 'Procs', 'neighbors', 'N', 'DELTA', 'PHI', 'RHO', 'round']);
+// what a property can name besides the state variables of the algorithms
+const PROPERTY_VARS = new Set(['Procs', 'N', 'crashed', 'correct', 'up', 't']);
+// built-ins that depend on one process or on chance, and so make no sense in a property
+const PROPERTY_NO_FUNS = new Map([['now', 'use "t" for the current time'], ['random', 'a property must not depend on chance'], ['pick', 'a property must not depend on chance']]);
 const BUILTIN_FUNS = {
   min: [1, 1], max: [1, 1], choose: [1, 1], size: [1, 1], keys: [1, 1], values: [1, 1],
-  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1],
+  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1], defined: [1, 1],
   head: [1, 1], tail: [1, 1], last: [1, 1], sort: [1, 1], reverse: [1, 1], slice: [3, 3], range: [2, 2],
   remove: [2, 2], get: [3, 3], sum: [1, 1], mean: [1, 1], argmin: [1, 1], argmax: [1, 1], pick: [1, 1],
   sqrt: [1, 1], ln: [1, 1], exp: [1, 1], pow: [2, 2], floor: [1, 1], ceil: [1, 1], round: [1, 1]
@@ -977,6 +997,51 @@ function check(prog, ctx) {
     for (const p of a.params) checkExpr(p.expr, new Set());
     for (const s of a.state) checkExpr(s.expr, new Set());
   }
+  // ---- properties: one boolean expression evaluated over the state of every process
+  const stateNames = new Set();
+  for (const a of prog.algorithms) for (const st of a.state) stateNames.add(st.name);
+  const propNames = new Set();
+  for (const pr of prog.properties || []) {
+    if (propNames.has(pr.name)) E('Property "' + pr.name + '" is already defined', pr.tok);
+    propNames.add(pr.name);
+    (function walk(e, bound) {
+      if (!e) return;
+      switch (e.e) {
+        case 'lit': return;
+        case 'var':
+          if (bound.has(e.name) || stateNames.has(e.name) || PROPERTY_VARS.has(e.name) || isAtomName(e.name)) return;
+          E(BUILTIN_VARS.has(e.name)
+            ? '"' + e.name + '" is not available in a property: a property sees every process at once'
+            : '"' + e.name + '" is not a state variable of any algorithm', e.tok);
+          return;
+        case 'bin': walk(e.l, bound); walk(e.r, bound); return;
+        case 'un': return walk(e.x, bound);
+        case 'index': walk(e.x, bound); walk(e.i, bound); return;
+        case 'tuplit': case 'setlit': e.items.forEach(x => walk(x, bound)); return;
+        case 'compr': {
+          walk(e.set, bound);
+          const b2 = new Set(bound); b2.add(e.var);
+          walk(e.where, b2);
+          return;
+        }
+        case 'call': {
+          const f = BUILTIN_FUNS[e.name];
+          if (!f) E('Unknown function "' + e.name + '" (a property can only use built-in functions)', e.tok);
+          else if (PROPERTY_NO_FUNS.has(e.name)) E('"' + e.name + '" is not available in a property: ' + PROPERTY_NO_FUNS.get(e.name), e.tok);
+          else if (e.args.length < f[0] || e.args.length > f[1])
+            E('"' + e.name + '" takes ' + (f[0] === f[1] ? f[0] : f[0] + ' to ' + f[1]) + ' argument(s)', e.tok);
+          e.args.forEach(x => walk(x, bound));
+          return;
+        }
+        default:
+          for (const k in e) {
+            const v = e[k];
+            if (Array.isArray(v)) v.forEach(x => { if (x && x.e) walk(x, bound); });
+            else if (v && typeof v === 'object' && v.e) walk(v, bound);
+          }
+      }
+    })(pr.expr, new Set());
+  }
   return { errors, warnings, ifaces };
 }
 
@@ -1171,6 +1236,7 @@ function binop(op, a, b, line) {
 
 function lookup(name, env, line) {
   if (env.locals.has(name)) return env.locals.get(name);
+  if (env.property) throw new RtError('"' + name + '" is not available in a property', line);
   const inst = env.inst;
   if (name in inst.state) return inst.state[name];
   if (name in inst.params) return inst.params[name];
@@ -1226,6 +1292,12 @@ function callBuiltin(name, args, env, line) {
     case 'append': needType(a, v => v instanceof Tup, 'a tuple', line); return new Tup(a.items.concat([args[1]]));
     case 'toset': return VSet.of(elems(a, line));
     case 'str': return typeof a === 'string' ? a : fmt(a);
+    case 'defined': {
+      needType(a, v => v instanceof VMap, 'a map', line);
+      const m = new Map();
+      for (const [k, v] of a.m) if (v[1] !== null) m.set(k, v);
+      return new VMap(m);
+    }
     case 'head': case 'last': {
       const xs = seqOf(a, name, line);
       if (!xs.length) throw new RtError(name + ' of an empty ' + typeName(a), line);
@@ -1440,7 +1512,8 @@ function runSimulation(scn) {
   const out = {
     ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
     snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
-    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, netFaults: { links: [], partitions: [] }
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, netFaults: { links: [], partitions: [] },
+    properties: []
   };
   // ---- configuration ----
   let cfg;
@@ -1819,6 +1892,74 @@ function runSimulation(scn) {
     }
   }
 
+  // ---- global properties ----
+  // Each property is one boolean expression over the state of every process: a state variable name reads as a
+  // map from process to its value on that process, in the main algorithm. "always" is checked after every step
+  // and reports the first moment it turns false; "eventually" latches the first moment it turns true.
+  const props = (prog.properties || []).map(pr => ({
+    name: pr.name, kind: pr.kind, expr: pr.expr, line: pr.line,
+    ok: pr.kind === 'always', at: null, node: null, error: null
+  }));
+  const propStateNames = (() => {
+    const set = new Set();
+    for (const a of prog.algorithms) for (const st of a.state) set.add(st.name);
+    return [...set];
+  })();
+  function propEnv(t) {
+    const locals = new Map();
+    for (const name of propStateNames) {
+      const m = new Map();
+      for (const node of nodes) {
+        const st = node.insts[0].state;
+        if (name in st) m.set(key(node.id), [node.id, st[name]]);
+      }
+      locals.set(name, new VMap(m));
+    }
+    const crashedSet = new Set(nodes.filter(n => n.crashed).map(n => n.id));
+    const everCrashed = new Set(nodes.filter(n => (out.downs[n.id] || []).length).map(n => n.id));
+    const setOf = ids => new VSet(new Map(ids.map(id => [key(id), id])));
+    locals.set('Procs', sim.procSet);
+    locals.set('N', nodes.length);
+    locals.set('crashed', setOf([...crashedSet]));
+    locals.set('up', setOf(nodes.filter(n => !n.crashed).map(n => n.id)));
+    locals.set('correct', setOf(nodes.filter(n => !everCrashed.has(n.id)).map(n => n.id)));
+    locals.set('t', t);
+    // a placeholder instance: a property has no algorithm of its own, and only built-in functions are allowed
+    const inst = { state: {}, params: {}, algo: { funcs: new Map() } };
+    return { node: null, inst, locals, sim, rng: streams.get('input'), time: t, property: true };
+  }
+  function checkProperties(t, nodeId) {
+    if (!props.length) return;
+    let env = null;
+    for (const p of props) {
+      if (p.error) continue;
+      if (p.kind === 'always' && !p.ok) continue;      // the first violation is the one that matters
+      if (p.kind === 'eventually' && p.ok) continue;   // already satisfied
+      if (!env) env = propEnv(t);
+      let v;
+      try { v = evalExpr(p.expr, env); }
+      catch (e) {
+        p.error = e instanceof RtError ? e.message : String(e && e.message || e);
+        logE(t, nodeId, 'property', p.name + ' could not be evaluated: ' + p.error, p.line);
+        continue;
+      }
+      if (typeof v !== 'boolean') {
+        p.error = 'the expression is not a boolean, found ' + typeName(v);
+        logE(t, nodeId, 'property', p.name + ' could not be evaluated: ' + p.error, p.line);
+        continue;
+      }
+      if (p.kind === 'always' && !v) {
+        // kept apart from timing violations: a broken property is a broken algorithm, not a broken assumption
+        p.ok = false; p.at = t; p.node = nodeId;
+        logE(t, nodeId, 'property', p.name + ' is violated', p.line);
+        if (cfg.haltOnProperty) throw new HaltSignal('Property violated: ' + p.name);
+      } else if (p.kind === 'eventually' && v) {
+        p.ok = true; p.at = t;
+        logE(t, nodeId, 'property', p.name + ' holds from here', p.line);
+      }
+    }
+  }
+
   function snapshot(node, t) {
     const states = {};
     let changed = false;
@@ -1912,6 +2053,7 @@ function runSimulation(scn) {
     }
     drain(node);
     snapshot(node, t);
+    checkProperties(t, node.id);
     out.activity.push({ t, end: t, node: node.id, type: 'recover', msg: null });
   }
 
@@ -1999,7 +2141,9 @@ function runSimulation(scn) {
       // processing activity, used by the UI to animate nodes
       if (ev.type !== 'init') out.activity.push({ t: ev.t, end: curEnd, node: node.id, type: ev.type, msg: ev.type === 'deliver' ? ev.rec.id : null });
       snapshot(node, ev.t);
+      checkProperties(curEnd, node.id);
     }
+    out.properties = props.map(p => ({ name: p.name, kind: p.kind, ok: p.error ? false : p.ok, at: p.at, node: p.node, error: p.error, line: p.line }));
     if (halted) out.stopReason = halted;
     else if (!out.stopReason) out.stopReason = 'No more events in the queue';
     out.ok = true;
@@ -2062,7 +2206,8 @@ function normalizeScenario(s) {
     faults: (s.faults || []).map((f, i) => normalizeFault(f, i + 1)),
     inputs,
     paramOverrides: {},
-    haltOnAssert: !!s.haltOnAssert
+    haltOnAssert: !!s.haltOnAssert,
+    haltOnProperty: !!s.haltOnProperty
   };
 }
 

@@ -268,7 +268,9 @@ h3 { font-size: 14px; margin: 14px 0 6px; }
 .log .t { font-family: var(--mono); color: var(--muted); font-size: 12px; }
 .log .n { font-weight: 700; }
 .log .k-output .x { color: var(--green); }
-.log .k-violation .x, .log .k-error .x, .log .k-assert .x { color: var(--red); }
+.log .k-violation .x, .log .k-error .x, .log .k-assert .x, .log .k-property .x { color: var(--red); }
+.log .k-property .x { font-weight: 700; }
+.chip.good { border-color: var(--green); color: var(--green); }
 .log .k-drop .x, .log .k-warn .x { color: var(--amber); }
 .log .k-crash .x { color: var(--violet); }
 .log .k-input .x { color: var(--blue); }

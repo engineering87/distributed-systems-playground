@@ -1399,7 +1399,11 @@ function renderChips() {
     el('span', { class: 'chip' }, del + ' delivered'),
     lost ? el('span', { class: 'chip' }, lost + ' lost') : null,
     el('span', { class: 'chip' + (r.violations ? ' bad' : '') }, r.violations + (r.violations === 1 ? ' violation' : ' violations')),
-    el('span', { class: 'chip' }, r.outputs.length + (r.outputs.length === 1 ? ' output' : ' outputs'))
+    el('span', { class: 'chip' }, r.outputs.length + (r.outputs.length === 1 ? ' output' : ' outputs')),
+    r.properties && r.properties.length
+      ? el('span', { class: 'chip' + (r.properties.some(p => !p.ok) ? ' bad' : ' good'), title: r.properties.map(p => p.name + ' (' + p.kind + '): ' + (p.error ? p.error : p.ok ? 'holds' : p.kind === 'always' ? 'violated at ' + C.fmtDuration(p.at) + ' on p' + p.node : 'never held')).join('\n') },
+        r.properties.filter(p => p.ok).length + '/' + r.properties.length + ' properties')
+      : null
   ].filter(Boolean);
   box.append(...items);
 }
@@ -1983,7 +1987,7 @@ function bindTransport() {
 
 // ============================================================ event log
 const LOG_MAX = 3000;
-const KIND_LABEL = { fault: 'fault', output: 'output', violation: 'violation', drop: 'dropped', warn: 'warning', error: 'error', assert: 'assertion failed', input: 'input', log: 'log' };
+const KIND_LABEL = { fault: 'fault', output: 'output', violation: 'violation', drop: 'dropped', warn: 'warning', error: 'error', assert: 'assertion failed', input: 'input', log: 'log', property: 'property' };
 function renderLog() {
   const ol = $('#log'); ol.textContent = '';
   S.logRows = []; S.logCur = -1;

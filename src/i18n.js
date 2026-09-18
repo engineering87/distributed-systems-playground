@@ -288,6 +288,12 @@ const LIBTXT = {
 P(/^(\w+): (.+?) Guarantees: (.+)$/, m => LIBTXT[m[2]] ? m[1] + ': ' + LIBTXT[m[2]] + ' Garanzie: ' + (LIBTXT[m[3]] || m[3]) : null);
 M('Links', 'Collegamenti');
 M('or', 'o');
+M('Properties', 'Proprietà');
+P(/^(\d+)\/(\d+) properties$/, m => m[1] + '/' + m[2] + ' proprietà');
+P(/^(\w+) is violated$/, m => m[1] + ' violata');
+P(/^(\w+) holds from here$/, m => m[1] + ' vale da qui');
+P(/^(\w+) could not be evaluated: (.+)$/, m => m[1] + ' non valutabile: ' + m[2]);
+M('property', 'proprietà');
 P(/^Invalid duration: "(.*)" \(examples: (.*)\)$/, m => 'Durata non valida: "' + m[1] + '" (esempi: ' + m[2] + ')');
 P(/^Unknown distribution: (\w+) \(available: (.*)\)$/, m => 'Distribuzione sconosciuta: ' + m[1] + ' (disponibili: ' + m[2] + ')');
 P(/^(\w+) takes (\d+) argument\(s\)$/, m => m[1] + ' richiede ' + m[2] + ' argomenti');

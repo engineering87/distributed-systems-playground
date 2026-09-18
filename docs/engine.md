@@ -68,6 +68,7 @@ When the engine takes an event for process *p* at time *t*:
 6. Guards are checked. For each module, the enabled `upon condition` and `upon exists` handlers are tried in round-robin order. When one fires, its internal events are processed as in the previous point, and the guards are checked again. The step ends when no guard is enabled and the local queue is empty.
 7. Everything the step produced carries the time *t + d*: messages leave at that time, timers start counting from it, outputs are stamped with it.
 8. The state of every module of *p* is recorded if something changed, along with the current round.
+9. Global properties are evaluated, if the program declares any (see [Properties](language.md#properties)).
 
 Steps 5 and 6 are bounded: more than 20,000 internal events or guard firings in one step, or more than 200,000 statements, stop the run with an error. Both usually mean a handler that keeps re-enabling itself.
 
@@ -165,6 +166,7 @@ The second property has one caveat: it holds for events strictly before the inje
 | `netFaults` | link failures and partitions, in microseconds |
 | `specs` | the module tree: algorithm, interface, alias, parent and depth |
 | `rounds` | round length and per-process round starts, when rounds are used |
+| `properties` | per declared property: kind, whether it held, and the instant and process of the first violation |
 | `violations`, `stopReason`, `error`, `errorLine`, `endT` | summary |
 
 The engine never touches the page, so the same function runs in the browser, in the Node test suite and in the [command line tool](cli.md).

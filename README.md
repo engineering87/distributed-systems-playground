@@ -163,6 +163,9 @@ This project exists to make that gap visible.
 **Beyond the page**
 - A command line tool that runs the same engine: many seeds in one command, outcomes grouped, exit codes for continuous integration. See [Running scenarios outside the browser](docs/cli.md).
 
+**Checking**
+- Global properties written next to the algorithm: `property Agreement always … end`, checked after every step over the state of every process, with the instant and the process of the first violation.
+
 **Analysis**
 - A synchronized space-time diagram with processing bars, violations, outputs, rounds and GST.
 - A causality mode: click an event to shade everything that could have caused it and everything it could affect.

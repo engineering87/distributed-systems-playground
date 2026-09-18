@@ -111,7 +111,7 @@ algorithm FloodSet
     f := 1
   state
     W := ∅
-    decided := false
+    decision := nil
 
   upon event ⟨c, Propose | v⟩ do
     W := W ∪ {v}
@@ -127,10 +127,24 @@ algorithm FloodSet
     W := W ∪ V
   end
 
-  upon event ⟨net, RoundEnd | r⟩ where r = f + 1 and not decided do
-    decided := true
-    trigger ⟨c, Decide | min(W)⟩
+  upon event ⟨net, RoundEnd | r⟩ where r = f + 1 and decision = nil do
+    decision := min(W)
+    trigger ⟨c, Decide | decision⟩
   end
+end
+
+// Properties are checked after every step, on the state of every process at once.
+// A state variable reads as a map from process to its value there.
+property Agreement always
+  #toset(values(defined(decision))) ≤ 1
+end
+
+property Validity always
+  #{p in keys(defined(decision)) where decision[p] ∉ W[p]} = 0
+end
+
+property Termination eventually
+  keys(defined(decision)) = correct
 end
 `;
 

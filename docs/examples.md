@@ -54,11 +54,13 @@ Every process starts an election by sending its own identifier clockwise. A proc
 
 Each process proposes a random value from 1 to 9. In each of the first f + 1 rounds (f = 1 here) every process sends the set of values it knows to everybody; at the end of round f + 1 it decides the minimum of its set.
 
-**What to watch.** With the *Ideal synchronous* preset, the proposals are 8, 7, 7 and 3, and every process decides 3. The dashed vertical lines on the diagram mark the rounds. No violation is possible.
+The program also declares three properties, checked after every step: *Agreement* (no two processes decide differently), *Validity* (a decided value is one the process knew) and *Termination* (every correct process decides).
+
+**What to watch.** With the *Ideal synchronous* preset, the proposals are 8, 7, 7 and 3, every process decides 3, and the three properties hold. The dashed vertical lines on the diagram mark the rounds. No violation is possible.
 
 **Try this.**
 
-- Switch to *Realistic synchronous* and run with the same seed. Rounds are now built on drifting clocks, delays have a long tail, and late messages are discarded. The run records 11 violations and 9 discarded messages, and p2 decides 7 while everybody else decides 3: the value 3 never reached p2 in time. The algorithm is correct; its assumption is not.
+- Switch to *Realistic synchronous* and run with the same seed. Rounds are now built on drifting clocks, delays have a long tail, and late messages are discarded. The run records 11 violations and 9 discarded messages, and p2 decides 7 while everybody else decides 3: the value 3 never reached p2 in time. *Agreement* is reported as broken at 150 ms on p2, while *Validity* and *Termination* still hold. The algorithm is correct; its assumption is not.
 - Change the policy to *Deliver late* and run again. Late messages now reach processes in a later round, and with this seed everybody decides 3 again.
 - Try other seeds with the dice button. Disagreement is rare: the minimum has many paths to every process, and all of them must fail. It shows up in roughly 1 seed out of 50.
 - Back in *Ideal synchronous*, crash p4 at `0ms`. Its value never spreads, and the others agree on 7.

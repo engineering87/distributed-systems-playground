@@ -55,6 +55,25 @@ took 24 ms
 
 A run counts as failed when the code does not compile or the simulation stops with a runtime error. Violations and failed assertions are reported separately, because a violation is a broken assumption, not a broken program.
 
+## Properties across a batch
+
+When the program declares [properties](language.md#properties), every run reports whether each one held, and the batch says in which seed each was first broken:
+
+```sh
+node bin/dsp.mjs run --example floodset --preset sync-real --seeds 1..8
+```
+
+```text
+     5 Agreement broken             741     24     9    11       4   2.999 s
+       property Agreement: violated at 150 ms on p2
+…
+property Agreement       (always)      held in 7/8 run(s), first broken at seed 5
+property Validity        (always)      held in 8/8 run(s)
+property Termination     (eventually)  held in 8/8 run(s)
+```
+
+The exit code is 1, so this command is a test: FloodSet keeps agreement under ideal rounds and loses it under rounds built on drifting clocks. Open seed 5 in the browser to watch the moment it happens.
+
 ## Comparing outcomes
 
 `--outcomes` answers the question a batch is usually run for: did every seed end the same way?
@@ -101,7 +120,7 @@ Parses the code and checks it against the assumed model of the scenario, exactly
 | Code | Meaning |
 |---|---|
 | 0 | every run finished without errors or failed assertions |
-| 1 | at least one run failed, or `check` found errors |
+| 1 | at least one run failed, broke a property or failed an assertion, or `check` found errors |
 | 2 | usage error, unreadable file, invalid JSON, unknown example or preset |
 
 A workflow step that keeps an exercise honest:
@@ -128,7 +147,7 @@ const res = R.runBatch(scenario, {
   onRun: (summary, done, total) => { /* progress; return false to stop */ }
 });
 
-res.summary;   // runs, failed, firstFailure, withViolations, averages
+res.summary;   // runs, failed, firstFailure, withViolations, per-property results, averages
 res.runs;      // one compact summary per seed
 R.outcomes(res.runs);      // runs grouped by the outputs they produced
 R.checkScenario(scenario); // { ok, errors, warnings }
@@ -138,6 +157,7 @@ A summary holds what a batch needs and not the whole trace: counts of messages b
 
 ## What it does not do yet
 
-- **Properties are local.** Correctness is checked with `assert` inside the algorithm. Global invariants such as agreement across processes are the next step; see the roadmap in the [specification](SPEC.md#10-roadmap).
+- **Properties are checked, not proved.** Global invariants are evaluated on the runs of the batch: more executions than a single run, never all of them. See the roadmap in the [specification](SPEC.md#10-roadmap).
+- **Fault schedules are fixed.** A batch varies the seed and the fields you override; generating crash and partition schedules automatically is the next step.
 - **Runs are sequential.** The tool runs one seed at a time in one process. It is fast enough for a few hundred runs of a small scenario; the interface will run batches in parallel workers.
 - **One run is one execution.** A batch explores more executions than a single run, never all of them. See [Assumptions and simplifications](assumptions.md#what-the-playground-is-not).

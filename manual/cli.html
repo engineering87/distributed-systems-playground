@@ -208,6 +208,16 @@ average per run:  60 events  24 messages  0 lost  0 violations  4 outputs
 took 24 ms</code></pre>
 <div class="table"><table><thead><tr><th>Option</th><th>Effect</th></tr></thead><tbody><tr><td><code>--seeds 1..50</code>, <code>--seeds 7</code>, <code>--seeds 1,4,9</code></td><td>which seeds to run; by default the seed stored in the scenario</td></tr><tr><td><code>--preset &lt;key&gt;</code></td><td>replace the whole timing model with a preset</td></tr><tr><td><code>--set &lt;path=value&gt;</code></td><td>change one scenario field, repeatable</td></tr><tr><td><code>--stop-on-failure</code></td><td>stop at the first run that fails</td></tr><tr><td><code>--outputs</code></td><td>print the outputs of every run</td></tr><tr><td><code>--outcomes</code></td><td>group the runs by the outputs they produced</td></tr><tr><td><code>--json</code></td><td>print summaries as JSON</td></tr><tr><td><code>--quiet</code></td><td>print only the summary</td></tr></tbody></table></div>
 <p>A run counts as failed when the code does not compile or the simulation stops with a runtime error. Violations and failed assertions are reported separately, because a violation is a broken assumption, not a broken program.</p>
+<h2 id="properties-across-a-batch">Properties across a batch<a class="anchor" href="#properties-across-a-batch" aria-label="Link to this section">#</a></h2>
+<p>When the program declares <a href="language.html#properties">properties</a>, every run reports whether each one held, and the batch says in which seed each was first broken:</p>
+<pre class="code lang-sh"><code>node bin/dsp.mjs run --example floodset --preset sync-real --seeds 1..8</code></pre>
+<pre class="code lang-text"><code>     5 Agreement broken             741     24     9    11       4   2.999 s
+       property Agreement: violated at 150 ms on p2
+…
+property Agreement       (always)      held in 7/8 run(s), first broken at seed 5
+property Validity        (always)      held in 8/8 run(s)
+property Termination     (eventually)  held in 8/8 run(s)</code></pre>
+<p>The exit code is 1, so this command is a test: FloodSet keeps agreement under ideal rounds and loses it under rounds built on drifting clocks. Open seed 5 in the browser to watch the moment it happens.</p>
 <h2 id="comparing-outcomes">Comparing outcomes<a class="anchor" href="#comparing-outcomes" aria-label="Link to this section">#</a></h2>
 <p><code>--outcomes</code> answers the question a batch is usually run for: did every seed end the same way?</p>
 <pre class="code lang-sh"><code>node bin/dsp.mjs run --example floodset --preset sync-real --seeds 1..8 --outcomes</code></pre>
@@ -229,7 +239,7 @@ node bin/dsp.mjs run scenario.json --preset async --set actual.delay=&quot;logno
 <pre class="code lang-sh"><code>node bin/dsp.mjs check scenario.json</code></pre>
 <p>Parses the code and checks it against the assumed model of the scenario, exactly like the editor does, and prints errors and warnings. It runs nothing, so it is fast enough for a pre-commit hook.</p>
 <h2 id="exit-codes-and-continuous-integration">Exit codes and continuous integration<a class="anchor" href="#exit-codes-and-continuous-integration" aria-label="Link to this section">#</a></h2>
-<div class="table"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody><tr><td>0</td><td>every run finished without errors or failed assertions</td></tr><tr><td>1</td><td>at least one run failed, or <code>check</code> found errors</td></tr><tr><td>2</td><td>usage error, unreadable file, invalid JSON, unknown example or preset</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody><tr><td>0</td><td>every run finished without errors or failed assertions</td></tr><tr><td>1</td><td>at least one run failed, broke a property or failed an assertion, or <code>check</code> found errors</td></tr><tr><td>2</td><td>usage error, unreadable file, invalid JSON, unknown example or preset</td></tr></tbody></table></div>
 <p>A workflow step that keeps an exercise honest:</p>
 <pre class="code lang-yaml"><code>- run: node bin/dsp.mjs check solution.json
 - run: node bin/dsp.mjs run solution.json --seeds 1..100 --quiet</code></pre>
@@ -246,17 +256,17 @@ const res = R.runBatch(scenario, {
   onRun: (summary, done, total) =&gt; { /* progress; return false to stop */ }
 });
 
-res.summary;   // runs, failed, firstFailure, withViolations, averages
+res.summary;   // runs, failed, firstFailure, withViolations, per-property results, averages
 res.runs;      // one compact summary per seed
 R.outcomes(res.runs);      // runs grouped by the outputs they produced
 R.checkScenario(scenario); // { ok, errors, warnings }</code></pre>
 <p>A summary holds what a batch needs and not the whole trace: counts of messages by status, violations, failed assertions, the outputs with their times, the stop reason and any error. A full run, with every message and snapshot, is what <code>SimCore.runSimulation</code> returns; see <a href="engine.html#what-a-run-produces">How the engine works</a>.</p>
 <h2 id="what-it-does-not-do-yet">What it does not do yet<a class="anchor" href="#what-it-does-not-do-yet" aria-label="Link to this section">#</a></h2>
-<ul><li><strong>Properties are local.</strong> Correctness is checked with <code>assert</code> inside the algorithm. Global invariants such as agreement across processes are the next step; see the roadmap in the <a href="spec.html#10-roadmap">specification</a>.</li><li><strong>Runs are sequential.</strong> The tool runs one seed at a time in one process. It is fast enough for a few hundred runs of a small scenario; the interface will run batches in parallel workers.</li><li><strong>One run is one execution.</strong> A batch explores more executions than a single run, never all of them. See <a href="assumptions.html#what-the-playground-is-not">Assumptions and simplifications</a>.</li></ul>
+<ul><li><strong>Properties are checked, not proved.</strong> Global invariants are evaluated on the runs of the batch: more executions than a single run, never all of them. See the roadmap in the <a href="spec.html#10-roadmap">specification</a>.</li><li><strong>Fault schedules are fixed.</strong> A batch varies the seed and the fields you override; generating crash and partition schedules automatically is the next step.</li><li><strong>Runs are sequential.</strong> The tool runs one seed at a time in one process. It is fast enough for a few hundred runs of a small scenario; the interface will run batches in parallel workers.</li><li><strong>One run is one execution.</strong> A batch explores more executions than a single run, never all of them. See <a href="assumptions.html#what-the-playground-is-not">Assumptions and simplifications</a>.</li></ul>
 <nav class="pager"><a href="troubleshooting.html"><small>Previous</small>Troubleshooting</a><a href="teaching.html" style="text-align:right"><small>Next</small>Teaching</a></nav>
 <footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/cli.md" target="_blank" rel="noopener">docs/cli.md</a>. Released under the MIT License.</footer>
 </main>
-<aside class="toc"><p>On this page</p><a class="l2" href="#the-command-line-tool">The command line tool</a><a class="l2" href="#running-a-scenario">Running a scenario</a><a class="l2" href="#comparing-outcomes">Comparing outcomes</a><a class="l2" href="#changing-the-model-from-the-command-line">Changing the model from the command line</a><a class="l2" href="#checking-a-program">Checking a program</a><a class="l2" href="#exit-codes-and-continuous-integration">Exit codes and continuous integration</a><a class="l2" href="#the-batch-runner-api">The batch runner API</a><a class="l2" href="#what-it-does-not-do-yet">What it does not do yet</a></aside>
+<aside class="toc"><p>On this page</p><a class="l2" href="#the-command-line-tool">The command line tool</a><a class="l2" href="#running-a-scenario">Running a scenario</a><a class="l2" href="#properties-across-a-batch">Properties across a batch</a><a class="l2" href="#comparing-outcomes">Comparing outcomes</a><a class="l2" href="#changing-the-model-from-the-command-line">Changing the model from the command line</a><a class="l2" href="#checking-a-program">Checking a program</a><a class="l2" href="#exit-codes-and-continuous-integration">Exit codes and continuous integration</a><a class="l2" href="#the-batch-runner-api">The batch runner API</a><a class="l2" href="#what-it-does-not-do-yet">What it does not do yet</a></aside>
 </div>
 </body>
 </html>

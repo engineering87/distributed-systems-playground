@@ -103,7 +103,8 @@ test('the command line runs, checks and lists', () => {
   assert.match(cli('examples'), /floodset\s+synchronous-rounds/);
   assert.match(cli('presets'), /sync-real/);
   assert.match(cli('check', '--example', 'causal-broadcast'), /No errors/);
-  assert.match(cli('run', '--example', 'floodset', '--preset', 'sync-real', '--seeds', '1..6', '--outcomes'), /outcomes \(\d+ distinct\)/);
+  assert.throws(() => cli('run', '--example', 'floodset', '--preset', 'sync-real', '--seeds', '1..6', '--outcomes'),
+    e => (assert.match(e.stdout, /outcomes \(\d+ distinct\)/), assert.equal(e.status, 1), true));
   assert.match(cli('run', '--example', 'flooding', '--seeds', '1', '--outputs'), /Deliver \| 1, "hello"/);
 });
 
@@ -126,4 +127,32 @@ test('the command line reads a scenario file and reports failures with an exit c
   fs.writeFileSync(file, '{not json');
   assert.throws(() => cli('run', file), e => (assert.equal(e.status, 2), assert.match(e.stderr, /Invalid JSON/), true));
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('batches report which property broke and in which seed', () => {
+  const res = R.runBatch(scenarioOf('floodset'), { seeds: '1..8', preset: 'sync-real' });
+  const agreement = res.summary.properties.find(p => p.name === 'Agreement');
+  assert.equal(agreement.kind, 'always');
+  assert.equal(agreement.held + agreement.failed, 8);
+  assert.equal(agreement.failed, 1);
+  assert.equal(agreement.firstFailure, 5);
+  assert.equal(res.summary.withPropertyFailures, 1);
+  assert.equal(res.summary.firstPropertyFailure, 5);
+  const broken = res.runs.find(r => r.seed === 5).properties.find(p => p.name === 'Agreement');
+  assert.equal(broken.ok, false);
+  assert.ok(broken.at > 0 && broken.node > 0);
+
+  const ideal = R.runBatch(scenarioOf('floodset'), { seeds: '1..8' });
+  assert.equal(ideal.summary.withPropertyFailures, 0);
+});
+
+test('the command line reports properties and fails when one breaks', () => {
+  const ok = cli('run', '--example', 'floodset', '--seeds', '1..4');
+  assert.match(ok, /property Agreement\s+\(always\)\s+held in 4\/4 run\(s\)/);
+  assert.throws(() => cli('run', '--example', 'floodset', '--preset', 'sync-real', '--seeds', '1..8'), e => {
+    assert.equal(e.status, 1);
+    assert.match(e.stdout, /Agreement broken/);
+    assert.match(e.stdout, /first broken at seed 5/);
+    return true;
+  });
 });

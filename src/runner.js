@@ -69,6 +69,8 @@ function summarize(res, seed) {
     lost: msgs.length - (byStatus.delivered || 0) - (byStatus.pending || 0),
     violations: res.violations || 0,
     assertions: (res.log || []).filter(e => e.kind === 'assert').length,
+    properties: (res.properties || []).map(p => ({ name: p.name, kind: p.kind, ok: p.ok, at: p.at, node: p.node, error: p.error })),
+    propertyFailures: (res.properties || []).filter(p => !p.ok).length,
     outputs,
     outputCount: outputs.length,
     nodesWithOutput: new Set(outputs.map(o => o.node)).size
@@ -95,7 +97,7 @@ function runBatch(scenario, opts) {
     const summary = summarize(C.runSimulation(scn), seed);
     runs.push(summary);
     if (opts.onRun && opts.onRun(summary, runs.length, seeds.length) === false) break;
-    if (opts.stopOnFailure && !summary.ok) break;
+    if (opts.stopOnFailure && (!summary.ok || summary.propertyFailures)) break;
   }
   return { scenario: base, runs, summary: aggregate(runs), ms: Date.now() - started };
 }
@@ -106,6 +108,13 @@ function aggregate(runs) {
   const failed = runs.filter(r => !r.ok);
   const withViolations = runs.filter(r => r.violations > 0);
   const withAssertions = runs.filter(r => r.assertions > 0);
+  const withPropertyFailures = runs.filter(r => r.propertyFailures > 0);
+  const byProperty = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = byProperty[p.name] = byProperty[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
   return {
     runs: runs.length,
     failed: failed.length,
@@ -114,6 +123,9 @@ function aggregate(runs) {
     firstViolation: withViolations.length ? withViolations[0].seed : null,
     withAssertions: withAssertions.length,
     firstAssertion: withAssertions.length ? withAssertions[0].seed : null,
+    withPropertyFailures: withPropertyFailures.length,
+    firstPropertyFailure: withPropertyFailures.length ? withPropertyFailures[0].seed : null,
+    properties: Object.values(byProperty),
     avgMessages: +(sum('messages') / n).toFixed(1),
     avgDelivered: +(sum('delivered') / n).toFixed(1),
     avgLost: +(sum('lost') / n).toFixed(1),

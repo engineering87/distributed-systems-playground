@@ -172,7 +172,7 @@ One horizontal line per process, time from left to right.
 
 ## Event log
 
-Entries in time order: inputs, outputs, faults, dropped messages, violations, warnings, errors, `log` and failed `assert` statements. Entries after the cursor are faded, and the current one is highlighted.
+Entries in time order: inputs, outputs, faults, dropped messages, violations, broken properties, warnings, errors, `log` and failed `assert` statements. The chips above the diagram also count how many declared properties held. Entries after the cursor are faded, and the current one is highlighted.
 
 Click an entry to move the cursor there. The filter shows one kind at a time. The log shows up to 3,000 entries per filter.
 

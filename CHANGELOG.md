@@ -6,6 +6,16 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.8.0]
+
+### Added
+- Global properties in Upon: `property <name> always|eventually <expression> end`, checked after every step over the state of every process, with the built-ins `crashed`, `up`, `correct`, `t` and the function `defined`.
+- The FloodSet example declares agreement, validity and termination.
+- Properties are reported in the event log (new *Properties* filter), among the counters, in the batch runner and by the command line tool, which exits with 1 when one breaks.
+
+### Changed
+- The FloodSet example stores its decision in a state variable, so that a property can observe it.
+
 ## [0.7.0]
 
 ### Added

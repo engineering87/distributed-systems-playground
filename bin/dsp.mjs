@@ -31,7 +31,7 @@ Options:
   --preset <key>        replace the timing model with a preset
   --set <path=value>    change one scenario field, repeatable
                         (--set actual.loss=0.3 --set stopAt=5s)
-  --stop-on-failure     stop at the first run that fails
+  --stop-on-failure     stop at the first run that fails or breaks a property
   --outcomes            group the runs by the outputs they produced
   --outputs             print the outputs of every run
   --json                print the result as JSON
@@ -92,17 +92,23 @@ const padL = (s, n) => String(s).padStart(n);
 
 function printRuns(res, args) {
   const head = ['seed', 'status', 'events', 'msgs', 'lost', 'viol', 'outputs', 'time'];
-  const widths = [6, 22, 8, 7, 6, 6, 8, 10];
+  const widths = [6, 26, 8, 7, 6, 6, 8, 10];
   process.stdout.write(head.map((h, i) => pad(h, widths[i])).join('') + '\n');
   for (const r of res.runs) {
+    const broken = r.properties.filter(p => !p.ok);
     const status = !r.ok ? (r.compileErrors.length ? 'compile error' : 'error')
-      : r.assertions ? r.assertions + ' assertion(s)'
-        : r.violations ? 'ok, ' + r.violations + ' violation(s)' : 'ok';
+      : broken.length ? broken.map(p => p.name).join(', ') + ' broken'
+        : r.assertions ? r.assertions + ' assertion(s)'
+          : r.violations ? 'ok, ' + r.violations + ' violation(s)' : 'ok';
     process.stdout.write([padL(r.seed, 6), ' ' + pad(status, widths[1] - 1), padL(r.eventCount, 7) + ' ',
       padL(r.messages, 6) + ' ', padL(r.lost, 5) + ' ', padL(r.violations, 5) + ' ',
       padL(r.outputCount, 7) + ' ', padL(C.fmtDuration(r.endT), 9) + ' '].join('') + '\n');
     if (r.error) process.stdout.write('       ' + r.error + (r.errorLine ? ' (line ' + r.errorLine + ')' : '') + '\n');
     for (const e of r.compileErrors) process.stdout.write('       line ' + e.line + ': ' + e.msg + '\n');
+    for (const p of broken) {
+      process.stdout.write('       property ' + p.name + ': ' +
+        (p.error ? p.error : p.kind === 'always' ? 'violated at ' + C.fmtDuration(p.at) + ' on p' + p.node : 'never held') + '\n');
+    }
     if (args.outputs) for (const o of r.outputs) process.stdout.write('       ' + padL(C.fmtDuration(o.t), 9) + '  p' + o.node + '  ' + o.text + '\n');
   }
 }
@@ -114,6 +120,10 @@ function printSummary(res) {
   process.stdout.write(line + '\n');
   process.stdout.write(['average per run:', s.avgEvents + ' events', s.avgMessages + ' messages',
     s.avgLost + ' lost', s.avgViolations + ' violations', s.avgOutputs + ' outputs'].join('  ') + '\n');
+  for (const p of s.properties) {
+    process.stdout.write('property ' + pad(p.name, 16) + pad('(' + p.kind + ')', 14) + 'held in ' + p.held + '/' + (p.held + p.failed) + ' run(s)' +
+      (p.firstFailure !== null ? ', first broken at seed ' + p.firstFailure : '') + '\n');
+  }
   if (s.firstFailure !== null) process.stdout.write('first failing seed: ' + s.firstFailure + '\n');
   if (s.firstAssertion !== null) process.stdout.write('first seed with a failed assertion: ' + s.firstAssertion + '\n');
   if (s.firstViolation !== null) process.stdout.write('first seed with a violation: ' + s.firstViolation + '\n');
@@ -143,7 +153,7 @@ function cmdRun(args) {
     printSummary(res);
     if (args.outcomes) printOutcomes(res);
   }
-  const bad = res.summary.failed > 0 || res.summary.withAssertions > 0;
+  const bad = res.summary.failed > 0 || res.summary.withAssertions > 0 || res.summary.withPropertyFailures > 0;
   process.exit(bad ? 1 : 0);
 }
 

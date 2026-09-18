@@ -19,6 +19,7 @@ This page is the complete reference. If you have never written Upon, start with 
 - [Built-in functions](#built-in-functions)
 - [Functions](#functions)
 - [Timers](#timers)
+- [Properties](#properties)
 - [Provided modules](#provided-modules)
 - [Composing modules](#composing-modules)
 - [What the checker verifies](#what-the-checker-verifies)
@@ -409,6 +410,73 @@ upon event ⟨timer, Timeout | retry⟩ do … end
 
 The checker warns about a `Timeout` handler for a timer the module never starts.
 
+## Properties
+
+A property is a global invariant: one boolean expression over the state of **every** process, checked by the engine. It lives at the top level of the program, next to interfaces and algorithms.
+
+```upon
+interface Consensus
+  request Propose(v)
+  indication Decide(v)
+end
+
+algorithm Simple
+  implements Consensus as c
+  uses Net as net
+  state
+    proposal := nil
+    decision := nil
+
+  upon event ⟨c, Propose | v⟩ do
+    proposal := v
+    decision := v
+    trigger ⟨c, Decide | v⟩
+  end
+end
+
+property Agreement always
+  #toset(values(defined(decision))) ≤ 1
+end
+
+property Validity always
+  #{p in keys(defined(decision)) where decision[p] ≠ proposal[p]} = 0
+end
+
+property Termination eventually
+  keys(defined(decision)) = correct
+end
+```
+
+**Inside a property, a state variable is a map from process to its value on that process**, taken from the main algorithm. `decision` above is `{1 ↦ 7, 2 ↦ nil, 3 ↦ 7}`, so `values(decision)` are the values across the system and `defined(decision)` keeps only the processes where the variable is not `nil`. Everything else is the ordinary expression language.
+
+| Kind | Meaning | When it is checked |
+|---|---|---|
+| `always` | safety: the expression must be true at all times | after every step; the first moment it turns false is reported |
+| `eventually` | liveness: the expression must become true at some point | after every step; the first moment it turns true is reported, and the property is satisfied from then on |
+
+Besides state variables, a property can use:
+
+| Name | Value |
+|---|---|
+| `Π`, `Procs` | the set of all processes |
+| `N` | the number of processes |
+| `crashed` | the processes that are down right now |
+| `up` | the processes that are running right now |
+| `correct` | the processes that never crashed in this run |
+| `t` | the current time, in microseconds |
+| `defined(m)` | the map `m` without the entries whose value is `nil` |
+
+A property cannot use `self`, `neighbors`, `round`, `DELTA`, `PHI`, `RHO`, `now()`, `random` or `pick`: it looks at the whole system from outside, at one moment, and must not depend on chance. Only built-in functions are available; the functions of an algorithm are not.
+
+**What the engine reports.** Each property ends the run as *held* or *broken*, with the instant and the process whose step made it fail. Broken properties appear in the event log under the *Properties* filter, are counted next to the other chips, and are listed by the [command line tool](cli.md). Setting `haltOnProperty` in the scenario stops the run at the first violation.
+
+**Limits worth knowing.**
+
+- Properties see the state of the **main algorithm** only. To observe a module further down the stack, expose what you need in the main algorithm.
+- `eventually` can only say "it did not happen before the run ended". A longer simulated duration may change the answer; this is a check, not a proof. See [Assumptions and simplifications](assumptions.md#what-the-playground-is-not).
+- A property is evaluated after every step, so a long run with several properties costs noticeably more than the same run without them.
+- A property that is not a boolean, or that fails with a runtime error, is reported as broken with its error, and the run continues.
+
 ## Provided modules
 
 ### Net
@@ -510,6 +578,7 @@ The checker runs while you type and again before every run. Errors stop the run;
 - A `trigger` to an unknown instance, an indication sent downwards, a request sent upwards, or the wrong number of arguments.
 - A handler for an event that the instance cannot produce, or with the wrong number of patterns; `Init` or `Recovery` with patterns; a `timer` handler for anything but `Timeout(t)`.
 - An unknown function, a call with the wrong number of arguments, `call` with a built-in function, `return` outside a function, a function with a built-in's name or a repeated parameter.
+- In a property: two properties with the same name, a name that is not a state variable of any algorithm, and the names and functions that a property may not use.
 - `uses … via Y` where `Y` does not exist or implements another interface; `via` with `Net` or `Rounds`.
 
 **Warnings**
