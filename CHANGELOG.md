@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.8.2]
+
+### Security
+- The exported graph is built from an allowlist of SVG elements and attributes, and the exported diagram escapes every value it writes, instead of cleaning the result with regular expressions afterwards.
+
 ## [0.8.1]
 
 ### Security

@@ -52,6 +52,8 @@ CI runs the tests and `npm run check`, which fails if `index.html` or `manual/` 
 
 **Examples.** Add the scenario to `src/examples.js`, a test that checks what the example is meant to show, and a section in [Examples](docs/examples.md). Quote only numbers you obtained from the engine with the stated seed.
 
+**Security.** Never clean up generated markup with regular expressions: build it safely instead, with an allowlist of elements and attributes and escaping per value. Data that comes from outside the page (imported files, shared links, local storage) is parsed without keys that could reach a prototype.
+
 **Interface.** Every new text shown to the user needs an Italian translation in `src/i18n.js`: an exact phrase, or a pattern when the text contains numbers or names. The test suite checks the texts of examples, presets and library modules. Check the change at a narrow width (about 375 pixels), on a laptop screen (1280 by 720) and on a large monitor, in both themes, with mouse and with touch emulation. Keep keyboard access working.
 
 ## Writing documentation

@@ -12,7 +12,7 @@ A scenario that makes the simulation slow or stop with an error is a bug, not a 
 
 ## Known analyzer findings
 
-The download helper builds a `blob:` URL from data that originates in the page, which static analysis reports as "DOM text reinterpreted as HTML". The blob is always typed `application/octet-stream`, the link carries a `download` attribute and the URL is revoked right after the click, and the two SVG exports are sanitized before they leave the page, so the content is never rendered as a document. Alerts on that line are dismissed with this justification.
+The download helper builds a `blob:` URL from data that originates in the page, which static analysis reports as "DOM text reinterpreted as HTML". The blob is always typed `application/octet-stream`, the link carries a `download` attribute and the URL is revoked right after the click, so the content is never rendered as a document. The exported images are safe by construction: the graph copies only elements and attributes from an allowlist, and the diagram escapes every value it writes. Alerts on that line are dismissed with this justification.
 
 ## Reporting
 

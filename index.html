@@ -7347,30 +7347,30 @@ class SvgCtx {
   arc(x, y, r) { this.path.arc(x, y, r); }
   clip() {
     const id = 'c' + (++this.clipN);
-    this.out.push('<clipPath id="' + id + '"><path d="' + this.path.d + '"/></clipPath><g clip-path="url(#' + id + ')">');
+    this.out.push('<clipPath id="' + id + '"><path d="' + xmlEsc(this.path.d) + '"/></clipPath><g clip-path="url(#' + id + ')">');
     this.open++;
   }
   alpha() { return this.globalAlpha < 1 ? ' opacity="' + r2(this.globalAlpha) + '"' : ''; }
   stroke(p) {
     const d = (p || this.path).d;
     if (!d) return;
-    this.out.push('<path d="' + d + '" fill="none" stroke="' + this.strokeStyle + '" stroke-width="' + r2(this.lineWidth) + '"' +
-      (this.dash.length ? ' stroke-dasharray="' + this.dash.join(' ') + '"' : '') + ' stroke-linecap="round"' + this.alpha() + '/>');
+    this.out.push('<path d="' + xmlEsc(d) + '" fill="none" stroke="' + xmlEsc(this.strokeStyle) + '" stroke-width="' + r2(this.lineWidth) + '"' +
+      (this.dash.length ? ' stroke-dasharray="' + this.dash.map(r2).join(' ') + '"' : '') + ' stroke-linecap="round"' + this.alpha() + '/>');
   }
   fill(p) {
     const d = (p || this.path).d;
-    if (d) this.out.push('<path d="' + d + '" fill="' + this.fillStyle + '"' + this.alpha() + '/>');
+    if (d) this.out.push('<path d="' + xmlEsc(d) + '" fill="' + xmlEsc(this.fillStyle) + '"' + this.alpha() + '/>');
   }
   fillRect(x, y, w, h) {
-    this.out.push('<rect x="' + r2(x) + '" y="' + r2(y) + '" width="' + r2(w) + '" height="' + r2(h) + '" fill="' + this.fillStyle + '"' + this.alpha() + '/>');
+    this.out.push('<rect x="' + r2(x) + '" y="' + r2(y) + '" width="' + r2(w) + '" height="' + r2(h) + '" fill="' + xmlEsc(this.fillStyle) + '"' + this.alpha() + '/>');
   }
   measureText(t) { this.measure.font = this.font; return this.measure.measureText(t); }
   fillText(t, x, y) {
     const m = /^(?:(\d+)\s+)?([\d.]+)px\s+(.*)$/.exec(this.font) || [];
     const anchor = { center: 'middle', right: 'end', end: 'end' }[this.textAlign] || 'start';
     const base = this.textBaseline === 'middle' ? ' dominant-baseline="central"' : '';
-    this.out.push('<text x="' + r2(x) + '" y="' + r2(y) + '" fill="' + this.fillStyle + '" font-size="' + (m[2] || 11) + '"' +
-      (m[1] ? ' font-weight="' + m[1] + '"' : '') + ' font-family="' + xmlEsc(m[3] || 'sans-serif') + '" text-anchor="' + anchor + '"' + base + this.alpha() + '>' + xmlEsc(t) + '</text>');
+    this.out.push('<text x="' + r2(x) + '" y="' + r2(y) + '" fill="' + xmlEsc(this.fillStyle) + '" font-size="' + (Number(m[2]) || 11) + '"' +
+      (m[1] ? ' font-weight="' + Number(m[1]) + '"' : '') + ' font-family="' + xmlEsc(m[3] || 'sans-serif') + '" text-anchor="' + anchor + '"' + base + this.alpha() + '>' + xmlEsc(t) + '</text>');
   }
   svg(W, H) {
     while (this.open > 0) { this.out.push('</g>'); this.open--; }
@@ -7397,6 +7397,16 @@ function diagramPng() {
   drawDiagram({ ctx, W });
   return new Promise(res => cv.toBlob(res, 'image/png'));
 }
+// Elements and attributes an exported graph may contain. Anything else, including every event handler, is
+// dropped while copying, so the result is safe by construction instead of being cleaned up afterwards.
+const SVG_TAGS = new Set(['svg', 'g', 'defs', 'marker', 'path', 'line', 'polyline', 'polygon', 'circle', 'ellipse', 'rect', 'text', 'tspan', 'clippath']);
+const SVG_ATTRS = new Set(['viewbox', 'width', 'height', 'xmlns', 'x', 'y', 'dx', 'dy', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
+  'd', 'points', 'transform', 'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin',
+  'opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'letter-spacing',
+  'id', 'marker-end', 'marker-start', 'markerwidth', 'markerheight', 'refx', 'refy', 'orient', 'markerunits', 'clip-path', 'display']);
+// url(...) may only point at a fragment of the same file, never at another document or a script
+function safeAttrValue(v) { return !/url\s*\(/i.test(v) || /^url\(\s*['"]?#/i.test(String(v).trim()); }
+
 // the graph: both SVG layers merged, with computed styles written inline
 function graphSvg() {
   const src = [$('#topo'), $('#topo-fx')];
@@ -7418,20 +7428,20 @@ function graphSvg() {
     if (node.nodeType === 3) { parent.append(node.textContent); return; }
     if (node.nodeType !== 1) return;
     const tag = node.tagName.toLowerCase();
-    if (tag === 'title' || tag === 'pattern' || node.id === 'topo-bg' || node.classList.contains('lk-hit')) return;
-    if (['script', 'foreignobject', 'iframe', 'use', 'a', 'image'].includes(tag)) return;
+    if (!SVG_TAGS.has(tag)) return;
+    if (node.id === 'topo-bg' || node.classList.contains('lk-hit')) return;
     const cs = getComputedStyle(node);
     if (cs.display === 'none' || node.getAttribute('display') === 'none') return;
     const el2 = document.createElementNS(SVGNS, tag);
     for (const a of node.attributes) {
       const n = a.name.toLowerCase();
-      if (['class', 'style', 'tabindex', 'role', 'data-node', 'data-link', 'data-msg', 'aria-label'].includes(n)) continue;
-      if (n.startsWith('on') || /^\s*(javascript|data):/i.test(a.value)) continue;
-      el2.setAttribute(a.name, a.value);
+      if (!SVG_ATTRS.has(n) || !safeAttrValue(a.value)) continue;
+      el2.setAttribute(n, a.value);
     }
     if (tag !== 'g' && tag !== 'svg' && tag !== 'defs' && tag !== 'marker') {
       for (const pr of props) {
         const v = cs.getPropertyValue(pr);
+        if (!SVG_ATTRS.has(pr) || !safeAttrValue(v)) continue;
         if (v && v !== 'none' || pr === 'fill') el2.setAttribute(pr, v);
       }
     }
@@ -7441,24 +7451,13 @@ function graphSvg() {
   for (const s of src) for (const ch of s.childNodes) copy(ch, out);
   return new XMLSerializer().serializeToString(out);
 }
-// Last line of defense for the two SVG exports: the content is generated and escaped, but an image that leaves
-// the page must never carry script, event handlers or javascript: URLs.
-function sanitizeSvg(svg) {
-  return String(svg)
-    .replace(/<\s*(script|foreignObject|iframe|use|a)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
-    .replace(/<\s*(script|foreignObject|iframe|use|a)\b[^>]*\/?>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
-    .replace(/(href|xlink:href|src)\s*=\s*"\s*(javascript|data):[^"]*"/gi, '')
-    .replace(/(href|xlink:href|src)\s*=\s*'\s*(javascript|data):[^']*'/gi, '');
-}
 async function exportImage(kind) {
   const msg = $('#export-msg');
   if (!S.res && kind !== 'graph-svg') { msg.textContent = T('Run the simulation first.'); return; }
   try {
-    if (kind === 'diagram-svg') await saveFile(exportName('svg', 'diagram'), sanitizeSvg(diagramSvg()), 'image/svg+xml', msg);
+    if (kind === 'diagram-svg') await saveFile(exportName('svg', 'diagram'), diagramSvg(), 'image/svg+xml', msg);
     else if (kind === 'diagram-png') await saveFile(exportName('png', 'diagram'), await diagramPng(), 'image/png', msg);
-    else await saveFile(exportName('svg', 'graph'), sanitizeSvg(graphSvg()), 'image/svg+xml', msg);
+    else await saveFile(exportName('svg', 'graph'), graphSvg(), 'image/svg+xml', msg);
   } catch (e) { msg.textContent = 'Could not create the image: ' + e.message; }
 }
 
