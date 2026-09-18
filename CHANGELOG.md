@@ -6,6 +6,12 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.8.1]
+
+### Security
+- Downloads always use a non-renderable content type, so an exported image cannot be rendered by the page if its link is opened instead of downloaded.
+- Exported SVG images are sanitized before leaving the page, and the graph export skips scriptable elements and attributes.
+
 ## [0.8.0]
 
 ### Added

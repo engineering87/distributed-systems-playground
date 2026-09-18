@@ -2340,8 +2340,9 @@ async function saveFile(name, text, mime, msgEl) {
       }
       return;
     }
-    // the file is only downloaded, never opened by the page
-    const blob = text instanceof Blob ? text : new Blob([String(text)], { type: 'application/octet-stream' });
+    // The blob is always typed application/octet-stream, even for images: a blob: URL is same-origin, and an
+    // SVG or HTML type would be rendered (and could run script) if the link were opened instead of downloaded.
+    const blob = new Blob([text instanceof Blob ? text : String(text)], { type: 'application/octet-stream' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -2628,10 +2629,16 @@ function graphSvg() {
     if (node.nodeType !== 1) return;
     const tag = node.tagName.toLowerCase();
     if (tag === 'title' || tag === 'pattern' || node.id === 'topo-bg' || node.classList.contains('lk-hit')) return;
+    if (['script', 'foreignobject', 'iframe', 'use', 'a', 'image'].includes(tag)) return;
     const cs = getComputedStyle(node);
     if (cs.display === 'none' || node.getAttribute('display') === 'none') return;
     const el2 = document.createElementNS(SVGNS, tag);
-    for (const a of node.attributes) if (!['class', 'style', 'tabindex', 'role', 'data-node', 'data-link', 'data-msg', 'aria-label'].includes(a.name)) el2.setAttribute(a.name, a.value);
+    for (const a of node.attributes) {
+      const n = a.name.toLowerCase();
+      if (['class', 'style', 'tabindex', 'role', 'data-node', 'data-link', 'data-msg', 'aria-label'].includes(n)) continue;
+      if (n.startsWith('on') || /^\s*(javascript|data):/i.test(a.value)) continue;
+      el2.setAttribute(a.name, a.value);
+    }
     if (tag !== 'g' && tag !== 'svg' && tag !== 'defs' && tag !== 'marker') {
       for (const pr of props) {
         const v = cs.getPropertyValue(pr);
@@ -2644,13 +2651,24 @@ function graphSvg() {
   for (const s of src) for (const ch of s.childNodes) copy(ch, out);
   return new XMLSerializer().serializeToString(out);
 }
+// Last line of defense for the two SVG exports: the content is generated and escaped, but an image that leaves
+// the page must never carry script, event handlers or javascript: URLs.
+function sanitizeSvg(svg) {
+  return String(svg)
+    .replace(/<\s*(script|foreignObject|iframe|use|a)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*(script|foreignObject|iframe|use|a)\b[^>]*\/?>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+    .replace(/(href|xlink:href|src)\s*=\s*"\s*(javascript|data):[^"]*"/gi, '')
+    .replace(/(href|xlink:href|src)\s*=\s*'\s*(javascript|data):[^']*'/gi, '');
+}
 async function exportImage(kind) {
   const msg = $('#export-msg');
   if (!S.res && kind !== 'graph-svg') { msg.textContent = T('Run the simulation first.'); return; }
   try {
-    if (kind === 'diagram-svg') await saveFile(exportName('svg', 'diagram'), new Blob([diagramSvg()], { type: 'image/svg+xml' }), 'image/svg+xml', msg);
+    if (kind === 'diagram-svg') await saveFile(exportName('svg', 'diagram'), sanitizeSvg(diagramSvg()), 'image/svg+xml', msg);
     else if (kind === 'diagram-png') await saveFile(exportName('png', 'diagram'), await diagramPng(), 'image/png', msg);
-    else await saveFile(exportName('svg', 'graph'), new Blob([graphSvg()], { type: 'image/svg+xml' }), 'image/svg+xml', msg);
+    else await saveFile(exportName('svg', 'graph'), sanitizeSvg(graphSvg()), 'image/svg+xml', msg);
   } catch (e) { msg.textContent = 'Could not create the image: ' + e.message; }
 }
 
