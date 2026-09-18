@@ -24,6 +24,7 @@ const PAGES = [
   ['docs/engine.md', 'engine.html', 'How the engine works', 'Reference'],
   ['docs/assumptions.md', 'assumptions.html', 'Assumptions and simplifications', 'Reference'],
   ['docs/troubleshooting.md', 'troubleshooting.html', 'Troubleshooting', 'Reference'],
+  ['docs/cli.md', 'cli.html', 'Outside the browser', 'Using it'],
   ['docs/teaching.md', 'teaching.html', 'Teaching', 'Using it'],
   ['CONTRIBUTING.md', 'contributing.html', 'Contributing', 'Project'],
   ['CHANGELOG.md', 'changelog.html', 'Changelog', 'Project'],

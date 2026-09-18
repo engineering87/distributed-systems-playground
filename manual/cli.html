@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Changelog · Distributed Systems Playground</title>
-<meta name="description" content="Documentation of Distributed Systems Playground: Changelog.">
+<title>Running scenarios outside the browser · Distributed Systems Playground</title>
+<meta name="description" content="Documentation of Distributed Systems Playground: Running scenarios outside the browser.">
 <link rel="icon" type="image/svg+xml" href="../docs/assets/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -186,55 +186,77 @@ document.addEventListener('DOMContentLoaded', function () {
   <a class="button" href="../index.html"><span class="long">Open the </span>Playground</a>
 </header>
 <div class="layout">
-<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="cli.html">Outside the browser</a></li><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html" aria-current="page">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
+<nav class="side" aria-label="Documentation"><p class="group">Start here</p><ul><li><a href="index.html">Overview</a></li><li><a href="getting-started.html">Getting started</a></li><li><a href="concepts.html">Concepts</a></li><li><a href="examples.html">Examples</a></li></ul><p class="group">Reference</p><ul><li><a href="interface.html">The interface</a></li><li><a href="language.html">The Upon language</a></li><li><a href="library.html">The module library</a></li><li><a href="timing-model.html">The timing model</a></li><li><a href="faults.html">Faults</a></li><li><a href="engine.html">How the engine works</a></li><li><a href="assumptions.html">Assumptions and simplifications</a></li><li><a href="troubleshooting.html">Troubleshooting</a></li></ul><p class="group">Using it</p><ul><li><a href="cli.html" aria-current="page">Outside the browser</a></li><li><a href="teaching.html">Teaching</a></li></ul><p class="group">Project</p><ul><li><a href="contributing.html">Contributing</a></li><li><a href="changelog.html">Changelog</a></li><li><a href="spec.html">Specification</a></li></ul></nav>
 <main>
-<h1 id="changelog">Changelog<a class="anchor" href="#changelog" aria-label="Link to this section">#</a></h1>
-<p>All notable changes to this project are listed here. Versions follow <a href="https://semver.org" target="_blank" rel="noopener">semantic versioning</a>; while the major version is 0, minor versions may change behavior.</p>
-<h2 id="unreleased">[Unreleased]<a class="anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
-<p>Nothing yet.</p>
-<h2 id="070">[0.7.0]<a class="anchor" href="#070" aria-label="Link to this section">#</a></h2>
-<h3 id="added">Added<a class="anchor" href="#added" aria-label="Link to this section">#</a></h3>
-<ul><li>A batch runner (<code>src/runner.js</code>) that runs a scenario over many seeds without touching the page, with compact summaries and outcome grouping.</li><li>A command line tool (<code>bin/dsp.mjs</code>) to run and check scenarios outside the browser, with exit codes for continuous integration.</li><li>Documentation page: running scenarios outside the browser.</li></ul>
-<h2 id="061">[0.6.1]<a class="anchor" href="#061" aria-label="Link to this section">#</a></h2>
-<h3 id="security">Security<a class="anchor" href="#security" aria-label="Link to this section">#</a></h3>
-<ul><li>The CI workflow runs with read-only repository permissions.</li><li>Downloaded scenario files are built from the application state instead of the text shown in the export dialog, and every download uses a generic content type.</li><li>JSON from imported files, shared links and local storage is parsed without <code>__proto__</code>, <code>constructor</code> and <code>prototype</code> keys; stored settings are checked against their allowed values.</li><li>Property paths used by form fields follow only own properties and refuse keys that could reach a prototype.</li><li>The editor's syntax highlighting and line numbers are built as DOM nodes, so code is never interpreted as HTML.</li><li>Translated blocks are restored from cloned nodes instead of re-parsed markup.</li></ul>
-<h2 id="060">[0.6.0]<a class="anchor" href="#060" aria-label="Link to this section">#</a></h2>
-<h3 id="added-1">Added<a class="anchor" href="#added-1" aria-label="Link to this section">#</a></h3>
-<ul><li>Logo, banner and social preview image.</li><li>Settings menu: theme (system, light, dark), a palette for color vision deficiencies, interface language (English, Italian), presentation mode, keyboard shortcuts, welcome tour.</li><li>Presentation mode for lectures: larger text, side panel hidden, remote clickers step through events.</li><li>Welcome tour on the first visit.</li><li>Export of the space-time diagram as SVG or PNG, and of the graph as SVG.</li><li>Example gallery with thumbnails, topics and models.</li><li>A browsable documentation site generated from <code>docs/</code> with no extra dependencies.</li><li>Changelog, citation file, code of conduct, security policy, issue and pull request templates.</li></ul>
-<h3 id="changed">Changed<a class="anchor" href="#changed" aria-label="Link to this section">#</a></h3>
-<ul><li>Packets slow down as they approach their destination.</li></ul>
-<h2 id="051">[0.5.1]<a class="anchor" href="#051" aria-label="Link to this section">#</a></h2>
-<h3 id="added-2">Added<a class="anchor" href="#added-2" aria-label="Link to this section">#</a></h3>
-<ul><li>Full user documentation in <code>docs/</code>: getting started, concepts, assumptions and simplifications, engine, timing model, faults, language, library, examples, interface, teaching, troubleshooting.</li><li><code>CONTRIBUTING.md</code> with writing guidelines.</li><li>A test that compiles every Upon program in the documentation and checks every link and anchor.</li></ul>
-<h3 id="fixed">Fixed<a class="anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
-<ul><li>A fault injected at the cursor could change earlier history when duplication was enabled.</li><li>Messages dropped in transit did not update the FIFO state of their channel.</li><li>Duplicates of a message dropped in transit were not recorded.</li><li>Inputs sent to a crashed process changed the random values received by the others.</li></ul>
-<h3 id="changed-1">Changed<a class="anchor" href="#changed-1" aria-label="Link to this section">#</a></h3>
-<ul><li>The FloodSet example uses four processes and seed 5.</li></ul>
-<h2 id="050">[0.5.0]<a class="anchor" href="#050" aria-label="Link to this section">#</a></h2>
-<h3 id="added-3">Added<a class="anchor" href="#added-3" aria-label="Link to this section">#</a></h3>
-<ul><li>Upon: functions with <code>return</code> and <code>call</code>, explicit binding with <code>via</code>, twenty new built-in functions.</li><li>Module library: stubborn, perfect and FIFO links; best-effort, reliable, uniform reliable, FIFO, causal and probabilistic broadcast.</li><li><em>Add module</em> menu.</li><li><em>Stack</em> tab showing requests and indications between modules.</li><li><em>Layers</em>: messages colored by the module that originated them.</li><li><em>Causality</em> mode with causal past and future of an event.</li><li>Examples: reliable broadcast with a sender crash, causal broadcast, gossip.</li></ul>
-<h2 id="040">[0.4.0]<a class="anchor" href="#040" aria-label="Link to this section">#</a></h2>
-<h3 id="added-4">Added<a class="anchor" href="#added-4" aria-label="Link to this section">#</a></h3>
-<ul><li>Layouts for phones, tablets, laptops and large monitors; touch support.</li></ul>
-<h3 id="changed-2">Changed<a class="anchor" href="#changed-2" aria-label="Link to this section">#</a></h3>
-<ul><li>Faster rendering of large runs.</li></ul>
-<h3 id="fixed-1">Fixed<a class="anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
-<ul><li>Malformed stored scenarios no longer break the application.</li><li>Keyboard shortcuts work after clicking a checkbox.</li></ul>
-<h2 id="030">[0.3.0]<a class="anchor" href="#030" aria-label="Link to this section">#</a></h2>
-<h3 id="added-5">Added<a class="anchor" href="#added-5" aria-label="Link to this section">#</a></h3>
-<ul><li>Crash-recovery with <code>stable</code> variables, link failures and partitions over time.</li><li>Fault injection at the cursor.</li><li>Example: failure detector across a partition and a recovery.</li></ul>
-<h2 id="020">[0.2.0]<a class="anchor" href="#020" aria-label="Link to this section">#</a></h2>
-<h3 id="added-6">Added<a class="anchor" href="#added-6" aria-label="Link to this section">#</a></h3>
-<ul><li>Animated execution on the topology, event-by-event playback, event injection at the cursor.</li></ul>
-<h3 id="changed-3">Changed<a class="anchor" href="#changed-3" aria-label="Link to this section">#</a></h3>
-<ul><li>The whole interface and documentation are in English.</li></ul>
-<h2 id="010">[0.1.0]<a class="anchor" href="#010" aria-label="Link to this section">#</a></h2>
-<h3 id="added-7">Added<a class="anchor" href="#added-7" aria-label="Link to this section">#</a></h3>
-<ul><li>First version: Upon language, discrete-event engine, parametric timing model, topology editor, space-time diagram, examples.</li></ul>
-<nav class="pager"><a href="contributing.html"><small>Previous</small>Contributing</a><a href="spec.html" style="text-align:right"><small>Next</small>Specification</a></nav>
-<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a>. Released under the MIT License.</footer>
+<h1 id="running-scenarios-outside-the-browser">Running scenarios outside the browser<a class="anchor" href="#running-scenarios-outside-the-browser" aria-label="Link to this section">#</a></h1>
+<p>The engine does not depend on the page, so the same scenario can be run from a terminal. This is useful to try an algorithm over many seeds, to compare timing models, to grade exercises, and to check a scenario in continuous integration.</p>
+<p>You need Node.js 18 or later and a copy of the repository. There is nothing to install.</p>
+<h2 id="the-command-line-tool">The command line tool<a class="anchor" href="#the-command-line-tool" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-sh"><code>node bin/dsp.mjs --help          # or: npm run dsp -- --help
+node bin/dsp.mjs examples        # the built-in examples and their timing model
+node bin/dsp.mjs presets         # the timing presets</code></pre>
+<p>A scenario is a JSON file exported from the playground (<strong>Export</strong> → <em>Save file</em> or <em>Copy JSON</em>), <code>-</code> to read it from standard input, or <code>--example &lt;key&gt;</code> for a built-in one. A scenario carries its own code, topology, timing model, inputs, faults and seed, so a run from the terminal matches the one in the browser exactly.</p>
+<h2 id="running-a-scenario">Running a scenario<a class="anchor" href="#running-a-scenario" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-sh"><code>node bin/dsp.mjs run --example floodset --seeds 1..8</code></pre>
+<pre class="code lang-text"><code>seed  status                events  msgs   lost  viol  outputs time
+   1 ok                        60     24     0     0       4     2 s
+   2 ok                        60     24     0     0       4     2 s
+…
+
+8 run(s), 0 failed, 0 with failed assertions, 0 with violations
+average per run:  60 events  24 messages  0 lost  0 violations  4 outputs
+took 24 ms</code></pre>
+<div class="table"><table><thead><tr><th>Option</th><th>Effect</th></tr></thead><tbody><tr><td><code>--seeds 1..50</code>, <code>--seeds 7</code>, <code>--seeds 1,4,9</code></td><td>which seeds to run; by default the seed stored in the scenario</td></tr><tr><td><code>--preset &lt;key&gt;</code></td><td>replace the whole timing model with a preset</td></tr><tr><td><code>--set &lt;path=value&gt;</code></td><td>change one scenario field, repeatable</td></tr><tr><td><code>--stop-on-failure</code></td><td>stop at the first run that fails</td></tr><tr><td><code>--outputs</code></td><td>print the outputs of every run</td></tr><tr><td><code>--outcomes</code></td><td>group the runs by the outputs they produced</td></tr><tr><td><code>--json</code></td><td>print summaries as JSON</td></tr><tr><td><code>--quiet</code></td><td>print only the summary</td></tr></tbody></table></div>
+<p>A run counts as failed when the code does not compile or the simulation stops with a runtime error. Violations and failed assertions are reported separately, because a violation is a broken assumption, not a broken program.</p>
+<h2 id="comparing-outcomes">Comparing outcomes<a class="anchor" href="#comparing-outcomes" aria-label="Link to this section">#</a></h2>
+<p><code>--outcomes</code> answers the question a batch is usually run for: did every seed end the same way?</p>
+<pre class="code lang-sh"><code>node bin/dsp.mjs run --example floodset --preset sync-real --seeds 1..8 --outcomes</code></pre>
+<pre class="code lang-text"><code>outcomes (5 distinct):
+     4 run(s)  seeds 3, 6, 7, 8
+           Decide | 1 | Decide | 1 | Decide | 1 | Decide | 1
+…
+     1 run(s)  seeds 5
+           Decide | 3 | Decide | 3 | Decide | 3 | Decide | 7</code></pre>
+<p>The last group is a run where the processes did not agree. Open that seed in the browser to see why: the scenario is the same, so <code>--seeds 5</code> in the terminal and seed 5 in the page are the same execution.</p>
+<p>Each seed of FloodSet draws different proposals, so different groups are normal. What matters is whether the values inside one run are all equal.</p>
+<h2 id="changing-the-model-from-the-command-line">Changing the model from the command line<a class="anchor" href="#changing-the-model-from-the-command-line" aria-label="Link to this section">#</a></h2>
+<p><code>--set</code> follows the same field names as the exported JSON:</p>
+<pre class="code lang-sh"><code>node bin/dsp.mjs run --example flooding --set actual.loss=0.3 --seeds 1..20 --quiet
+node bin/dsp.mjs run --example epfd --set actual.gst=8s --set stopAt=15s
+node bin/dsp.mjs run scenario.json --preset async --set actual.delay=&quot;lognormal(3, 0.8)&quot;</code></pre>
+<p>Values that look like numbers or booleans are converted; everything else stays a string, which is what durations and distributions need. Property names that could reach an object's prototype are refused.</p>
+<h2 id="checking-a-program">Checking a program<a class="anchor" href="#checking-a-program" aria-label="Link to this section">#</a></h2>
+<pre class="code lang-sh"><code>node bin/dsp.mjs check scenario.json</code></pre>
+<p>Parses the code and checks it against the assumed model of the scenario, exactly like the editor does, and prints errors and warnings. It runs nothing, so it is fast enough for a pre-commit hook.</p>
+<h2 id="exit-codes-and-continuous-integration">Exit codes and continuous integration<a class="anchor" href="#exit-codes-and-continuous-integration" aria-label="Link to this section">#</a></h2>
+<div class="table"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody><tr><td>0</td><td>every run finished without errors or failed assertions</td></tr><tr><td>1</td><td>at least one run failed, or <code>check</code> found errors</td></tr><tr><td>2</td><td>usage error, unreadable file, invalid JSON, unknown example or preset</td></tr></tbody></table></div>
+<p>A workflow step that keeps an exercise honest:</p>
+<pre class="code lang-yaml"><code>- run: node bin/dsp.mjs check solution.json
+- run: node bin/dsp.mjs run solution.json --seeds 1..100 --quiet</code></pre>
+<p>With <code>assert</code> statements in the algorithm and <em>Stop at the first failed assertion</em> in the scenario, a violated property makes the step fail and names the seed that produced it.</p>
+<h2 id="the-batch-runner-api">The batch runner API<a class="anchor" href="#the-batch-runner-api" aria-label="Link to this section">#</a></h2>
+<p><code>src/runner.js</code> is the module behind the tool. It has no dependency on the page and can be required from Node or loaded in a browser page.</p>
+<pre class="code lang-js"><code>const R = require('./src/runner.js');
+
+const res = R.runBatch(scenario, {
+  seeds: '1..200',              // range, list, array or { from, to }
+  preset: 'sync-real',          // optional, replaces the timing model
+  set: { 'actual.loss': '0.2' },// optional field overrides
+  stopOnFailure: false,
+  onRun: (summary, done, total) =&gt; { /* progress; return false to stop */ }
+});
+
+res.summary;   // runs, failed, firstFailure, withViolations, averages
+res.runs;      // one compact summary per seed
+R.outcomes(res.runs);      // runs grouped by the outputs they produced
+R.checkScenario(scenario); // { ok, errors, warnings }</code></pre>
+<p>A summary holds what a batch needs and not the whole trace: counts of messages by status, violations, failed assertions, the outputs with their times, the stop reason and any error. A full run, with every message and snapshot, is what <code>SimCore.runSimulation</code> returns; see <a href="engine.html#what-a-run-produces">How the engine works</a>.</p>
+<h2 id="what-it-does-not-do-yet">What it does not do yet<a class="anchor" href="#what-it-does-not-do-yet" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>Properties are local.</strong> Correctness is checked with <code>assert</code> inside the algorithm. Global invariants such as agreement across processes are the next step; see the roadmap in the <a href="spec.html#10-roadmap">specification</a>.</li><li><strong>Runs are sequential.</strong> The tool runs one seed at a time in one process. It is fast enough for a few hundred runs of a small scenario; the interface will run batches in parallel workers.</li><li><strong>One run is one execution.</strong> A batch explores more executions than a single run, never all of them. See <a href="assumptions.html#what-the-playground-is-not">Assumptions and simplifications</a>.</li></ul>
+<nav class="pager"><a href="troubleshooting.html"><small>Previous</small>Troubleshooting</a><a href="teaching.html" style="text-align:right"><small>Next</small>Teaching</a></nav>
+<footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/cli.md" target="_blank" rel="noopener">docs/cli.md</a>. Released under the MIT License.</footer>
 </main>
-<aside class="toc"><p>On this page</p><a class="l2" href="#unreleased">[Unreleased]</a><a class="l2" href="#070">[0.7.0]</a><a class="l3" href="#added">Added</a><a class="l2" href="#061">[0.6.1]</a><a class="l3" href="#security">Security</a><a class="l2" href="#060">[0.6.0]</a><a class="l3" href="#added-1">Added</a><a class="l3" href="#changed">Changed</a><a class="l2" href="#051">[0.5.1]</a><a class="l3" href="#added-2">Added</a><a class="l3" href="#fixed">Fixed</a><a class="l3" href="#changed-1">Changed</a><a class="l2" href="#050">[0.5.0]</a><a class="l3" href="#added-3">Added</a><a class="l2" href="#040">[0.4.0]</a><a class="l3" href="#added-4">Added</a><a class="l3" href="#changed-2">Changed</a><a class="l3" href="#fixed-1">Fixed</a><a class="l2" href="#030">[0.3.0]</a><a class="l3" href="#added-5">Added</a><a class="l2" href="#020">[0.2.0]</a><a class="l3" href="#added-6">Added</a><a class="l3" href="#changed-3">Changed</a><a class="l2" href="#010">[0.1.0]</a><a class="l3" href="#added-7">Added</a></aside>
+<aside class="toc"><p>On this page</p><a class="l2" href="#the-command-line-tool">The command line tool</a><a class="l2" href="#running-a-scenario">Running a scenario</a><a class="l2" href="#comparing-outcomes">Comparing outcomes</a><a class="l2" href="#changing-the-model-from-the-command-line">Changing the model from the command line</a><a class="l2" href="#checking-a-program">Checking a program</a><a class="l2" href="#exit-codes-and-continuous-integration">Exit codes and continuous integration</a><a class="l2" href="#the-batch-runner-api">The batch runner API</a><a class="l2" href="#what-it-does-not-do-yet">What it does not do yet</a></aside>
 </div>
 </body>
 </html>

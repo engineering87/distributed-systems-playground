@@ -167,7 +167,7 @@ The second property has one caveat: it holds for events strictly before the inje
 | `rounds` | round length and per-process round starts, when rounds are used |
 | `violations`, `stopReason`, `error`, `errorLine`, `endT` | summary |
 
-The engine never touches the page, so the same function runs in the browser and in the Node test suite.
+The engine never touches the page, so the same function runs in the browser, in the Node test suite and in the [command line tool](cli.md).
 
 ## From a run to the screen
 

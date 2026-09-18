@@ -160,6 +160,9 @@ This project exists to make that gap visible.
 - Arrival ripples, loss marks, processing glow, timer icons, round badges, output bubbles and crash flashes.
 - Event-by-event playback, automatic speed, or fixed speeds from 2 ms to 5 s of simulated time per second.
 
+**Beyond the page**
+- A command line tool that runs the same engine: many seeds in one command, outcomes grouped, exit codes for continuous integration. See [Running scenarios outside the browser](docs/cli.md).
+
 **Analysis**
 - A synchronized space-time diagram with processing bars, violations, outputs, rounds and GST.
 - A causality mode: click an event to shade everything that could have caused it and everything it could affect.
@@ -239,6 +242,7 @@ The documentation goes further than this page. Read it on the [documentation sit
 | [How the engine works](docs/engine.md) | event ordering, steps, determinism |
 | [Assumptions and simplifications](docs/assumptions.md) | what the simulator leaves out, in one place |
 | [Teaching with the playground](docs/teaching.md) | lesson advice and exercises |
+| [Running scenarios outside the browser](docs/cli.md) | the command line tool and the batch runner API |
 | [Troubleshooting](docs/troubleshooting.md) | symptoms, causes and fixes |
 
 The Upon programs in the documentation are compiled by the test suite, and the results quoted come from real runs with the stated seeds.
@@ -656,12 +660,14 @@ Randomness comes from `xoshiro128**`, with a separate stream derived via `splitm
 ```
 src/
   core.js          lexer, parser, checker, interpreter, engine, causal cone (no DOM)
+  runner.js        batch runs over many seeds, used by the command line and the tests
   library.js       communication modules written in Upon
   i18n.js          Italian translation of the interface
   examples.js      example scenarios and timing presets
   ui.js            interface and animation
   style.css        light and dark themes
   template.html    page structure
+bin/dsp.mjs        command line tool: run and check scenarios without a browser
 scripts/build.mjs  bundles src/ into index.html
 scripts/build-docs.mjs  generates the documentation site in manual/
 test/              tests for the language and the engine (node:test)
@@ -676,6 +682,7 @@ Requires Node.js 18 or later. There are no dependencies to install.
 
 ```sh
 npm test         # run the test suite
+npm run dsp -- run --example floodset --seeds 1..8 --outcomes   # run scenarios from a terminal
 npm run build    # rebuild index.html and the documentation site
 npm run check    # fail if index.html or manual/ is out of date
 ```

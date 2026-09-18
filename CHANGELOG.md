@@ -6,6 +6,13 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.7.0]
+
+### Added
+- A batch runner (`src/runner.js`) that runs a scenario over many seeds without touching the page, with compact summaries and outcome grouping.
+- A command line tool (`bin/dsp.mjs`) to run and check scenarios outside the browser, with exit codes for continuous integration.
+- Documentation page: running scenarios outside the browser.
+
 ## [0.6.1]
 
 ### Security

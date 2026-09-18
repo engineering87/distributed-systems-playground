@@ -24,6 +24,7 @@ The same pages are published as a [documentation site](https://engineering87.git
 | [The timing model](timing-model.md) | assumed and actual models, distributions, presets, rounds, GST |
 | [Faults](faults.md) | crashes, recoveries, link failures, partitions |
 | [How the engine works](engine.md) | event ordering, steps, message handling, determinism |
+| [Running scenarios outside the browser](cli.md) | the command line tool and the batch runner API |
 | [Troubleshooting](troubleshooting.md) | symptoms, causes, fixes and error messages |
 | [Specification](SPEC.md) | the design document, grammar and implementation status |
 | [Changelog](../CHANGELOG.md) | what changed in each version |

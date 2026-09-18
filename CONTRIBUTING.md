@@ -19,6 +19,8 @@ Open `index.html` in a browser to use the application.
 | File | Content | Rule |
 |---|---|---|
 | `src/core.js` | lexer, parser, checker, interpreter, simulation engine, causal cone | no access to the page, so it runs under Node |
+| `src/runner.js` | batch runs over many seeds | no access to the page, so it runs under Node |
+| `bin/dsp.mjs` | command line tool | no dependencies; every command covered by a test |
 | `src/library.js` | library modules written in Upon | each module documented and tested |
 | `src/examples.js` | example scenarios and timing presets | each example documented and tested |
 | `src/ui.js` | interface and animation | |

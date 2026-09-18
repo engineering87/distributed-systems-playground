@@ -307,7 +307,11 @@ Implementation note: inside a `trigger`, the ASCII `>` closes the event, so comp
 
 Every higher abstraction (stubborn link, perfect link, broadcast, failure detector, consensus) is **written in the DSL**. Its source code is part of the teaching material.
 
-### 5.7 Module library
+### 5.7 Batch runner and command line
+
+`src/runner.js` runs a scenario several times without the page: it clones the scenario, applies optional field overrides and a timing preset, runs one simulation per seed and returns a compact summary of each (counts of messages by status, violations, failed assertions, outputs with their times, stop reason, error) plus an aggregate and, on request, the runs grouped by the outputs they produced. `bin/dsp.mjs` is a dependency-free command line front end for it, with exit codes suitable for continuous integration. Both are described in [Running scenarios outside the browser](cli.md).
+
+### 5.8 Module library
 
 `src/library.js` holds modules written in Upon, each with the interface it implements, the interfaces it uses, a summary and its guarantees: `RetransmitLinks` (stubborn links, bounded retransmissions), `EliminateDuplicates` and `AckLinks` (perfect links), `SequencedFifoLinks` (FIFO perfect links), `BasicBroadcast`, `EagerReliableBroadcast`, `MajorityAckURB`, `BroadcastWithSequenceNumber` (FIFO reliable broadcast), `WaitingCausalBroadcast` (vector clocks) and `EagerGossip`. Adding a module inserts the missing interfaces and, for every used interface that the program does not implement yet, a default module that does.
 
@@ -420,8 +424,10 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.3** | crash-recovery with `stable`, link failures and partitions over time, fault injection at the cursor |
 | **v0.4** | responsive layouts and touch support, faster rendering of large runs, robustness fixes |
 | **v0.5** | functions and `via` in Upon, more built-ins, module library for links and broadcast, stack view, layer colors, causality mode, full user documentation |
-| **v0.6** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
-| **v0.7** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with automatic property checks |
+| **v0.6** | visual identity, settings (theme, palette, language), presentation mode, documentation site, batch runner and command line tool |
+| **v0.7** | global invariants checked across processes, test suites over seeds and fault schedules, engine in worker threads |
+| **v0.8** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
+| **v0.9** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with automatic property checks |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |
 | **v1.2** | failure detector oracles (P, ◇P, Ω) as provided modules, to study consensus on top of the abstraction |
 | **v2** | Byzantine faults (adversarial nodes written in the DSL), systematic exploration of interleavings, trace export |

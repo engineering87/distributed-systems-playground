@@ -9,7 +9,7 @@ authors:
 repository-code: "https://github.com/engineering87/distributed-systems-playground"
 url: "https://engineering87.github.io/distributed-systems-playground/"
 license: MIT
-version: "0.6.1"
+version: "0.7.0"
 keywords:
   - distributed systems
   - distributed algorithms

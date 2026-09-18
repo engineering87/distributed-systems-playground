@@ -1,6 +1,6 @@
 {
   "name": "distributed-systems-playground",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Web app to simulate distributed algorithms with an interactive topology, upon-event pseudocode and a parametric timing model",
   "private": true,
   "homepage": "https://engineering87.github.io/distributed-systems-playground/",
@@ -14,6 +14,7 @@
   "scripts": {
     "build": "node scripts/build.mjs && node scripts/build-docs.mjs",
     "check": "node scripts/build.mjs --check && node scripts/build-docs.mjs --check",
-    "test": "node --test test/core.test.cjs test/docs.test.cjs"
+    "test": "node --test test/core.test.cjs test/runner.test.cjs test/docs.test.cjs",
+    "dsp": "node bin/dsp.mjs"
   }
 }
