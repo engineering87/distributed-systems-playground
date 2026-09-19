@@ -9,6 +9,8 @@ Fault tolerance is the reason most distributed algorithms exist. This page descr
 - [Recovery](#recovery)
 - [Link failure](#link-failure)
 - [Partition](#partition)
+- [Process pause](#process-pause)
+- [Omission](#omission)
 - [Unreliable channels](#unreliable-channels)
 - [Adding faults](#adding-faults)
 - [Seeing faults in a run](#seeing-faults-in-a-run)
@@ -21,7 +23,9 @@ Fault tolerance is the reason most distributed algorithms exist. This page descr
 |---|---|---|
 | Crash | a process | until a recovery, or forever |
 | Recovery | a crashed process | instant |
-| Link failure | both directions between two processes | an interval, or forever |
+| Link failure | one or both directions between two processes | an interval, or forever |
+| Process pause | a process | a fixed interval |
+| Omission | the sends or receives of a process | an interval, or forever |
 | Partition | all channels between groups of processes | an interval, or forever |
 | Disabled link | one link | the whole run |
 | Loss, duplication, delays | every message, independently | the whole run |
@@ -85,7 +89,9 @@ A recovery scheduled for a process that is running is ignored, with a warning in
 
 ## Link failure
 
-A link failure interrupts the channel between two processes, in both directions, from a start time until an end time. With no end time, it lasts until the end of the run.
+A link failure interrupts the channel between two processes from a start time until an end time. With no end time, it lasts until the end of the run.
+
+By default both directions fail together. With **One way**, only the messages from the first process to the second are lost, and the other direction keeps working. That asymmetry is worth trying: a process that hears its neighbor but cannot answer looks alive to itself and dead to everybody else, and many algorithms behave badly in that situation.
 
 A message is dropped if the channel is down when it is sent, or when it would arrive. So a message already travelling when the link goes down is lost too.
 
@@ -109,6 +115,37 @@ Processes not listed form one additional group, which is why `3` isolates p3. A 
 
 From the inside, a partition looks exactly like a crash of the other side: messages stop arriving. That is the heart of many impossibility results, and the [partition example](examples.md#failure-detector-across-a-partition-and-a-recovery) shows it with a failure detector.
 
+## Process pause
+
+A pause stops a process from handling events for a fixed interval, without losing anything:
+
+- events that arrive during the pause wait, and are handled when it ends;
+- its timers do not fire during the pause, and fire when it ends;
+- its state is intact, and nothing is reset.
+
+This is the garbage collection pause, the overloaded machine, the virtual machine that was suspended. From the outside it looks exactly like a crash: the process answers nothing. From the inside nothing happened, which is why a process that comes back from a long pause can send a message that the others consider stale.
+
+A paused process is drawn with a dashed amber outline and a ⏸ mark on the graph, and its line on the diagram carries an amber band for the length of the pause. The *State* tab says "paused until". The event log shows the start and the end of every pause, even when no event runs into it.
+
+Pauses need an end time: a pause forever is a crash without message loss, which is not a useful model.
+
+## Omission
+
+An omission fault makes a process drop some of its own messages, without crashing:
+
+| Field | Meaning |
+|---|---|
+| Process | whose messages are dropped |
+| Omits | its sends, its receives, or both |
+| Probability | 1 drops every message, 0.3 drops about one in three |
+| From, Until | the window; empty *Until* means until the end of the run |
+
+A dropped message is marked *omitted by a process* and appears in the log under *Dropped messages*. A send omission never leaves the sender; a receive omission arrives and is thrown away, which is the difference between a broken network card and a full receive buffer.
+
+Omissions use their own random stream, one per process, so adding one does not change what happened before it, and the same scenario always omits the same messages.
+
+An omitting process is not faulty in the crash-stop sense: it keeps running, keeps its state and keeps handling the messages it does receive. Algorithms written for crash faults often assume this cannot happen.
+
 ## Unreliable channels
 
 Channel faults are set in the *Timing* tab and apply to every message independently:
@@ -130,14 +167,17 @@ A link can have its own loss and delay distribution. Select it on the graph and 
 |---|---|
 | Crash | process, time |
 | Recovery | process, time |
-| Link failure | two processes, from, until (empty for forever) |
+| Link failure | two processes, one way or both, from, until (empty for forever) |
 | Partition | groups, from, until (empty for forever) |
+| Process pause | process, from, until |
+| Omission | process, what it omits, probability, from, until (empty for forever) |
 
 The form rejects unknown processes, an end before the start, and a process listed in two groups.
 
 **During playback.** Pause where you want the fault to happen, then:
 
 - select a process and press **Crash here**, or **Recover here** if it is down;
+- select a process, type a duration and press **Pause here** to stop it for that long;
 - select a process, type a duration and press **Isolate here** to cut it off from everybody else;
 - select a link, type a duration and press **Cut here**.
 
@@ -149,8 +189,10 @@ The run is recomputed and playback continues from the same instant. Everything b
 [
   { "type": "crash", "node": 2, "at": "1.5s" },
   { "type": "recover", "node": 2, "at": "2.5s" },
-  { "type": "link", "a": 1, "b": 3, "from": "0ms", "to": "1s" },
-  { "type": "partition", "groups": "1 2 | 3 4 5", "from": "500ms", "to": "" }
+  { "type": "link", "a": 1, "b": 3, "from": "0ms", "to": "1s", "oneWay": true },
+  { "type": "partition", "groups": "1 2 | 3 4 5", "from": "500ms", "to": "" },
+  { "type": "pause", "node": 4, "from": "800ms", "to": "1.2s" },
+  { "type": "omission", "node": 5, "direction": "send", "prob": 0.3, "from": "0ms", "to": "" }
 ]
 ```
 
@@ -173,12 +215,16 @@ The run is recomputed and playback continues from the same instant. Everything b
 
 **A network that gets better.** Use the *Partially synchronous* preset: heavy delays before GST, bounded delays after.
 
+**A process that freezes and comes back.** Pause a leader for longer than the failure detector's timeout. The others suspect it and move on; the leader wakes up convinced it is still in charge. This is how two leaders appear in a system that was proved to have one.
+
+**A half-open connection.** Cut one direction of a link. The sender keeps sending and hears nothing back; the receiver hears everything and its answers vanish.
+
+**A process that keeps its state but drops messages.** Give it a send omission with probability 0.5. Unlike loss on the links, this hits every message that one process sends, whatever its destination.
+
 ## What is not modeled
 
 - Byzantine processes, which lie or deviate from the algorithm.
-- Omission failures of a process, where a process silently skips some sends or receives.
-- Pauses of a running process, such as long garbage collections.
-- One-way link failures.
 - Corrupted messages.
+- Processes that slow down instead of stopping: a pause is all or nothing, and the step duration distribution is the same for everybody.
 
 See [Assumptions and simplifications](assumptions.md#failures) for the reasoning behind these choices.

@@ -176,7 +176,8 @@ This project exists to make that gap visible.
 
 **Faults**
 - Crashes and recoveries, with volatile state reset and `stable` variables preserved.
-- Link failures and network partitions over time intervals, or for the whole run.
+- Link failures, in one direction or both, and network partitions over time intervals, or for the whole run.
+- Process pauses, where a process handles nothing for a while and then catches up with its state intact, and omission faults, where a process drops part of what it sends or receives without crashing.
 - Message loss, duplication, delays and spikes, globally or per link.
 
 **Interaction and reproducibility**
@@ -709,7 +710,7 @@ Every simulator simplifies. The most important choices here are:
 - **Channels** are point to point, with no routing. Each message draws its delay and its loss independently; there is no congestion and no bandwidth.
 - **Lockstep rounds** ignore the delay distribution entirely; emulated rounds use it.
 - **Partial synchrony** follows the Dwork, Lynch and Stockmeyer model with a GST; messages sent before GST arrive by GST plus the bound.
-- **Failures** are crash-stop and crash-recovery, symmetric link failures and partitions. Byzantine behavior and omissions of a process are not modeled.
+- **Failures** are crash-stop, crash-recovery, link failures (one way or both), partitions, process pauses and omissions. Byzantine behavior and message corruption are not modeled.
 - **Sets** are iterated in sorted order, which real systems do not guarantee.
 - **Distributions** are illustrative, not measurements of real networks.
 

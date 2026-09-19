@@ -543,6 +543,12 @@ function msgGeom(m) {
   return linkGeom(a, b, isCurved(m.from, m.to));
 }
 // is process id down at time t in the last run?
+function pausedAt(id, t) {
+  const ps = S.res && S.res.pauses ? S.res.pauses[id] : null;
+  if (!ps) return null;
+  for (const p of ps) if (t >= p.from && t < p.to) return p;
+  return null;
+}
 function downAt(id, t) {
   const d = S.res && S.res.downs[id];
   if (!d) return null;
@@ -550,11 +556,19 @@ function downAt(id, t) {
   return null;
 }
 // is the channel between a and b interrupted at time t in the last run?
+// what is cut between a and b at time t: both directions, or only one of them
 function cutAtUI(a, b, t) {
   const nf = S.res && S.res.netFaults;
   if (!nf) return null;
-  for (const l of nf.links)
-    if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+  let ab = false, ba = false;
+  for (const l of nf.links) {
+    if (t < l.from || (l.to !== null && t >= l.to)) continue;
+    if (l.a === a && l.b === b) { ab = true; if (!l.oneWay) ba = true; }
+    else if (l.a === b && l.b === a) { ba = true; if (!l.oneWay) ab = true; }
+  }
+  if (ab && ba) return 'link down';
+  if (ab) return 'link down p' + a + ' → p' + b;
+  if (ba) return 'link down p' + b + ' → p' + a;
   for (const p of nf.partitions) {
     if (t < p.from || (p.to !== null && t >= p.to)) continue;
     if (!p.groupOf) { p.groupOf = new Map(); p.groups.forEach((g, i) => g.forEach(id => p.groupOf.set(id, i))); }
@@ -603,12 +617,13 @@ function buildStatic() {
     const glow = sv('circle', { r: R_NODE + 6, class: 'glow', display: 'none' });
     const cross = sv('path', { class: 'cross', d: 'M-10 -10L10 10M10 -10L-10 10', display: 'none' });
     const icon = sv('text', { class: 'icon', x: -R_NODE - 4, y: -R_NODE + 2, display: 'none' }, '⏱');
+    const pause = sv('text', { class: 'icon pause', x: R_NODE - 2, y: R_NODE + 2, display: 'none' }, '⏸');
     const out = sv('text', { class: 'out', y: R_NODE + 14, display: 'none' });
     const badge = sv('text', { class: 'badge', x: R_NODE + 3, y: -R_NODE + 2, display: 'none' });
     badge.style.textAnchor = 'start';
-    g.append(glow, sv('circle', { r: R_NODE, class: 'body' }), sv('text', { class: 'name' }, 'p' + n.id), cross, icon, out, badge);
+    g.append(glow, sv('circle', { r: R_NODE, class: 'body' }), sv('text', { class: 'name' }, 'p' + n.id), cross, icon, pause, out, badge);
     gN.append(g);
-    V.nodes.set(n.id, { g, glow, cross, icon, out, badge, state: {} });
+    V.nodes.set(n.id, { g, glow, cross, icon, pause, out, badge, state: {} });
   }
   V.key = staticKey();
 }
@@ -642,7 +657,8 @@ function renderTopo() {
   for (const L of V.links) {
     const cut = S.res ? cutAtUI(L.l.a, L.l.b, t) : null;
     const sel = !!(S.selected && S.selected.type === 'link' && S.selected.idx === L.i);
-    setIf(L, 'cls', L.path, 'class', 'lk' + (L.l.enabled ? '' : ' off') + (cut ? ' cut' : '') + (sel ? ' sel' : ''));
+    const oneWayCut = !!cut && cut !== 'link down' && cut !== 'partition';
+    setIf(L, 'cls', L.path, 'class', 'lk' + (L.l.enabled ? '' : ' off') + (cut ? (oneWayCut ? ' cut half' : ' cut') : '') + (sel ? ' sel' : ''));
     if (L.l.directed) setIf(L, 'mk', L.path, 'marker-end', sel ? 'url(#arrow-sel)' : 'url(#arrow)');
     if (cut === L.cut) continue;
     L.cut = cut;
@@ -660,7 +676,9 @@ function renderTopo() {
       else if (t >= S.cone.future[id]) coneCls = ' influenced';
       else if (t <= S.cone.past[id]) coneCls = ' cause';
     }
-    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : '') + coneCls);
+    const paused = !crashed && !!pausedAt(id, t);
+    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (paused ? ' paused' : '') + (b ? ' busy' : '') + coneCls);
+    setIf(R, 'pause', R.pause, 'display', paused ? 'inline' : 'none');
     setIf(R, 'cross', R.cross, 'display', crashed ? 'inline' : 'none');
     if (b) {
       setIf(R, 'glow', R.glow, 'display', 'inline');
@@ -780,7 +798,7 @@ function renderAnim() {
         f = 1 - Math.pow(1 - f, 1.6);
         if (m.status === 'dropped-loss') f *= 0.5;
         if (labels) f = 0.14 + 0.72 * f;
-        const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
+        const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut' || m.status === 'dropped-omission') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
         const tint = layers && cls === 'ok' ? layerColor(m.origin) : '';
         if (withTrails) {
           const tr = trails.take();
@@ -831,7 +849,7 @@ function renderAnim() {
         if (m.status === 'dropped-loss' && g) [x, y] = geomAt(g, 0.5);
         else if (g) [x, y] = geomAt(g, 1);
         else { x = to.x; y = to.y; }
-        const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
+        const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut' || m.status === 'dropped-omission') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
         const sz = 5 + 4 * k;
         const b = bursts.take().root;
         b.setAttribute('d', `M${x - sz} ${y - sz}L${x + sz} ${y + sz}M${x + sz} ${y - sz}L${x - sz} ${y + sz}`);
@@ -1028,7 +1046,13 @@ function describeFault(f) {
   switch (f.type) {
     case 'crash': return 'p' + f.node + ' crashes at ' + f.at;
     case 'recover': return 'p' + f.node + ' recovers at ' + f.at;
-    case 'link': return 'link p' + f.a + '–p' + f.b + ' down from ' + f.from + until;
+    case 'link': return (f.oneWay ? 'one-way link p' + f.a + ' → p' + f.b : 'link p' + f.a + '–p' + f.b) + ' down from ' + f.from + until;
+    case 'pause': return 'p' + f.node + ' paused from ' + f.from + ' until ' + f.to;
+    case 'omission': {
+      const what = f.direction === 'send' ? 'sends' : f.direction === 'receive' ? 'receives' : 'sends and receives';
+      const how = (f.prob === undefined || +f.prob >= 1) ? 'all' : Math.round(+f.prob * 100) + '% of';
+      return 'p' + f.node + ' omits ' + how + ' its ' + what + ' from ' + f.from + until;
+    }
     case 'partition': {
       const groups = groupsOf(f);
       const listed = new Set(groups.flat());
@@ -1061,6 +1085,13 @@ function faultHere(build, describe) {
   if (!addFault(f)) return;
   run(true, resume);
   toast(describe + ' at ' + C.fmtDuration(S.cursor) + '.');
+}
+// a pause needs an end: the duration field is read as a length, one second by default
+function pauseEndFrom(at, input) {
+  const v = String(input.value || '').trim();
+  let len = 1000000;
+  if (v) { try { len = C.parseDuration(v); } catch (e) { len = 1000000; } }
+  return C.fmtDuration(C.parseDuration(at) + Math.max(1, len));
 }
 function untilFrom(input) {
   const v = input.value.trim();
@@ -1131,7 +1162,9 @@ function renderProps() {
       const iso = el('input', { class: 'narrow', value: '2s', placeholder: 'forever', 'aria-label': 'Isolation duration', title: 'Duration, empty for forever' });
       row.append(el('span', { class: 'sep' }), iso, el('button', { type: 'button', class: 'ghost small',
         onclick: () => faultHere(at => ({ type: 'partition', groups: String(n.id), from: at, to: untilFrom(iso) }),
-          'p' + n.id + ' is isolated') }, 'Isolate here'));
+          'p' + n.id + ' is isolated') }, 'Isolate here'),
+        el('button', { type: 'button', class: 'ghost small', title: 'Stop processing for that long, without losing anything',
+          onclick: () => faultHere(at => ({ type: 'pause', node: n.id, from: at, to: pauseEndFrom(at, iso) }), 'p' + n.id + ' pauses') }, 'Pause here'));
       box.append(row);
     }
     return;
@@ -1533,6 +1566,24 @@ function drawDiagramInto(ctx, nodes, W, H) {
       band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' ' + T('down'));
     }
   }
+  // process pauses: the process is alive but handles nothing until the pause ends
+  if (r && r.pauses) {
+    ctx.fillStyle = col.amber;
+    for (const id in r.pauses) {
+      const y = rowY.get(+id);
+      if (y === undefined) continue;
+      for (const p of r.pauses[id]) {
+        const x1 = Math.max(X(p.from), LEFT), x2 = Math.min(X(Math.min(p.to, t)), W);
+        if (x2 <= x1) continue;
+        ctx.globalAlpha = 0.18;
+        ctx.fillRect(x1, y - 7, x2 - x1, 14);
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(x1, y - 7, 2, 14);
+        if (p.to <= t) ctx.fillRect(x2 - 2, y - 7, 2, 14);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
   // causal cone: the part of each process line that can affect the origin, and the part it can affect
   if (r && S.cone) {
     const c = S.cone;
@@ -1717,12 +1768,13 @@ function drawMsg(B, m, alpha, tcut, X, rowY, selected, layers) {
   }
   let color = m.violation ? col.red : layers ? layerColor(m.origin) : col.blue;
   let dash = [];
-  if (m.status === 'dropped-loss' || m.status === 'dropped-cut') { color = col.amber; dash = [4, 3]; }
+  if (m.status === 'dropped-loss' || m.status === 'dropped-cut' || m.status === 'dropped-omission') { color = col.amber; dash = [4, 3]; }
   else if (m.status === 'lost-crash') { color = col.muted; dash = [2, 3]; }
   else if (m.status === 'dropped-late') dash = [4, 3];
-  const lost = m.status === 'dropped-loss' || m.status === 'dropped-late' || m.status === 'lost-crash' || m.status === 'dropped-cut';
+  const lost = m.status === 'dropped-loss' || m.status === 'dropped-late' || m.status === 'lost-crash' || m.status === 'dropped-cut' || m.status === 'dropped-omission';
   let tt = m.recvT, ty = y2;
   if (m.status === 'dropped-loss') { tt = (m.sendT + m.recvT) / 2; ty = (y1 + y2) / 2; }
+  else if (m.status === 'dropped-omission' && m.recvT === m.sendT) { tt = m.sendT; ty = y1; }
   let frac = 1;
   if (tcut < tt && tt > m.sendT) frac = Math.max(0, (tcut - m.sendT) / (tt - m.sendT));
   const self = m.from === m.to;
@@ -1763,6 +1815,7 @@ function distSeg(px, py, s) {
 }
 const STATUS_TEXT = {
   delivered: 'delivered', pending: 'still in transit when the run ended', 'dropped-loss': 'lost by the network',
+  'dropped-omission': 'omitted by a process',
   'dropped-late': 'discarded because late', 'lost-crash': 'recipient crashed', 'dropped-link': 'no link',
   'dropped-cut': 'dropped by a link failure or a partition'
 };
@@ -2062,9 +2115,11 @@ function renderInspector(force) {
   const i = upperBound(snaps, S.cursor, s => s.t) - 1;
   const cur = i >= 0 ? snaps[i] : null, prev = i > 0 ? snaps[i - 1] : null;
   const down = downAt(id, S.cursor);
+  const pause = pausedAt(id, S.cursor);
   const past = (r.downs[id] || []).filter(d => d.to !== null && d.to <= S.cursor);
   const status = down ? 'crashed at ' + C.fmtDuration(down.from)
-    : past.length ? 'running, recovered at ' + C.fmtDuration(past[past.length - 1].to) : 'running';
+    : pause ? 'paused until ' + C.fmtDuration(pause.to)
+      : past.length ? 'running, recovered at ' + C.fmtDuration(past[past.length - 1].to) : 'running';
   wrap.append(el('div', { class: 'meta' },
     el('span', {}, 'status ', el('b', {}, status)),
     el('span', {}, 'local clock ', el('b', {}, C.fmtDuration(Math.round(info.offset + (1 + info.rho) * S.cursor)))),
@@ -2460,9 +2515,11 @@ function bindHeader() {
   $('#btn-add-fault').addEventListener('click', () => {
     const type = $('#fault-type').value;
     const v = id => $(id).value.trim();
-    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to') }
+    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-oneway').checked }
       : type === 'partition' ? { type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to') }
-      : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
+      : type === 'pause' ? { type, node: parseInt(v('#fault-node2'), 10), from: v('#fault-from'), to: v('#fault-to2') }
+        : type === 'omission' ? { type, node: parseInt(v('#fault-node2'), 10), direction: v('#fault-direction'), prob: v('#fault-prob'), from: v('#fault-from'), to: v('#fault-to') }
+          : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
     if (addFault(f)) { renderProps(); toast('Fault added: ' + describeFault(f) + '.'); }
   });
 }

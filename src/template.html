@@ -238,15 +238,22 @@ uses PerfectLinks as pl via AckLinks</pre>
             <option value="crash">Crash</option>
             <option value="recover">Recovery</option>
             <option value="link">Link failure</option>
+          <option value="pause">Process pause</option>
+          <option value="omission">Omission</option>
             <option value="partition">Partition</option>
           </select></label>
         <label class="field" data-ft="crash recover"><span>Process</span><input id="fault-node" type="number" min="1" class="narrow"></label>
         <label class="field" data-ft="crash recover"><span>At</span><input id="fault-at" value="1s" class="narrow"></label>
         <label class="field" data-ft="link"><span>Between</span><input id="fault-a" type="number" min="1" class="narrow" aria-label="First process"></label>
         <label class="field" data-ft="link"><span>and</span><input id="fault-b" type="number" min="1" class="narrow" aria-label="Second process"></label>
+        <label class="check" data-ft="link" title="Only the messages from the first process to the second are lost"><input type="checkbox" id="fault-oneway"> One way</label>
+        <label class="field" data-ft="pause omission"><span>Process</span><input id="fault-node2" type="number" min="1" class="narrow" aria-label="Process"></label>
+        <label class="field" data-ft="omission"><span>Omits</span><select id="fault-direction"><option value="both">sends and receives</option><option value="send">sends</option><option value="receive">receives</option></select></label>
+        <label class="field" data-ft="omission"><span>Probability</span><input id="fault-prob" value="1" class="tiny" aria-label="Omission probability"></label>
         <label class="field" data-ft="partition"><span>Groups</span><input id="fault-groups" placeholder="1 2 | 3 4" style="width:130px"></label>
-        <label class="field" data-ft="link partition"><span>From</span><input id="fault-from" value="1s" class="narrow"></label>
-        <label class="field" data-ft="link partition"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
+        <label class="field" data-ft="link partition pause omission"><span>From</span><input id="fault-from" value="1s" class="narrow"></label>
+        <label class="field" data-ft="link partition omission"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
+        <label class="field" data-ft="pause"><span>Until</span><input id="fault-to2" value="3s" class="narrow" aria-label="End of the pause"></label>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
       </div>
       <p class="hint" data-i18n-block="hint-faults">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>

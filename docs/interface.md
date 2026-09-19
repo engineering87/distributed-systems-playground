@@ -160,6 +160,7 @@ One horizontal line per process, time from left to right.
 | red circle | a violation at that process |
 | red square | a failed assertion or a runtime error |
 | violet dashed line, cross, green circle | the process is down, the crash, the recovery |
+| amber band on a process line | the process is paused |
 | red shading | a partition (full height) or a link failure (between two rows) |
 | dashed vertical lines, `r1`, `r2` | lockstep rounds |
 | short ticks on a line | emulated round starts of that process |
@@ -194,6 +195,7 @@ Click an entry to move the cursor there. The filter shows one kind at a time. Th
 | bubble above a process | an output |
 | text under a process | its latest output |
 | dashed, crossed-out process | the process is down |
+| dashed amber outline with ⏸ | the process is paused |
 | violet or green flash | a crash or a recovery |
 | dashed red link with ✂ | the link is interrupted |
 

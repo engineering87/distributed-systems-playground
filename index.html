@@ -472,6 +472,10 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
 #topo .nd.cause .body { stroke: var(--blue); stroke-width: 3; stroke-dasharray: 2 2; }
 #topo .nd.influenced .body { stroke: var(--amber); stroke-width: 3.4; }
 #topo .nd.origin .body { stroke: var(--ink); stroke-width: 4; }
+#topo .lk.cut.half { stroke-dasharray: 3 6; opacity: .8; }
+#topo .nd.paused .body { stroke: var(--amber); stroke-dasharray: 6 3; }
+#topo .nd.paused .name { opacity: .6; }
+#topo .nd .icon.pause { fill: var(--amber); }
 body.cone-mode #st { cursor: crosshair; }
 
 /* five tabs on narrow screens */
@@ -772,15 +776,22 @@ uses PerfectLinks as pl via AckLinks</pre>
             <option value="crash">Crash</option>
             <option value="recover">Recovery</option>
             <option value="link">Link failure</option>
+          <option value="pause">Process pause</option>
+          <option value="omission">Omission</option>
             <option value="partition">Partition</option>
           </select></label>
         <label class="field" data-ft="crash recover"><span>Process</span><input id="fault-node" type="number" min="1" class="narrow"></label>
         <label class="field" data-ft="crash recover"><span>At</span><input id="fault-at" value="1s" class="narrow"></label>
         <label class="field" data-ft="link"><span>Between</span><input id="fault-a" type="number" min="1" class="narrow" aria-label="First process"></label>
         <label class="field" data-ft="link"><span>and</span><input id="fault-b" type="number" min="1" class="narrow" aria-label="Second process"></label>
+        <label class="check" data-ft="link" title="Only the messages from the first process to the second are lost"><input type="checkbox" id="fault-oneway"> One way</label>
+        <label class="field" data-ft="pause omission"><span>Process</span><input id="fault-node2" type="number" min="1" class="narrow" aria-label="Process"></label>
+        <label class="field" data-ft="omission"><span>Omits</span><select id="fault-direction"><option value="both">sends and receives</option><option value="send">sends</option><option value="receive">receives</option></select></label>
+        <label class="field" data-ft="omission"><span>Probability</span><input id="fault-prob" value="1" class="tiny" aria-label="Omission probability"></label>
         <label class="field" data-ft="partition"><span>Groups</span><input id="fault-groups" placeholder="1 2 | 3 4" style="width:130px"></label>
-        <label class="field" data-ft="link partition"><span>From</span><input id="fault-from" value="1s" class="narrow"></label>
-        <label class="field" data-ft="link partition"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
+        <label class="field" data-ft="link partition pause omission"><span>From</span><input id="fault-from" value="1s" class="narrow"></label>
+        <label class="field" data-ft="link partition omission"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
+        <label class="field" data-ft="pause"><span>Until</span><input id="fault-to2" value="3s" class="narrow" aria-label="End of the pause"></label>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
       </div>
       <p class="hint" data-i18n-block="hint-faults">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
@@ -2493,7 +2504,7 @@ function runSimulation(scn) {
   const out = {
     ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
     snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
-    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, netFaults: { links: [], partitions: [] },
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, pauses: {}, netFaults: { links: [], partitions: [] },
     properties: []
   };
   // ---- configuration ----
@@ -2724,6 +2735,11 @@ function runSimulation(scn) {
     // a cut at send time only concerns messages sent after the fault starts; FIFO state is updated by every
     // message that enters the channel, including those a fault will drop on arrival.
     if (cutAtSend(rec, node.id, q, ts, line)) return;
+    if (omissions.length && !self && omits(node.id, 'send', ts)) {
+      rec.status = 'dropped-omission'; rec.recvT = ts;
+      logE(ts, node.id, 'drop', 'message to p' + q + ' not sent (omission)', line);
+      return;
+    }
     const assumeBound = cfg.known.DELTA !== null &&
       (cfg.timing === 'synchronous-timed' || (cfg.timing === 'partial' && cfg.gst !== null && ts >= cfg.gst) ||
        (cfg.timing === 'partial' && cfg.gst === null));
@@ -2749,19 +2765,44 @@ function runSimulation(scn) {
   const fifoLast = new Map();
 
   const linkCuts = cfg.faults.filter(f => f.type === 'link');
+  const pauses = cfg.faults.filter(f => f.type === 'pause');
+  const omissions = cfg.faults.filter(f => f.type === 'omission');
+  for (const p of pauses) {
+    (out.pauses[p.node] = out.pauses[p.node] || []).push({ from: p.from, to: p.to });
+    // logged from the schedule, so that a pause is visible even when no event runs into it
+    logE(p.from, p.node, 'fault', 'p' + p.node + ' pauses: it handles nothing until ' + fmtDuration(p.to));
+    logE(p.to, p.node, 'fault', 'p' + p.node + ' resumes');
+  }
+  // a paused process is not down: it processes nothing until the pause ends, and loses nothing
+  function pauseEnd(id, t) {
+    let end = 0;
+    for (const p of pauses) if (p.node === id && t >= p.from && t < p.to) end = Math.max(end, p.to);
+    return end;
+  }
+  // an omitting process drops some of the messages it sends or receives, without crashing
+  function omits(id, dir, t) {
+    for (const f of omissions) {
+      if (f.node !== id || t < f.from || (f.to !== null && t >= f.to)) continue;
+      if (f.direction !== 'both' && f.direction !== dir) continue;
+      if (f.prob >= 1 || streams.get('omit:' + id).next() < f.prob) return true;
+    }
+    return false;
+  }
   const partitions = cfg.faults.filter(f => f.type === 'partition').map(p => {
     const groupOf = new Map();
     p.groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
     return Object.assign({}, p, { groupOf });
   });
   out.netFaults = {
-    links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to })),
+    links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to, oneWay: !!l.oneWay })),
     partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to }))
   };
   // is the channel between a and b interrupted at time t? (processes not listed in a partition form one more group)
   function cutAt(a, b, t) {
-    for (const l of linkCuts)
-      if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+    for (const l of linkCuts) {
+      const match = l.oneWay ? (l.a === a && l.b === b) : ((l.a === a && l.b === b) || (l.a === b && l.b === a));
+      if (match && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+    }
     for (const p of partitions) {
       if (t < p.from || (p.to !== null && t >= p.to)) continue;
       const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1;
@@ -3076,6 +3117,8 @@ function runSimulation(scn) {
         continue;
       }
       if (ev.t < node.busyUntil) { ev.t = node.busyUntil; push(ev); continue; }
+      const held = pauseEnd(node.id, ev.t);
+      if (held) { ev.t = held; push(ev); continue; }
       if (ev.type === 'timer') {
         const inst = node.insts[ev.inst];
         if (inst.timers[ev.id] !== ev.gen) continue; // cancelled or restarted
@@ -3101,6 +3144,11 @@ function runSimulation(scn) {
         case 'deliver': {
           ev.rec.status = 'delivered';
           // the sending instance receives under the same alias on the destination node
+          if (omissions.length && ev.from !== node.id && omits(node.id, 'receive', ev.t)) {
+            ev.rec.status = 'dropped-omission';
+            logE(ev.t, node.id, 'drop', 'message from p' + ev.from + ' not received (omission)');
+            continue;
+          }
           trace(node, 'net', ev.rec.spec, 'Deliver', [ev.from, ev.payload]);
           dispatch(node, ev.rec.spec, ev.alias, 'Deliver', [ev.from, ev.payload]);
           break;
@@ -3230,7 +3278,24 @@ function normalizeFault(f, n) {
       if (a === b) throw new Error(where + 'a link needs two different processes');
       const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
       if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
-      return { type, a, b, from, to };
+      // one-way: only the messages from a to b are lost, the other direction keeps working
+      return { type, a, b, from, to, oneWay: !!f.oneWay };
+    }
+    case 'pause': {
+      const node = pid(f.node, 'process');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end');
+      if (to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, node, from, to };
+    }
+    case 'omission': {
+      const node = pid(f.node, 'process');
+      const dir = f.direction || 'both';
+      if (!['send', 'receive', 'both'].includes(dir)) throw new Error(where + 'direction must be send, receive or both');
+      const prob = f.prob === undefined || f.prob === '' ? 1 : Number(f.prob);
+      if (!Number.isFinite(prob) || prob < 0 || prob > 1) throw new Error(where + 'probability must be between 0 and 1');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, node, direction: dir, prob, from, to };
     }
     case 'partition': {
       let groups;
@@ -4097,6 +4162,24 @@ const LIBTXT = {
 P(/^(\w+): (.+?) Guarantees: (.+)$/, m => LIBTXT[m[2]] ? m[1] + ': ' + LIBTXT[m[2]] + ' Garanzie: ' + (LIBTXT[m[3]] || m[3]) : null);
 M('Links', 'Collegamenti');
 M('or', 'o');
+M('Process pause', 'Pausa di processo'); M('Omission', 'Omissione'); M('One way', 'Unidirezionale');
+M('Only the messages from the first process to the second are lost', 'Si perdono solo i messaggi dal primo processo al secondo');
+M('Omits', 'Omette'); M('sends and receives', 'invii e ricezioni'); M('sends', 'invii'); M('receives', 'ricezioni');
+M('Probability', 'Probabilità'); M('Omission probability', 'Probabilità di omissione'); M('End of the pause', 'Fine della pausa');
+M('Pause here', 'Pausa qui'); M('Stop processing for that long, without losing anything', 'Smetti di elaborare per quel tempo, senza perdere nulla');
+M('omitted by a process', 'omesso da un processo');
+P(/^(p\d+) pauses: it handles nothing until (.+)$/, m => m[1] + ' va in pausa: non elabora nulla fino a ' + m[2]);
+P(/^(p\d+) resumes$/, m => m[1] + ' riprende');
+P(/^link down (p\d+) → (p\d+)$/, m => 'collegamento interrotto ' + m[1] + ' → ' + m[2]);
+P(/^(p\d+) pauses at (.+)\.$/, m => m[1] + ' va in pausa a ' + m[2] + '.');
+P(/^paused until (.+)$/, m => 'in pausa fino a ' + m[1]);
+P(/^(p\d+) paused from (\S+) until (\S+)$/, m => m[1] + ' in pausa da ' + m[2] + ' fino a ' + m[3]);
+P(/^one-way link (p\d+) → (p\d+) down from (\S+)(?: until (\S+)| onwards)$/, m => 'collegamento unidirezionale ' + m[1] + ' → ' + m[2] + ' interrotto da ' + m[3] + (m[4] ? ' fino a ' + m[4] : ' in poi'));
+P(/^(p\d+) omits (all|\d+% of) its (sends and receives|sends|receives) from (\S+)(?: until (\S+)| onwards)$/, m =>
+  m[1] + ' omette ' + (m[2] === 'all' ? 'tutti i' : 'il ' + m[2].replace('% of', '% dei')) + ' suoi ' +
+  ({ 'sends and receives': 'invii e ricezioni', sends: 'invii', receives: 'ricezioni' })[m[3]] + ' da ' + m[4] + (m[5] ? ' fino a ' + m[5] : ' in poi'));
+P(/^message to (p\d+) not sent \(omission\)$/, m => 'messaggio per ' + m[1] + ' non inviato (omissione)');
+P(/^message from (p\d+) not received \(omission\)$/, m => 'messaggio da ' + m[1] + ' non ricevuto (omissione)');
 M('Properties', 'Proprietà');
 P(/^(\d+)\/(\d+) properties$/, m => m[1] + '/' + m[2] + ' proprietà');
 P(/^(\w+) is violated$/, m => m[1] + ' violata');
@@ -5333,6 +5416,12 @@ function msgGeom(m) {
   return linkGeom(a, b, isCurved(m.from, m.to));
 }
 // is process id down at time t in the last run?
+function pausedAt(id, t) {
+  const ps = S.res && S.res.pauses ? S.res.pauses[id] : null;
+  if (!ps) return null;
+  for (const p of ps) if (t >= p.from && t < p.to) return p;
+  return null;
+}
 function downAt(id, t) {
   const d = S.res && S.res.downs[id];
   if (!d) return null;
@@ -5340,11 +5429,19 @@ function downAt(id, t) {
   return null;
 }
 // is the channel between a and b interrupted at time t in the last run?
+// what is cut between a and b at time t: both directions, or only one of them
 function cutAtUI(a, b, t) {
   const nf = S.res && S.res.netFaults;
   if (!nf) return null;
-  for (const l of nf.links)
-    if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+  let ab = false, ba = false;
+  for (const l of nf.links) {
+    if (t < l.from || (l.to !== null && t >= l.to)) continue;
+    if (l.a === a && l.b === b) { ab = true; if (!l.oneWay) ba = true; }
+    else if (l.a === b && l.b === a) { ba = true; if (!l.oneWay) ab = true; }
+  }
+  if (ab && ba) return 'link down';
+  if (ab) return 'link down p' + a + ' → p' + b;
+  if (ba) return 'link down p' + b + ' → p' + a;
   for (const p of nf.partitions) {
     if (t < p.from || (p.to !== null && t >= p.to)) continue;
     if (!p.groupOf) { p.groupOf = new Map(); p.groups.forEach((g, i) => g.forEach(id => p.groupOf.set(id, i))); }
@@ -5393,12 +5490,13 @@ function buildStatic() {
     const glow = sv('circle', { r: R_NODE + 6, class: 'glow', display: 'none' });
     const cross = sv('path', { class: 'cross', d: 'M-10 -10L10 10M10 -10L-10 10', display: 'none' });
     const icon = sv('text', { class: 'icon', x: -R_NODE - 4, y: -R_NODE + 2, display: 'none' }, '⏱');
+    const pause = sv('text', { class: 'icon pause', x: R_NODE - 2, y: R_NODE + 2, display: 'none' }, '⏸');
     const out = sv('text', { class: 'out', y: R_NODE + 14, display: 'none' });
     const badge = sv('text', { class: 'badge', x: R_NODE + 3, y: -R_NODE + 2, display: 'none' });
     badge.style.textAnchor = 'start';
-    g.append(glow, sv('circle', { r: R_NODE, class: 'body' }), sv('text', { class: 'name' }, 'p' + n.id), cross, icon, out, badge);
+    g.append(glow, sv('circle', { r: R_NODE, class: 'body' }), sv('text', { class: 'name' }, 'p' + n.id), cross, icon, pause, out, badge);
     gN.append(g);
-    V.nodes.set(n.id, { g, glow, cross, icon, out, badge, state: {} });
+    V.nodes.set(n.id, { g, glow, cross, icon, pause, out, badge, state: {} });
   }
   V.key = staticKey();
 }
@@ -5432,7 +5530,8 @@ function renderTopo() {
   for (const L of V.links) {
     const cut = S.res ? cutAtUI(L.l.a, L.l.b, t) : null;
     const sel = !!(S.selected && S.selected.type === 'link' && S.selected.idx === L.i);
-    setIf(L, 'cls', L.path, 'class', 'lk' + (L.l.enabled ? '' : ' off') + (cut ? ' cut' : '') + (sel ? ' sel' : ''));
+    const oneWayCut = !!cut && cut !== 'link down' && cut !== 'partition';
+    setIf(L, 'cls', L.path, 'class', 'lk' + (L.l.enabled ? '' : ' off') + (cut ? (oneWayCut ? ' cut half' : ' cut') : '') + (sel ? ' sel' : ''));
     if (L.l.directed) setIf(L, 'mk', L.path, 'marker-end', sel ? 'url(#arrow-sel)' : 'url(#arrow)');
     if (cut === L.cut) continue;
     L.cut = cut;
@@ -5450,7 +5549,9 @@ function renderTopo() {
       else if (t >= S.cone.future[id]) coneCls = ' influenced';
       else if (t <= S.cone.past[id]) coneCls = ' cause';
     }
-    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (b ? ' busy' : '') + coneCls);
+    const paused = !crashed && !!pausedAt(id, t);
+    setIf(R, 'cls', R.g, 'class', base + (crashed ? ' crashed' : '') + (paused ? ' paused' : '') + (b ? ' busy' : '') + coneCls);
+    setIf(R, 'pause', R.pause, 'display', paused ? 'inline' : 'none');
     setIf(R, 'cross', R.cross, 'display', crashed ? 'inline' : 'none');
     if (b) {
       setIf(R, 'glow', R.glow, 'display', 'inline');
@@ -5570,7 +5671,7 @@ function renderAnim() {
         f = 1 - Math.pow(1 - f, 1.6);
         if (m.status === 'dropped-loss') f *= 0.5;
         if (labels) f = 0.14 + 0.72 * f;
-        const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
+        const cls = m.violation ? 'late' : (m.status === 'dropped-loss' || m.status === 'dropped-cut' || m.status === 'dropped-omission') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'ok';
         const tint = layers && cls === 'ok' ? layerColor(m.origin) : '';
         if (withTrails) {
           const tr = trails.take();
@@ -5621,7 +5722,7 @@ function renderAnim() {
         if (m.status === 'dropped-loss' && g) [x, y] = geomAt(g, 0.5);
         else if (g) [x, y] = geomAt(g, 1);
         else { x = to.x; y = to.y; }
-        const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
+        const cls = (m.status === 'dropped-loss' || m.status === 'dropped-cut' || m.status === 'dropped-omission') ? 'lossy' : m.status === 'lost-crash' ? 'doomed' : 'late';
         const sz = 5 + 4 * k;
         const b = bursts.take().root;
         b.setAttribute('d', `M${x - sz} ${y - sz}L${x + sz} ${y + sz}M${x + sz} ${y - sz}L${x - sz} ${y + sz}`);
@@ -5818,7 +5919,13 @@ function describeFault(f) {
   switch (f.type) {
     case 'crash': return 'p' + f.node + ' crashes at ' + f.at;
     case 'recover': return 'p' + f.node + ' recovers at ' + f.at;
-    case 'link': return 'link p' + f.a + '–p' + f.b + ' down from ' + f.from + until;
+    case 'link': return (f.oneWay ? 'one-way link p' + f.a + ' → p' + f.b : 'link p' + f.a + '–p' + f.b) + ' down from ' + f.from + until;
+    case 'pause': return 'p' + f.node + ' paused from ' + f.from + ' until ' + f.to;
+    case 'omission': {
+      const what = f.direction === 'send' ? 'sends' : f.direction === 'receive' ? 'receives' : 'sends and receives';
+      const how = (f.prob === undefined || +f.prob >= 1) ? 'all' : Math.round(+f.prob * 100) + '% of';
+      return 'p' + f.node + ' omits ' + how + ' its ' + what + ' from ' + f.from + until;
+    }
     case 'partition': {
       const groups = groupsOf(f);
       const listed = new Set(groups.flat());
@@ -5851,6 +5958,13 @@ function faultHere(build, describe) {
   if (!addFault(f)) return;
   run(true, resume);
   toast(describe + ' at ' + C.fmtDuration(S.cursor) + '.');
+}
+// a pause needs an end: the duration field is read as a length, one second by default
+function pauseEndFrom(at, input) {
+  const v = String(input.value || '').trim();
+  let len = 1000000;
+  if (v) { try { len = C.parseDuration(v); } catch (e) { len = 1000000; } }
+  return C.fmtDuration(C.parseDuration(at) + Math.max(1, len));
 }
 function untilFrom(input) {
   const v = input.value.trim();
@@ -5921,7 +6035,9 @@ function renderProps() {
       const iso = el('input', { class: 'narrow', value: '2s', placeholder: 'forever', 'aria-label': 'Isolation duration', title: 'Duration, empty for forever' });
       row.append(el('span', { class: 'sep' }), iso, el('button', { type: 'button', class: 'ghost small',
         onclick: () => faultHere(at => ({ type: 'partition', groups: String(n.id), from: at, to: untilFrom(iso) }),
-          'p' + n.id + ' is isolated') }, 'Isolate here'));
+          'p' + n.id + ' is isolated') }, 'Isolate here'),
+        el('button', { type: 'button', class: 'ghost small', title: 'Stop processing for that long, without losing anything',
+          onclick: () => faultHere(at => ({ type: 'pause', node: n.id, from: at, to: pauseEndFrom(at, iso) }), 'p' + n.id + ' pauses') }, 'Pause here'));
       box.append(row);
     }
     return;
@@ -6323,6 +6439,24 @@ function drawDiagramInto(ctx, nodes, W, H) {
       band(l.from, l.to, Math.min(ya, yb) - 6, Math.max(ya, yb) + 6, 'p' + l.a + '–p' + l.b + ' ' + T('down'));
     }
   }
+  // process pauses: the process is alive but handles nothing until the pause ends
+  if (r && r.pauses) {
+    ctx.fillStyle = col.amber;
+    for (const id in r.pauses) {
+      const y = rowY.get(+id);
+      if (y === undefined) continue;
+      for (const p of r.pauses[id]) {
+        const x1 = Math.max(X(p.from), LEFT), x2 = Math.min(X(Math.min(p.to, t)), W);
+        if (x2 <= x1) continue;
+        ctx.globalAlpha = 0.18;
+        ctx.fillRect(x1, y - 7, x2 - x1, 14);
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(x1, y - 7, 2, 14);
+        if (p.to <= t) ctx.fillRect(x2 - 2, y - 7, 2, 14);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
   // causal cone: the part of each process line that can affect the origin, and the part it can affect
   if (r && S.cone) {
     const c = S.cone;
@@ -6507,12 +6641,13 @@ function drawMsg(B, m, alpha, tcut, X, rowY, selected, layers) {
   }
   let color = m.violation ? col.red : layers ? layerColor(m.origin) : col.blue;
   let dash = [];
-  if (m.status === 'dropped-loss' || m.status === 'dropped-cut') { color = col.amber; dash = [4, 3]; }
+  if (m.status === 'dropped-loss' || m.status === 'dropped-cut' || m.status === 'dropped-omission') { color = col.amber; dash = [4, 3]; }
   else if (m.status === 'lost-crash') { color = col.muted; dash = [2, 3]; }
   else if (m.status === 'dropped-late') dash = [4, 3];
-  const lost = m.status === 'dropped-loss' || m.status === 'dropped-late' || m.status === 'lost-crash' || m.status === 'dropped-cut';
+  const lost = m.status === 'dropped-loss' || m.status === 'dropped-late' || m.status === 'lost-crash' || m.status === 'dropped-cut' || m.status === 'dropped-omission';
   let tt = m.recvT, ty = y2;
   if (m.status === 'dropped-loss') { tt = (m.sendT + m.recvT) / 2; ty = (y1 + y2) / 2; }
+  else if (m.status === 'dropped-omission' && m.recvT === m.sendT) { tt = m.sendT; ty = y1; }
   let frac = 1;
   if (tcut < tt && tt > m.sendT) frac = Math.max(0, (tcut - m.sendT) / (tt - m.sendT));
   const self = m.from === m.to;
@@ -6553,6 +6688,7 @@ function distSeg(px, py, s) {
 }
 const STATUS_TEXT = {
   delivered: 'delivered', pending: 'still in transit when the run ended', 'dropped-loss': 'lost by the network',
+  'dropped-omission': 'omitted by a process',
   'dropped-late': 'discarded because late', 'lost-crash': 'recipient crashed', 'dropped-link': 'no link',
   'dropped-cut': 'dropped by a link failure or a partition'
 };
@@ -6852,9 +6988,11 @@ function renderInspector(force) {
   const i = upperBound(snaps, S.cursor, s => s.t) - 1;
   const cur = i >= 0 ? snaps[i] : null, prev = i > 0 ? snaps[i - 1] : null;
   const down = downAt(id, S.cursor);
+  const pause = pausedAt(id, S.cursor);
   const past = (r.downs[id] || []).filter(d => d.to !== null && d.to <= S.cursor);
   const status = down ? 'crashed at ' + C.fmtDuration(down.from)
-    : past.length ? 'running, recovered at ' + C.fmtDuration(past[past.length - 1].to) : 'running';
+    : pause ? 'paused until ' + C.fmtDuration(pause.to)
+      : past.length ? 'running, recovered at ' + C.fmtDuration(past[past.length - 1].to) : 'running';
   wrap.append(el('div', { class: 'meta' },
     el('span', {}, 'status ', el('b', {}, status)),
     el('span', {}, 'local clock ', el('b', {}, C.fmtDuration(Math.round(info.offset + (1 + info.rho) * S.cursor)))),
@@ -7250,9 +7388,11 @@ function bindHeader() {
   $('#btn-add-fault').addEventListener('click', () => {
     const type = $('#fault-type').value;
     const v = id => $(id).value.trim();
-    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to') }
+    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-oneway').checked }
       : type === 'partition' ? { type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to') }
-      : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
+      : type === 'pause' ? { type, node: parseInt(v('#fault-node2'), 10), from: v('#fault-from'), to: v('#fault-to2') }
+        : type === 'omission' ? { type, node: parseInt(v('#fault-node2'), 10), direction: v('#fault-direction'), prob: v('#fault-prob'), from: v('#fault-from'), to: v('#fault-to') }
+          : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
     if (addFault(f)) { renderProps(); toast('Fault added: ' + describeFault(f) + '.'); }
   });
 }

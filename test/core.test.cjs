@@ -573,3 +573,68 @@ test('the FloodSet example carries agreement, validity and termination', () => {
     assert.ok(r.properties.every(p => p.ok), 'ideal rounds keep every property, seed ' + seed);
   }
 });
+
+// ---------------------------------------------------------------- pauses, omissions, one-way links
+const PING = `interface T
+  request Go(q)
+  indication Got(p)
+end
+algorithm Pinger
+  implements T as t
+  uses Net as net
+  upon event ⟨t, Go | q⟩ do trigger ⟨net, Send | q, [PING]⟩ end
+  upon event ⟨net, Deliver | p, [PING]⟩ do trigger ⟨t, Got | p⟩ end
+end`;
+function pingScenario(faults, inputs) {
+  const s = tiny(PING, inputs || '0ms 1 Go | 2\n0ms 2 Go | 1', { top: 'Pinger', faults });
+  s.actual = Object.assign({}, s.actual, { delay: 'const(10ms)', step: 'const(0ms)' });
+  return s;
+}
+const statuses = r => r.msgs.map(m => `p${m.from}>p${m.to} ${m.status}`);
+
+test('a link failure can be one way', () => {
+  const both = C.runSimulation(pingScenario([{ type: 'link', a: 1, b: 2, from: '0ms', to: '' }]));
+  assert.deepEqual(statuses(both), ['p1>p2 dropped-cut', 'p2>p1 dropped-cut']);
+  const one = C.runSimulation(pingScenario([{ type: 'link', a: 1, b: 2, from: '0ms', to: '', oneWay: true }]));
+  assert.deepEqual(statuses(one), ['p1>p2 dropped-cut', 'p2>p1 delivered']);
+  assert.equal(one.netFaults.links[0].oneWay, true);
+});
+
+test('a paused process handles nothing while paused and loses nothing', () => {
+  const r = C.runSimulation(pingScenario([{ type: 'pause', node: 2, from: '5ms', to: '100ms' }]));
+  assert.deepEqual(statuses(r), ['p1>p2 delivered', 'p2>p1 delivered']);
+  const got = r.outputs.filter(o => o.node === 2);
+  assert.equal(got.length, 1);
+  assert.equal(got[0].t, 100000, 'the message waits for the end of the pause');
+  assert.deepEqual(r.pauses, { 2: [{ from: 5000, to: 100000 }] });
+  assert.ok(r.log.some(e => e.kind === 'fault' && /p2 pauses/.test(e.text)));
+  assert.ok(r.log.some(e => e.kind === 'fault' && e.t === 100000 && /p2 resumes/.test(e.text)));
+  assert.deepEqual(r.downs, {}, 'a pause is not a crash');
+});
+
+test('an omitting process drops the messages it sends, receives, or both', () => {
+  const send = C.runSimulation(pingScenario([{ type: 'omission', node: 1, direction: 'send', prob: 1, from: '0ms', to: '' }]));
+  assert.deepEqual(statuses(send), ['p1>p2 dropped-omission', 'p2>p1 delivered']);
+  const recv = C.runSimulation(pingScenario([{ type: 'omission', node: 1, direction: 'receive', prob: 1, from: '0ms', to: '' }]));
+  assert.deepEqual(statuses(recv), ['p1>p2 delivered', 'p2>p1 dropped-omission']);
+  const window = C.runSimulation(pingScenario([{ type: 'omission', node: 1, direction: 'send', prob: 1, from: '5ms', to: '20ms' }],
+    '0ms 1 Go | 2\n10ms 1 Go | 2'));
+  assert.deepEqual(statuses(window), ['p1>p2 delivered', 'p1>p2 dropped-omission']);
+  // a probability between 0 and 1 omits some of them, reproducibly
+  const some = C.runSimulation(pingScenario([{ type: 'omission', node: 1, prob: 0.5, from: '0ms', to: '' }],
+    Array.from({ length: 30 }, (_, i) => `${i}ms 1 Go | 2`).join('\n')));
+  const omitted = some.msgs.filter(m => m.status === 'dropped-omission').length;
+  assert.ok(omitted > 4 && omitted < 26, `omitted ${omitted} of 30`);
+  const again = C.runSimulation(pingScenario([{ type: 'omission', node: 1, prob: 0.5, from: '0ms', to: '' }],
+    Array.from({ length: 30 }, (_, i) => `${i}ms 1 Go | 2`).join('\n')));
+  assert.deepEqual(statuses(again), statuses(some), 'the same scenario gives the same omissions');
+});
+
+test('the new faults are validated', () => {
+  assert.throws(() => C.normalizeFault({ type: 'pause', node: 1, from: '5ms', to: '1ms' }), /end must come after the start/);
+  assert.throws(() => C.normalizeFault({ type: 'pause', node: 1, from: '5ms' }), /required/);
+  assert.throws(() => C.normalizeFault({ type: 'omission', node: 1, prob: 2, from: '0ms' }), /probability must be between 0 and 1/);
+  assert.throws(() => C.normalizeFault({ type: 'omission', node: 1, direction: 'x', from: '0ms' }), /direction must be send, receive or both/);
+  assert.deepEqual(C.normalizeFault({ type: 'omission', node: 3, from: '1s' }), { type: 'omission', node: 3, direction: 'both', prob: 1, from: 1000000, to: null });
+  assert.equal(C.normalizeFault({ type: 'link', a: 1, b: 2, from: '0ms', oneWay: true }).oneWay, true);
+});

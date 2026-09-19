@@ -429,9 +429,10 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.6** | visual identity, settings (theme, palette, language), presentation mode, documentation site, batch runner and command line tool |
 | **v0.7** | batch runner and command line tool |
 | **v0.8** | global invariants checked across processes, reported in the interface and by the batch runner |
-| **v0.9** | test suites over generated fault schedules, engine in worker threads, counterexample minimization |
-| **v1.0** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
-| **v1.1** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
+| **v0.9** | one-way link failures, process pauses and omission faults |
+| **v1.0** | test suites over generated fault schedules, engine in worker threads, counterexample minimization |
+| **v1.1** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
+| **v1.2** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |
 | **v1.2** | failure detector oracles (P, ◇P, Ω) as provided modules, to study consensus on top of the abstraction |
 | **v2** | Byzantine faults (adversarial nodes written in the DSL), systematic exploration of interleavings, trace export |

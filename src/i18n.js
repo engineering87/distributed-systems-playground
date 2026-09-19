@@ -288,6 +288,24 @@ const LIBTXT = {
 P(/^(\w+): (.+?) Guarantees: (.+)$/, m => LIBTXT[m[2]] ? m[1] + ': ' + LIBTXT[m[2]] + ' Garanzie: ' + (LIBTXT[m[3]] || m[3]) : null);
 M('Links', 'Collegamenti');
 M('or', 'o');
+M('Process pause', 'Pausa di processo'); M('Omission', 'Omissione'); M('One way', 'Unidirezionale');
+M('Only the messages from the first process to the second are lost', 'Si perdono solo i messaggi dal primo processo al secondo');
+M('Omits', 'Omette'); M('sends and receives', 'invii e ricezioni'); M('sends', 'invii'); M('receives', 'ricezioni');
+M('Probability', 'Probabilità'); M('Omission probability', 'Probabilità di omissione'); M('End of the pause', 'Fine della pausa');
+M('Pause here', 'Pausa qui'); M('Stop processing for that long, without losing anything', 'Smetti di elaborare per quel tempo, senza perdere nulla');
+M('omitted by a process', 'omesso da un processo');
+P(/^(p\d+) pauses: it handles nothing until (.+)$/, m => m[1] + ' va in pausa: non elabora nulla fino a ' + m[2]);
+P(/^(p\d+) resumes$/, m => m[1] + ' riprende');
+P(/^link down (p\d+) → (p\d+)$/, m => 'collegamento interrotto ' + m[1] + ' → ' + m[2]);
+P(/^(p\d+) pauses at (.+)\.$/, m => m[1] + ' va in pausa a ' + m[2] + '.');
+P(/^paused until (.+)$/, m => 'in pausa fino a ' + m[1]);
+P(/^(p\d+) paused from (\S+) until (\S+)$/, m => m[1] + ' in pausa da ' + m[2] + ' fino a ' + m[3]);
+P(/^one-way link (p\d+) → (p\d+) down from (\S+)(?: until (\S+)| onwards)$/, m => 'collegamento unidirezionale ' + m[1] + ' → ' + m[2] + ' interrotto da ' + m[3] + (m[4] ? ' fino a ' + m[4] : ' in poi'));
+P(/^(p\d+) omits (all|\d+% of) its (sends and receives|sends|receives) from (\S+)(?: until (\S+)| onwards)$/, m =>
+  m[1] + ' omette ' + (m[2] === 'all' ? 'tutti i' : 'il ' + m[2].replace('% of', '% dei')) + ' suoi ' +
+  ({ 'sends and receives': 'invii e ricezioni', sends: 'invii', receives: 'ricezioni' })[m[3]] + ' da ' + m[4] + (m[5] ? ' fino a ' + m[5] : ' in poi'));
+P(/^message to (p\d+) not sent \(omission\)$/, m => 'messaggio per ' + m[1] + ' non inviato (omissione)');
+P(/^message from (p\d+) not received \(omission\)$/, m => 'messaggio da ' + m[1] + ' non ricevuto (omissione)');
 M('Properties', 'Proprietà');
 P(/^(\d+)\/(\d+) properties$/, m => m[1] + '/' + m[2] + ' proprietà');
 P(/^(\w+) is violated$/, m => m[1] + ' violata');

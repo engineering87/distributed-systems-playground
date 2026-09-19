@@ -6,6 +6,15 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.9.0]
+
+### Added
+- One-way link failures: only the messages from the first process to the second are lost.
+- Process pauses: a process handles nothing for an interval, then handles everything that queued up, with its state intact.
+- Omission faults: a process drops a share of the messages it sends, receives, or both, without crashing.
+- **Pause here** on a selected process, next to the other fault buttons, and the new fault types in the *Scenario* form.
+- Pauses are drawn on the graph and on the space-time diagram, and reported in the *State* tab and in the event log.
+
 ## [0.8.2]
 
 ### Security

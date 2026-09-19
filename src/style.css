@@ -459,6 +459,10 @@ button.primary.pulse { box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 50%
 #topo .nd.cause .body { stroke: var(--blue); stroke-width: 3; stroke-dasharray: 2 2; }
 #topo .nd.influenced .body { stroke: var(--amber); stroke-width: 3.4; }
 #topo .nd.origin .body { stroke: var(--ink); stroke-width: 4; }
+#topo .lk.cut.half { stroke-dasharray: 3 6; opacity: .8; }
+#topo .nd.paused .body { stroke: var(--amber); stroke-dasharray: 6 3; }
+#topo .nd.paused .name { opacity: .6; }
+#topo .nd .icon.pause { fill: var(--amber); }
 body.cone-mode #st { cursor: crosshair; }
 
 /* five tabs on narrow screens */

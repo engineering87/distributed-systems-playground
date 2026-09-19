@@ -1512,7 +1512,7 @@ function runSimulation(scn) {
   const out = {
     ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
     snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
-    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, netFaults: { links: [], partitions: [] },
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, pauses: {}, netFaults: { links: [], partitions: [] },
     properties: []
   };
   // ---- configuration ----
@@ -1743,6 +1743,11 @@ function runSimulation(scn) {
     // a cut at send time only concerns messages sent after the fault starts; FIFO state is updated by every
     // message that enters the channel, including those a fault will drop on arrival.
     if (cutAtSend(rec, node.id, q, ts, line)) return;
+    if (omissions.length && !self && omits(node.id, 'send', ts)) {
+      rec.status = 'dropped-omission'; rec.recvT = ts;
+      logE(ts, node.id, 'drop', 'message to p' + q + ' not sent (omission)', line);
+      return;
+    }
     const assumeBound = cfg.known.DELTA !== null &&
       (cfg.timing === 'synchronous-timed' || (cfg.timing === 'partial' && cfg.gst !== null && ts >= cfg.gst) ||
        (cfg.timing === 'partial' && cfg.gst === null));
@@ -1768,19 +1773,44 @@ function runSimulation(scn) {
   const fifoLast = new Map();
 
   const linkCuts = cfg.faults.filter(f => f.type === 'link');
+  const pauses = cfg.faults.filter(f => f.type === 'pause');
+  const omissions = cfg.faults.filter(f => f.type === 'omission');
+  for (const p of pauses) {
+    (out.pauses[p.node] = out.pauses[p.node] || []).push({ from: p.from, to: p.to });
+    // logged from the schedule, so that a pause is visible even when no event runs into it
+    logE(p.from, p.node, 'fault', 'p' + p.node + ' pauses: it handles nothing until ' + fmtDuration(p.to));
+    logE(p.to, p.node, 'fault', 'p' + p.node + ' resumes');
+  }
+  // a paused process is not down: it processes nothing until the pause ends, and loses nothing
+  function pauseEnd(id, t) {
+    let end = 0;
+    for (const p of pauses) if (p.node === id && t >= p.from && t < p.to) end = Math.max(end, p.to);
+    return end;
+  }
+  // an omitting process drops some of the messages it sends or receives, without crashing
+  function omits(id, dir, t) {
+    for (const f of omissions) {
+      if (f.node !== id || t < f.from || (f.to !== null && t >= f.to)) continue;
+      if (f.direction !== 'both' && f.direction !== dir) continue;
+      if (f.prob >= 1 || streams.get('omit:' + id).next() < f.prob) return true;
+    }
+    return false;
+  }
   const partitions = cfg.faults.filter(f => f.type === 'partition').map(p => {
     const groupOf = new Map();
     p.groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
     return Object.assign({}, p, { groupOf });
   });
   out.netFaults = {
-    links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to })),
+    links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to, oneWay: !!l.oneWay })),
     partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to }))
   };
   // is the channel between a and b interrupted at time t? (processes not listed in a partition form one more group)
   function cutAt(a, b, t) {
-    for (const l of linkCuts)
-      if (((l.a === a && l.b === b) || (l.a === b && l.b === a)) && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+    for (const l of linkCuts) {
+      const match = l.oneWay ? (l.a === a && l.b === b) : ((l.a === a && l.b === b) || (l.a === b && l.b === a));
+      if (match && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+    }
     for (const p of partitions) {
       if (t < p.from || (p.to !== null && t >= p.to)) continue;
       const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1;
@@ -2095,6 +2125,8 @@ function runSimulation(scn) {
         continue;
       }
       if (ev.t < node.busyUntil) { ev.t = node.busyUntil; push(ev); continue; }
+      const held = pauseEnd(node.id, ev.t);
+      if (held) { ev.t = held; push(ev); continue; }
       if (ev.type === 'timer') {
         const inst = node.insts[ev.inst];
         if (inst.timers[ev.id] !== ev.gen) continue; // cancelled or restarted
@@ -2120,6 +2152,11 @@ function runSimulation(scn) {
         case 'deliver': {
           ev.rec.status = 'delivered';
           // the sending instance receives under the same alias on the destination node
+          if (omissions.length && ev.from !== node.id && omits(node.id, 'receive', ev.t)) {
+            ev.rec.status = 'dropped-omission';
+            logE(ev.t, node.id, 'drop', 'message from p' + ev.from + ' not received (omission)');
+            continue;
+          }
           trace(node, 'net', ev.rec.spec, 'Deliver', [ev.from, ev.payload]);
           dispatch(node, ev.rec.spec, ev.alias, 'Deliver', [ev.from, ev.payload]);
           break;
@@ -2249,7 +2286,24 @@ function normalizeFault(f, n) {
       if (a === b) throw new Error(where + 'a link needs two different processes');
       const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
       if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
-      return { type, a, b, from, to };
+      // one-way: only the messages from a to b are lost, the other direction keeps working
+      return { type, a, b, from, to, oneWay: !!f.oneWay };
+    }
+    case 'pause': {
+      const node = pid(f.node, 'process');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end');
+      if (to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, node, from, to };
+    }
+    case 'omission': {
+      const node = pid(f.node, 'process');
+      const dir = f.direction || 'both';
+      if (!['send', 'receive', 'both'].includes(dir)) throw new Error(where + 'direction must be send, receive or both');
+      const prob = f.prob === undefined || f.prob === '' ? 1 : Number(f.prob);
+      if (!Number.isFinite(prob) || prob < 0 || prob > 1) throw new Error(where + 'probability must be between 0 and 1');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, node, direction: dir, prob, from, to };
     }
     case 'partition': {
       let groups;

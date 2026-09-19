@@ -117,11 +117,15 @@ Emulated rounds show what happens when the lockstep abstraction is built on real
 
 **Recovery.** A recovered process keeps the values of variables declared `stable` and resets every other variable to its initial value. Its timers are cleared. Each module then receives `Recovery` if it has a handler for it, and `Init` otherwise, from the bottom of the stack up. Nothing else survives a crash: there is no log and no disk. A recovery for a process that is running is ignored with a warning.
 
-**Link failures and partitions are symmetric.** Both directions of a channel fail together. A message is dropped if its channel is interrupted when it is sent or when it would arrive, so a partition that starts while a message is in flight drops that message.
+**Link failures may be symmetric or one way.** By default both directions of a channel fail together; a one-way failure drops only the messages from the first process to the second. A message is dropped if its channel is interrupted when it is sent or when it would arrive, so a partition that starts while a message is in flight drops that message. Partitions are always symmetric.
+
+**A pause is not a crash.** A paused process handles no event for the length of the pause, then handles everything that queued up: nothing is lost, no state is reset, and its timers fire when it resumes. The pause has no effect on the messages it already sent.
+
+**Omissions belong to a process, not to the network.** A process with a send omission drops messages as it sends them, before they reach the channel; one with a receive omission throws away messages that arrived. Each draw comes from a stream of that process, so it does not disturb the rest of the run. An omitting process keeps its state and keeps running.
 
 **Processes outside a partition's groups form one extra group.** `3` alone isolates p3 from everybody else.
 
-**Not modeled:** Byzantine behavior, omission failures of a process (a process that skips some sends or receives), pauses of a running process, one-way link failures, message corruption.
+**Not modeled:** Byzantine behavior, message corruption, and processes that slow down instead of stopping (a pause is all or nothing, and every process draws its step duration from the same distribution).
 
 ## The language
 
