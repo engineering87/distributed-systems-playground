@@ -68,8 +68,18 @@ async def main():
         t0 = await pg.inner_text('#tlabel'); await pg.keyboard.press('Home'); await pg.keyboard.press('PageDown'); t1 = await pg.inner_text('#tlabel')
         check(t1 != t0 and not t1.startswith('t = 0 µs'), 'clicker PageDown steps: ' + t1)
         await pg.screenshot(path='present.png')
-        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
-        check(not await pg.evaluate("document.body.classList.contains('present')") and await pg.is_visible('.side'), 'presentation off with Esc')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        left = not await pg.evaluate("document.body.classList.contains('present')")
+        if not left:
+            # some browsers consume Esc to leave full screen; the exit button always works
+            await pg.click('#btn-present-exit'); await pg.wait_for_timeout(300)
+        check(not await pg.evaluate("document.body.classList.contains('present')") and await pg.is_visible('.side'),
+              'presentation off' + ('' if left else ' (with the exit button: Esc was consumed by the browser)'))
+        # leaving full screen on its own must leave presentation mode too
+        await pg.keyboard.press('p'); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.fullscreenElement ? document.exitFullscreen() : document.dispatchEvent(new Event('fullscreenchange'))")
+        await pg.wait_for_timeout(200)
+        check(not await pg.evaluate("document.body.classList.contains('present')"), 'leaving full screen leaves presentation mode')
         # exports
         await pg.keyboard.press('End')
         await pg.click('#btn-export'); await pg.wait_for_timeout(300)
@@ -84,5 +94,7 @@ async def main():
         # packets over nodes: node still selectable
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

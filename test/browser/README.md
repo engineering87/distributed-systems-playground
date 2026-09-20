@@ -43,6 +43,10 @@ downloaded files go (`test/browser/out` by default, which is not committed).
 
 `layout` and `perf` report measurements: the runner does not fail on their numbers, but it prints them.
 
+`touch` checks real gestures through a CDP session, which only Chromium offers; on Firefox and WebKit it runs
+the taps and the sizes and skips the gestures. Every suite prints the checks that passed even when a later
+step throws, so a failure still shows how far it got.
+
 ## Writing a new one
 
 Start from an existing file. Keep the shape: a list of `check(condition, message)` calls, a `print` of the

@@ -38,5 +38,7 @@ async def main():
         check('violata' in await pg.inner_text('#log'), 'italian log: ' + (await pg.inner_text('#log')).split('\n')[2])
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

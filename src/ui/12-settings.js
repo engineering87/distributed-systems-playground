@@ -41,6 +41,11 @@ function bindSettings() {
 }
 
 // ============================================================ presentation mode
+// A browser that exits full screen on its own (Esc is often consumed by the browser) must also leave
+// presentation mode, otherwise the page stays without its controls.
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && document.body.classList.contains('present')) togglePresentation(false);
+});
 function togglePresentation(on) {
   const body = document.body;
   on = on === undefined ? !body.classList.contains('present') : on;

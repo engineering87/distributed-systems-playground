@@ -266,7 +266,7 @@ Settings are saved in the browser.
 
 Press `P`, or use the button in the settings. The side panel, the event log, the editing tools and the top bar controls are hidden; the graph and the diagram take the whole screen, with larger text and wider rows. The browser switches to full screen when it allows it.
 
-`→`, `Page Down` and most presentation clickers move to the next event; `←` and `Page Up` go back. `Space` plays and pauses. `P`, `Esc` or the **Exit presentation** button leave the mode.
+`→`, `Page Down` and most presentation clickers move to the next event; `←` and `Page Up` go back. `Space` plays and pauses. `P`, `Esc` or the **Exit presentation** button leave the mode; leaving full screen by any other means leaves it too, since some browsers handle `Esc` themselves.
 
 A tip for lessons: select *Event by event* speed and a process before entering, so that its state and the next steps are what the audience sees.
 

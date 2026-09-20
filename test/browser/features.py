@@ -79,5 +79,7 @@ async def main():
         check('Fix the syntax' in await pg.inner_text('#toast'), 'add module on broken code')
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

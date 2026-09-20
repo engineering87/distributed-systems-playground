@@ -1,6 +1,6 @@
 import asyncio
 from playwright.async_api import async_playwright
-from common import URL, launcher
+from common import URL, launcher, BROWSER
 res=[]
 def check(c,m): res.append(('OK  ' if c else 'FAIL')+' '+m)
 async def main():
@@ -19,6 +19,12 @@ async def main():
         if await pk.count():
             await pk.first.tap(force=True)
             check('Go to send' in await pg.inner_text('#props'), 'tap selects packet')
+        # Real gestures need a CDP session, which only Chromium offers; the checks above are portable.
+        if BROWSER != 'chromium':
+            res.append('OK   gesture checks skipped on ' + BROWSER + ' (they need a CDP session)')
+            print(errs or 'no errors')
+            await b.close()
+            return
         # vertical swipe starting on the topology background should scroll the page
         box = await pg.locator('#topo').bounding_box()
         y0 = await pg.evaluate('scrollY')
@@ -66,5 +72,7 @@ async def main():
         await pg.tap('#dlg-export button[value=close]')
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

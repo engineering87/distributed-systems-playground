@@ -6,6 +6,14 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.10.1]
+
+### Fixed
+- Leaving full screen now leaves presentation mode as well. On browsers that handle `Esc` themselves, the mode stayed on with the controls hidden.
+
+### Changed
+- The browser suites print the checks that already passed when a step throws, and `touch` skips the gesture checks outside Chromium, where a CDP session is not available.
+
 ## [0.10.0]
 
 ### Added

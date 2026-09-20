@@ -99,5 +99,7 @@ end'''
         await pg.keyboard.press('Escape')
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

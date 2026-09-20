@@ -52,5 +52,7 @@ async def main():
         check('p2 paused from' in await pg.inner_text('#faults'), 'pause injected at the cursor: ' + [l for l in (await pg.inner_text('#faults')).split('\n') if 'p2' in l][:1].__str__())
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

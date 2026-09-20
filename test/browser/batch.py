@@ -49,5 +49,7 @@ async def main():
         check('Seeds look like' in await pg.inner_text('#toast'), 'bad seed list reported')
         print(errs or 'no errors')
         await b.close()
-asyncio.run(main())
-print('\n'.join(res))
+try:
+    asyncio.run(main())
+finally:
+    print('\n'.join(res))

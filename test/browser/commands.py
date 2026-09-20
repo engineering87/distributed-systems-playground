@@ -342,7 +342,9 @@ async def run():
         print('\n'.join(errs) or 'no JS errors')
         await b.close()
 
-asyncio.run(run())
-print('\n'.join(notes))
-print('\n'.join(fails) or 'ALL CHECKS PASSED')
-print(len(notes), 'passed,', len(fails), 'failed')
+try:
+    asyncio.run(run())
+finally:
+    print('\n'.join(notes))
+    print('\n'.join(fails) or 'ALL CHECKS PASSED')
+    print(len(notes), 'passed,', len(fails), 'failed')
