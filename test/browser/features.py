@@ -21,9 +21,18 @@ async def main():
         await pg.check('#layers')
         leg = await pg.inner_text('#layer-legend')
         check('Newsroom' in leg and 'AckLinks' in leg and 'EagerReliableBroadcast' in leg, 'layer legend: ' + leg.replace('\n', ', '))
-        await pg.evaluate("(()=>{const s=document.querySelector('#scrub'); s.value=150; s.dispatchEvent(new Event('input'));})()")
-        tints = await pg.evaluate("[...document.querySelectorAll('#g-msgs .pk rect')].filter(r => r.closest('.pk').getAttribute('display') !== 'none').map(r => r.style.fill)")
-        check(any(tints), f'packets tinted by layer: {set(tints)}')
+        # how many packets are in flight depends on the instant, so look for one instead of guessing
+        tints, at = [], None
+        for pos in range(60, 3000, 40):
+            await pg.evaluate(f"(()=>{{const s=document.querySelector('#scrub'); s.value={pos}; s.dispatchEvent(new Event('input'));}})()")
+            tints = await pg.evaluate(
+                "[...document.querySelectorAll('#g-msgs .pk')].filter(g => g.getAttribute('display') !== 'none')"
+                ".map(g => { const r = g.querySelector('rect'); const c = g.querySelector('circle');"
+                " return (r && r.style.fill) || (c && c.style.fill) || ''; })")
+            if any(tints):
+                at = pos
+                break
+        check(any(tints), f'packets tinted by layer at {at}: {set(tints)}')
         await pg.screenshot(path='n1.png')
         await pg.click('[data-tab=stack]')
         await pg.click('#g-nodes [data-node="2"]')

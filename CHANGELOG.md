@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.13.1]
+
+### Changed
+- The layer-color check no longer assumes that packets are in flight at one fixed instant: it looks for a moment when they are, which differs between browser engines. The gallery check no longer hardcodes the number of examples.
+
 ## [0.13.0]
 
 ### Added

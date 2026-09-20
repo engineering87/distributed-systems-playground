@@ -192,10 +192,13 @@ document.addEventListener('DOMContentLoaded', function () {
 <p>All notable changes to this project are listed here. Versions follow <a href="https://semver.org" target="_blank" rel="noopener">semantic versioning</a>; while the major version is 0, minor versions may change behavior.</p>
 <h2 id="unreleased">[Unreleased]<a class="anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
 <p>Nothing yet.</p>
+<h2 id="0131">[0.13.1]<a class="anchor" href="#0131" aria-label="Link to this section">#</a></h2>
+<h3 id="changed">Changed<a class="anchor" href="#changed" aria-label="Link to this section">#</a></h3>
+<ul><li>The layer-color check no longer assumes that packets are in flight at one fixed instant: it looks for a moment when they are, which differs between browser engines. The gallery check no longer hardcodes the number of examples.</li></ul>
 <h2 id="0130">[0.13.0]<a class="anchor" href="#0130" aria-label="Link to this section">#</a></h2>
 <h3 id="added">Added<a class="anchor" href="#added" aria-label="Link to this section">#</a></h3>
 <ul><li>Four algorithms from the catalog, each with the properties it must satisfy: perfect failure detector (P) under timed synchrony, eventual leader election (Ω) under partial synchrony, Ricart-Agrawala mutual exclusion, and two-phase commit with its blocking scenario.</li><li>New gallery categories: <em>Coordination</em> and <em>Leader election</em>.</li></ul>
-<h3 id="changed">Changed<a class="anchor" href="#changed" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-1">Changed<a class="anchor" href="#changed-1" aria-label="Link to this section">#</a></h3>
 <ul><li>The README opens the algorithms it can run, with the properties each one checks; the keyboard shortcuts moved to the interface guide.</li><li>Termination properties are written as &quot;every correct process decided&quot;, so that a process crashing after deciding no longer breaks them.</li></ul>
 <h2 id="0120">[0.12.0]<a class="anchor" href="#0120" aria-label="Link to this section">#</a></h2>
 <h3 id="added-1">Added<a class="anchor" href="#added-1" aria-label="Link to this section">#</a></h3>
@@ -210,18 +213,18 @@ document.addEventListener('DOMContentLoaded', function () {
 <h3 id="added-2">Added<a class="anchor" href="#added-2" aria-label="Link to this section">#</a></h3>
 <ul><li>Generated fault schedules for batch runs: <code>crash</code>, <code>recover</code>, <code>pause</code>, <code>partition</code>, <code>link</code> and <code>omission</code>, each drawn from the seed of its run, in the <em>Scenario</em> tab (<em>Faults per run</em> and <em>Window</em>) and on the command line (<code>--faults</code>, <code>--fault-window</code>).</li><li>The schedule of a run that had a problem is shown with its seed, and opening that seed adds exactly those faults to the scenario.</li></ul>
 <h2 id="0102">[0.10.2]<a class="anchor" href="#0102" aria-label="Link to this section">#</a></h2>
-<h3 id="changed-1">Changed<a class="anchor" href="#changed-1" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-2">Changed<a class="anchor" href="#changed-2" aria-label="Link to this section">#</a></h3>
 <ul><li>The batch suite no longer depends on how fast the machine is: it stops a batch in the same tick it starts one, waits longer for results, and allows a loaded machine to answer more slowly.</li></ul>
 <h2 id="0101">[0.10.1]<a class="anchor" href="#0101" aria-label="Link to this section">#</a></h2>
 <h3 id="fixed">Fixed<a class="anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
 <ul><li>Leaving full screen now leaves presentation mode as well. On browsers that handle <code>Esc</code> themselves, the mode stayed on with the controls hidden.</li></ul>
-<h3 id="changed-2">Changed<a class="anchor" href="#changed-2" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-3">Changed<a class="anchor" href="#changed-3" aria-label="Link to this section">#</a></h3>
 <ul><li>The browser suites print the checks that already passed when a step throws, and <code>touch</code> skips the gesture checks outside Chromium, where a CDP session is not available.</li></ul>
 <h2 id="0100">[0.10.0]<a class="anchor" href="#0100" aria-label="Link to this section">#</a></h2>
 <h3 id="added-3">Added<a class="anchor" href="#added-3" aria-label="Link to this section">#</a></h3>
 <ul><li><strong>Run over many seeds</strong> in the <em>Scenario</em> tab: the same scenario runs in background workers, one run per seed, reporting per-property results and the first seed that broke each one; clicking a seed opens that run. Falls back to running on the page, one seed at a time, where workers are not allowed.</li><li>The browser suites can run on Firefox and WebKit with <code>DSP_BROWSER</code>, and CI runs all three engines on the main branch.</li><li>A browser suite for batch runs.</li></ul>
 <h2 id="092">[0.9.2]<a class="anchor" href="#092" aria-label="Link to this section">#</a></h2>
-<h3 id="changed-3">Changed<a class="anchor" href="#changed-3" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-4">Changed<a class="anchor" href="#changed-4" aria-label="Link to this section">#</a></h3>
 <ul><li>The interface source is split into thirteen files under <code>src/ui/</code>, one per area, concatenated into a single scope at build time. The build now also fails when the bundled script does not parse.</li></ul>
 <h2 id="091">[0.9.1]<a class="anchor" href="#091" aria-label="Link to this section">#</a></h2>
 <h3 id="added-4">Added<a class="anchor" href="#added-4" aria-label="Link to this section">#</a></h3>
@@ -238,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <h2 id="080">[0.8.0]<a class="anchor" href="#080" aria-label="Link to this section">#</a></h2>
 <h3 id="added-6">Added<a class="anchor" href="#added-6" aria-label="Link to this section">#</a></h3>
 <ul><li>Global properties in Upon: <code>property &lt;name&gt; always|eventually &lt;expression&gt; end</code>, checked after every step over the state of every process, with the built-ins <code>crashed</code>, <code>up</code>, <code>correct</code>, <code>t</code> and the function <code>defined</code>.</li><li>The FloodSet example declares agreement, validity and termination.</li><li>Properties are reported in the event log (new <em>Properties</em> filter), among the counters, in the batch runner and by the command line tool, which exits with 1 when one breaks.</li></ul>
-<h3 id="changed-4">Changed<a class="anchor" href="#changed-4" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-5">Changed<a class="anchor" href="#changed-5" aria-label="Link to this section">#</a></h3>
 <ul><li>The FloodSet example stores its decision in a state variable, so that a property can observe it.</li></ul>
 <h2 id="070">[0.7.0]<a class="anchor" href="#070" aria-label="Link to this section">#</a></h2>
 <h3 id="added-7">Added<a class="anchor" href="#added-7" aria-label="Link to this section">#</a></h3>
@@ -249,14 +252,14 @@ document.addEventListener('DOMContentLoaded', function () {
 <h2 id="060">[0.6.0]<a class="anchor" href="#060" aria-label="Link to this section">#</a></h2>
 <h3 id="added-8">Added<a class="anchor" href="#added-8" aria-label="Link to this section">#</a></h3>
 <ul><li>Logo, banner and social preview image.</li><li>Settings menu: theme (system, light, dark), a palette for color vision deficiencies, interface language (English, Italian), presentation mode, keyboard shortcuts, welcome tour.</li><li>Presentation mode for lectures: larger text, side panel hidden, remote clickers step through events.</li><li>Welcome tour on the first visit.</li><li>Export of the space-time diagram as SVG or PNG, and of the graph as SVG.</li><li>Example gallery with thumbnails, topics and models.</li><li>A browsable documentation site generated from <code>docs/</code> with no extra dependencies.</li><li>Changelog, citation file, code of conduct, security policy, issue and pull request templates.</li></ul>
-<h3 id="changed-5">Changed<a class="anchor" href="#changed-5" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-6">Changed<a class="anchor" href="#changed-6" aria-label="Link to this section">#</a></h3>
 <ul><li>Packets slow down as they approach their destination.</li></ul>
 <h2 id="051">[0.5.1]<a class="anchor" href="#051" aria-label="Link to this section">#</a></h2>
 <h3 id="added-9">Added<a class="anchor" href="#added-9" aria-label="Link to this section">#</a></h3>
 <ul><li>Full user documentation in <code>docs/</code>: getting started, concepts, assumptions and simplifications, engine, timing model, faults, language, library, examples, interface, teaching, troubleshooting.</li><li><code>CONTRIBUTING.md</code> with writing guidelines.</li><li>A test that compiles every Upon program in the documentation and checks every link and anchor.</li></ul>
 <h3 id="fixed-1">Fixed<a class="anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
 <ul><li>A fault injected at the cursor could change earlier history when duplication was enabled.</li><li>Messages dropped in transit did not update the FIFO state of their channel.</li><li>Duplicates of a message dropped in transit were not recorded.</li><li>Inputs sent to a crashed process changed the random values received by the others.</li></ul>
-<h3 id="changed-6">Changed<a class="anchor" href="#changed-6" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-7">Changed<a class="anchor" href="#changed-7" aria-label="Link to this section">#</a></h3>
 <ul><li>The FloodSet example uses four processes and seed 5.</li></ul>
 <h2 id="050">[0.5.0]<a class="anchor" href="#050" aria-label="Link to this section">#</a></h2>
 <h3 id="added-10">Added<a class="anchor" href="#added-10" aria-label="Link to this section">#</a></h3>
@@ -264,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <h2 id="040">[0.4.0]<a class="anchor" href="#040" aria-label="Link to this section">#</a></h2>
 <h3 id="added-11">Added<a class="anchor" href="#added-11" aria-label="Link to this section">#</a></h3>
 <ul><li>Layouts for phones, tablets, laptops and large monitors; touch support.</li></ul>
-<h3 id="changed-7">Changed<a class="anchor" href="#changed-7" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-8">Changed<a class="anchor" href="#changed-8" aria-label="Link to this section">#</a></h3>
 <ul><li>Faster rendering of large runs.</li></ul>
 <h3 id="fixed-2">Fixed<a class="anchor" href="#fixed-2" aria-label="Link to this section">#</a></h3>
 <ul><li>Malformed stored scenarios no longer break the application.</li><li>Keyboard shortcuts work after clicking a checkbox.</li></ul>
@@ -274,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <h2 id="020">[0.2.0]<a class="anchor" href="#020" aria-label="Link to this section">#</a></h2>
 <h3 id="added-13">Added<a class="anchor" href="#added-13" aria-label="Link to this section">#</a></h3>
 <ul><li>Animated execution on the topology, event-by-event playback, event injection at the cursor.</li></ul>
-<h3 id="changed-8">Changed<a class="anchor" href="#changed-8" aria-label="Link to this section">#</a></h3>
+<h3 id="changed-9">Changed<a class="anchor" href="#changed-9" aria-label="Link to this section">#</a></h3>
 <ul><li>The whole interface and documentation are in English.</li></ul>
 <h2 id="010">[0.1.0]<a class="anchor" href="#010" aria-label="Link to this section">#</a></h2>
 <h3 id="added-14">Added<a class="anchor" href="#added-14" aria-label="Link to this section">#</a></h3>
@@ -282,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <nav class="pager"><a href="contributing.html"><small>Previous</small>Contributing</a><a href="spec.html" style="text-align:right"><small>Next</small>Specification</a></nav>
 <footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a>. Released under the MIT License.</footer>
 </main>
-<aside class="toc"><p>On this page</p><a class="l2" href="#unreleased">[Unreleased]</a><a class="l2" href="#0130">[0.13.0]</a><a class="l3" href="#added">Added</a><a class="l3" href="#changed">Changed</a><a class="l2" href="#0120">[0.12.0]</a><a class="l3" href="#added-1">Added</a><a class="l2" href="#0112">[0.11.2]</a><a class="l3" href="#security">Security</a><a class="l2" href="#0111">[0.11.1]</a><a class="l3" href="#security-1">Security</a><a class="l2" href="#0110">[0.11.0]</a><a class="l3" href="#added-2">Added</a><a class="l2" href="#0102">[0.10.2]</a><a class="l3" href="#changed-1">Changed</a><a class="l2" href="#0101">[0.10.1]</a><a class="l3" href="#fixed">Fixed</a><a class="l3" href="#changed-2">Changed</a><a class="l2" href="#0100">[0.10.0]</a><a class="l3" href="#added-3">Added</a><a class="l2" href="#092">[0.9.2]</a><a class="l3" href="#changed-3">Changed</a><a class="l2" href="#091">[0.9.1]</a><a class="l3" href="#added-4">Added</a><a class="l2" href="#090">[0.9.0]</a><a class="l3" href="#added-5">Added</a><a class="l2" href="#082">[0.8.2]</a><a class="l3" href="#security-2">Security</a><a class="l2" href="#081">[0.8.1]</a><a class="l3" href="#security-3">Security</a><a class="l2" href="#080">[0.8.0]</a><a class="l3" href="#added-6">Added</a><a class="l3" href="#changed-4">Changed</a><a class="l2" href="#070">[0.7.0]</a><a class="l3" href="#added-7">Added</a><a class="l2" href="#061">[0.6.1]</a><a class="l3" href="#security-4">Security</a><a class="l2" href="#060">[0.6.0]</a><a class="l3" href="#added-8">Added</a><a class="l3" href="#changed-5">Changed</a><a class="l2" href="#051">[0.5.1]</a><a class="l3" href="#added-9">Added</a><a class="l3" href="#fixed-1">Fixed</a><a class="l3" href="#changed-6">Changed</a><a class="l2" href="#050">[0.5.0]</a><a class="l3" href="#added-10">Added</a><a class="l2" href="#040">[0.4.0]</a><a class="l3" href="#added-11">Added</a><a class="l3" href="#changed-7">Changed</a><a class="l3" href="#fixed-2">Fixed</a><a class="l2" href="#030">[0.3.0]</a><a class="l3" href="#added-12">Added</a><a class="l2" href="#020">[0.2.0]</a><a class="l3" href="#added-13">Added</a><a class="l3" href="#changed-8">Changed</a><a class="l2" href="#010">[0.1.0]</a><a class="l3" href="#added-14">Added</a></aside>
+<aside class="toc"><p>On this page</p><a class="l2" href="#unreleased">[Unreleased]</a><a class="l2" href="#0131">[0.13.1]</a><a class="l3" href="#changed">Changed</a><a class="l2" href="#0130">[0.13.0]</a><a class="l3" href="#added">Added</a><a class="l3" href="#changed-1">Changed</a><a class="l2" href="#0120">[0.12.0]</a><a class="l3" href="#added-1">Added</a><a class="l2" href="#0112">[0.11.2]</a><a class="l3" href="#security">Security</a><a class="l2" href="#0111">[0.11.1]</a><a class="l3" href="#security-1">Security</a><a class="l2" href="#0110">[0.11.0]</a><a class="l3" href="#added-2">Added</a><a class="l2" href="#0102">[0.10.2]</a><a class="l3" href="#changed-2">Changed</a><a class="l2" href="#0101">[0.10.1]</a><a class="l3" href="#fixed">Fixed</a><a class="l3" href="#changed-3">Changed</a><a class="l2" href="#0100">[0.10.0]</a><a class="l3" href="#added-3">Added</a><a class="l2" href="#092">[0.9.2]</a><a class="l3" href="#changed-4">Changed</a><a class="l2" href="#091">[0.9.1]</a><a class="l3" href="#added-4">Added</a><a class="l2" href="#090">[0.9.0]</a><a class="l3" href="#added-5">Added</a><a class="l2" href="#082">[0.8.2]</a><a class="l3" href="#security-2">Security</a><a class="l2" href="#081">[0.8.1]</a><a class="l3" href="#security-3">Security</a><a class="l2" href="#080">[0.8.0]</a><a class="l3" href="#added-6">Added</a><a class="l3" href="#changed-5">Changed</a><a class="l2" href="#070">[0.7.0]</a><a class="l3" href="#added-7">Added</a><a class="l2" href="#061">[0.6.1]</a><a class="l3" href="#security-4">Security</a><a class="l2" href="#060">[0.6.0]</a><a class="l3" href="#added-8">Added</a><a class="l3" href="#changed-6">Changed</a><a class="l2" href="#051">[0.5.1]</a><a class="l3" href="#added-9">Added</a><a class="l3" href="#fixed-1">Fixed</a><a class="l3" href="#changed-7">Changed</a><a class="l2" href="#050">[0.5.0]</a><a class="l3" href="#added-10">Added</a><a class="l2" href="#040">[0.4.0]</a><a class="l3" href="#added-11">Added</a><a class="l3" href="#changed-8">Changed</a><a class="l3" href="#fixed-2">Fixed</a><a class="l2" href="#030">[0.3.0]</a><a class="l3" href="#added-12">Added</a><a class="l2" href="#020">[0.2.0]</a><a class="l3" href="#added-13">Added</a><a class="l3" href="#changed-9">Changed</a><a class="l2" href="#010">[0.1.0]</a><a class="l3" href="#added-14">Added</a></aside>
 </div>
 </body>
 </html>
