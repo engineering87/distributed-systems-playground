@@ -31,6 +31,10 @@ Options:
   --preset <key>        replace the timing model with a preset
   --set <path=value>    change one scenario field, repeatable
                         (--set actual.loss=0.3 --set stopAt=5s)
+  --faults <plan>       add generated faults to every run, drawn from its seed:
+                        crash:1, partition:1, pause:1, link:1, omission:1, recover:1
+                        (combine them: --faults crash:1,partition:1)
+  --fault-window <w>    when those faults happen, 0..3s by default
   --stop-on-failure     stop at the first run that fails or breaks a property
   --outcomes            group the runs by the outputs they produced
   --outputs             print the outputs of every run
@@ -56,6 +60,8 @@ function parseArgs(argv) {
     else if (a === '--example') out.example = need();
     else if (a === '--seeds') out.seeds = need();
     else if (a === '--preset') out.preset = need();
+    else if (a === '--faults') out.faults = need();
+    else if (a === '--fault-window') out.faultWindow = need();
     else if (a === '--set') {
       const kv = need();
       const eq = kv.indexOf('=');
@@ -105,6 +111,9 @@ function printRuns(res, args) {
       padL(r.outputCount, 7) + ' ', padL(C.fmtDuration(r.endT), 9) + ' '].join('') + '\n');
     if (r.error) process.stdout.write('       ' + r.error + (r.errorLine ? ' (line ' + r.errorLine + ')' : '') + '\n');
     for (const e of r.compileErrors) process.stdout.write('       line ' + e.line + ': ' + e.msg + '\n');
+    if (r.faults.length && (broken.length || !r.ok || r.assertions)) {
+      process.stdout.write('       faults: ' + r.faults.map(R.describePlanFault).join('; ') + '\n');
+    }
     for (const p of broken) {
       process.stdout.write('       property ' + p.name + ': ' +
         (p.error ? p.error : p.kind === 'always' ? 'violated at ' + C.fmtDuration(p.at) + ' on p' + p.node : 'never held') + '\n');
@@ -144,7 +153,10 @@ function cmdRun(args) {
   const scenario = loadScenario(args);
   let res;
   try {
-    res = R.runBatch(scenario, { seeds: args.seeds, preset: args.preset, set: args.set, stopOnFailure: args.stopOnFailure });
+    res = R.runBatch(scenario, {
+      seeds: args.seeds, preset: args.preset, set: args.set, stopOnFailure: args.stopOnFailure,
+      faults: args.faults, faultWindow: args.faultWindow
+    });
   } catch (e) { fail(e.message); }
   if (args.json) {
     process.stdout.write(JSON.stringify({ summary: res.summary, runs: res.runs, ms: res.ms }, null, 2) + '\n');

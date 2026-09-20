@@ -114,7 +114,9 @@ Everything is explained in [The timing model](timing-model.md).
 
 *Run over many seeds* in the *Scenario* tab answers the question a single run cannot: does this hold in general?
 
-Write the seeds as `1..50`, `7`, or `1,4,9`, press **Run over seeds**, and the runs happen in the background: the page stays usable while they go. The panel reports, as results arrive:
+Write the seeds as `1..50`, `7`, or `1,4,9`, press **Run over seeds**, and the runs happen in the background: the page stays usable while they go.
+
+**Faults per run** adds a generated schedule to every run, drawn from its seed: `crash:1`, `partition:1`, `pause:1`, `link:1`, `omission:1`, `recover:1`, or several separated by commas. **Window** says when they happen. The schedule of a run that had a problem is shown next to its seed, and opening that seed adds exactly those faults to the scenario, so the failure is in front of you, reproducible and editable. The panel reports, as results arrive:
 
 - how many runs finished and how many had a problem;
 - for each declared [property](language.md#properties), in how many runs it held and the first seed that broke it;

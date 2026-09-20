@@ -6,6 +6,12 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.11.0]
+
+### Added
+- Generated fault schedules for batch runs: `crash`, `recover`, `pause`, `partition`, `link` and `omission`, each drawn from the seed of its run, in the *Scenario* tab (*Faults per run* and *Window*) and on the command line (`--faults`, `--fault-window`).
+- The schedule of a run that had a problem is shown with its seed, and opening that seed adds exactly those faults to the scenario.
+
 ## [0.10.2]
 
 ### Changed

@@ -291,7 +291,13 @@ M('or', 'o');
 M('Run over many seeds', 'Esecuzione su molti semi');
 M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
-M('Seeds', 'Semi'); M('Run over seeds', 'Esegui sui semi'); M('Seeds to run', 'Semi da eseguire'); M('Stop', 'Ferma');
+M('Seeds', 'Semi'); M('Faults per run', 'Guasti per esecuzione'); M('Generated faults per run', 'Guasti generati per esecuzione');
+M('Window', 'Finestra'); M('When the generated faults happen', 'Quando avvengono i guasti generati');
+M('Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1',
+  'Guasti estratti dal seme di ogni esecuzione: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
+M('none', 'nessuno'); M('Open this run', 'Apri questa esecuzione');
+M('Open this run, with its generated faults', 'Apri questa esecuzione, con i suoi guasti generati');
+P(/^Added the faults of seed (\d+) to the scenario\.$/, m => 'Aggiunti allo scenario i guasti del seme ' + m[1] + '.'); M('Run over seeds', 'Esegui sui semi'); M('Seeds to run', 'Semi da eseguire'); M('Stop', 'Ferma');
 M('Open this run', 'Apri questa esecuzione'); M('stopped', 'fermato'); M('all clean', 'tutto a posto');
 M('Seeds look like 1..50, or 3, or 1,4,9.', 'I semi si scrivono come 1..50, oppure 3, oppure 1,4,9.');
 M('That is a lot of seeds: try at most 500.', 'Sono molti semi: al massimo 500.');

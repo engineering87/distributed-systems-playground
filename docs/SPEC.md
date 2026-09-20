@@ -431,7 +431,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.8** | global invariants checked across processes, reported in the interface and by the batch runner |
 | **v0.9** | one-way link failures, process pauses and omission faults |
 | **v0.10** | batch runs over many seeds in workers, browser suites in the repository, interface split by area |
-| **v1.0** | test suites over generated fault schedules, counterexample minimization |
+| **v0.11** | generated fault schedules for batch runs |
+| **v1.0** | counterexample minimization and a test suite saved with the scenario |
 | **v1.1** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
 | **v1.2** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |

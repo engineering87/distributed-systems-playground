@@ -20,15 +20,24 @@ function makeWorkers(n) {
   return out;
 }
 
-// runs `seeds` of `scenario`, calling onRun(summary) as results arrive; returns a handle with cancel()
-function runBatch(scenario, seeds, onRun, onDone) {
+// runs `seeds` of `scenario`, calling onRun(summary) as results arrive; returns a handle with cancel().
+// `faultsFor(seed)` adds a generated schedule to that run, drawn from its seed.
+function runBatch(scenario, seeds, onRun, onDone, faultsFor) {
+  const scenarioFor = seed => {
+    const added = faultsFor ? faultsFor(seed) : [];
+    if (!added.length) return { scn: scenario, added };
+    const scn = clone(scenario);
+    scn.faults = (scn.faults || []).concat(added);
+    return { scn, added };
+  };
   const pending = seeds.slice();
   const results = [];
   let cancelled = false;
   const finish = () => { if (!cancelled) onDone(results.sort((a, b) => a.seed - b.seed)); };
   const take = () => (pending.length ? pending.shift() : null);
-  const collect = summary => {
+  const collect = (summary, added) => {
     if (cancelled) return;
+    summary.faults = added || [];
     results.push(summary);
     onRun(summary, results.length, seeds.length);
   };
@@ -36,12 +45,15 @@ function runBatch(scenario, seeds, onRun, onDone) {
   if (workers.length) {
     let active = workers.length;
     for (const w of workers) {
+      let sent = null;
       const next = () => {
         const seed = take();
         if (seed === null) { w.terminate(); if (--active === 0) finish(); return; }
-        w.postMessage({ scenario, seed });
+        const { scn, added } = scenarioFor(seed);
+        sent = added;
+        w.postMessage({ scenario: scn, seed });
       };
-      w.onmessage = e => { collect(e.data); next(); };
+      w.onmessage = e => { const added = sent; collect(e.data, added); next(); };
       w.onerror = () => { w.terminate(); if (--active === 0) finish(); };
       next();
     }
@@ -52,7 +64,8 @@ function runBatch(scenario, seeds, onRun, onDone) {
     if (cancelled) return;
     const seed = take();
     if (seed === null) { finish(); return; }
-    collect(window.SimRunner.runBatch(scenario, { seeds: [seed] }).runs[0]);
+    const { scn, added } = scenarioFor(seed);
+    collect(window.SimRunner.runBatch(scn, { seeds: [seed] }).runs[0], added);
     setTimeout(step, 0);
   };
   setTimeout(step, 0);
@@ -86,20 +99,33 @@ function renderBatchResults(runs, seeds) {
   const shown = failed.length ? failed : runs;
   for (const r of shown.slice(0, 60)) {
     const broken = r.properties.filter(p => !p.ok).map(p => p.name);
+    const faults = (r.faults || []).map(f => window.SimRunner.describePlanFault(f)).join('; ');
     const what = !r.ok ? (r.error || 'does not compile')
       : broken.length ? broken.join(', ') + ' broken'
         : r.assertions ? r.assertions + ' failed assertion(s)'
           : r.violations ? r.violations + ' violation(s)' : 'ok';
     list.append(el('li', {},
       el('button', {
-        type: 'button', class: 'link', title: 'Open this run',
-        onclick: () => { $('#seed').value = r.seed; S.scn.seed = r.seed; run(false); setTab('scen'); }
+        type: 'button', class: 'link', title: faults ? 'Open this run, with its generated faults' : 'Open this run',
+        onclick: () => openBatchRun(r)
       }, 'seed ' + r.seed),
       el('span', { class: r.ok && !broken.length && !r.assertions ? '' : 'bad' }, ' ' + what),
-      el('span', { class: 'hint' }, '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs')));
+      el('span', { class: 'hint' }, faults ? '  ' + faults : '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs')));
   }
   box.append(list);
   if (shown.length > 60) box.append(el('p', { class: 'hint' }, 'showing the first 60 of ' + shown.length + '.'));
+}
+// opens one run of a batch: its seed, and the faults that run was given
+function openBatchRun(r) {
+  $('#seed').value = r.seed;
+  S.scn.seed = r.seed;
+  if ((r.faults || []).length) {
+    S.scn.faults = (S.scn.faults || []).concat(clone(r.faults));
+    renderFaults();
+    toast('Added the faults of seed ' + r.seed + ' to the scenario.');
+  }
+  run(false);
+  setTab('scen');
 }
 function startBatch() {
   const btn = $('#btn-batch');
@@ -107,6 +133,16 @@ function startBatch() {
   const seeds = parseSeedSpec($('#batch-seeds').value);
   if (!seeds) { toast('Seeds look like 1..50, or 3, or 1,4,9.'); return; }
   if (seeds.length > 500) { toast('That is a lot of seeds: try at most 500.'); return; }
+  const spec = $('#batch-faults').value.trim();
+  let faultsFor = null;
+  if (spec) {
+    try {
+      const plan = window.SimRunner.parsePlan(spec);
+      const win = window.SimRunner.parseWindow($('#batch-window').value);
+      faultsFor = seed => window.SimRunner.planFaults(plan, win, S.scn, seed);
+      faultsFor(seeds[0]);
+    } catch (e) { toast(e.message); return; }
+  }
   const scenario = clone(S.scn);
   $('#batch-results').textContent = '';
   $('#batch-progress').textContent = '0 / ' + seeds.length;
@@ -124,7 +160,7 @@ function startBatch() {
       btn.textContent = 'Run over seeds';
       $('#batch-progress').textContent = all.length + ' run(s) in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s';
       renderBatchResults(all, seeds);
-    });
+    }, faultsFor);
 }
 function bindBatch() {
   $('#btn-batch').addEventListener('click', startBatch);

@@ -161,6 +161,8 @@ A link can have its own loss and delay distribution. Select it on the graph and 
 
 ## Adding faults
 
+**Generated, one schedule per run.** *Run over many seeds* in the *Scenario* tab, and `--faults` on the [command line](cli.md#generated-fault-schedules), add a random schedule to each run of a batch, drawn from its seed. It is the quickest way to find the combination that breaks a property.
+
 **In the *Scenario* tab.** Choose the type, fill in the fields, press *Add fault*. The list above the form shows every fault in words; *Remove* deletes one.
 
 | Type | Fields |

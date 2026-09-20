@@ -38,6 +38,24 @@ async def main():
         await pg.click('#batch-results button:has-text("seed 5")'); await pg.wait_for_timeout(900); await pause()
         check(await pg.input_value('#seed') == '5' and '2/3 properties' in await pg.inner_text('#chips'), 'clicking a seed opens it: ' + (await pg.inner_text('#chips')).replace('\n',' '))
         # the page stays responsive while a long batch runs
+        # generated fault schedules: the same scenario, one random schedule per seed
+        await pg.fill('#batch-seeds','1..20'); await pg.fill('#batch-faults','partition:1'); await pg.fill('#batch-window','0..2s')
+        await pg.click('#btn-batch')
+        for _ in range(160):
+            if '20 run(s)' in await pg.inner_text('#batch-progress'): break
+            await pg.wait_for_timeout(250)
+        out = await pg.inner_text('#batch-results')
+        check('Agreement' in out and 'held in' in out, 'batch with generated faults: ' + [l for l in out.split('\n') if 'Agreement' in l][:1].__str__())
+        check('partition {p' in out, 'the schedule of a failing seed is shown: ' + [l for l in out.split('\n') if 'partition' in l][:1].__str__())
+        faults_before = len((await pg.inner_text('#faults')).split('Remove')) - 1
+        await pg.click('#batch-results button >> nth=0'); await pg.wait_for_timeout(900); await pause()
+        faults_after = len((await pg.inner_text('#faults')).split('Remove')) - 1
+        check(faults_after == faults_before + 1, f'opening a seed adds its schedule to the scenario ({faults_before} -> {faults_after})')
+        check('Agreement' in await pg.inner_text('#chips') or 'properties' in await pg.inner_text('#chips'), 'the reopened run is simulated')
+        for f in ['#batch-faults']: await pg.fill(f, 'nope:1')
+        await pg.click('#btn-batch')
+        check('Unknown fault plan' in await pg.inner_text('#toast'), 'bad fault plan reported: ' + await pg.inner_text('#toast'))
+        await pg.fill('#batch-faults', '')
         await pg.fill('#batch-seeds','1..200'); await pg.click('#btn-batch'); await pg.wait_for_timeout(400)
         t0 = await pg.evaluate("performance.now()")
         await pg.click('[data-tab=code]')

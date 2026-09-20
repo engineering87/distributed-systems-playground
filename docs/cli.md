@@ -47,6 +47,8 @@ took 24 ms
 | `--seeds 1..50`, `--seeds 7`, `--seeds 1,4,9` | which seeds to run; by default the seed stored in the scenario |
 | `--preset <key>` | replace the whole timing model with a preset |
 | `--set <path=value>` | change one scenario field, repeatable |
+| `--faults <plan>` | add generated faults to every run, drawn from its seed |
+| `--fault-window <w>` | when those faults happen, `0..3s` by default |
 | `--stop-on-failure` | stop at the first run that fails |
 | `--outputs` | print the outputs of every run |
 | `--outcomes` | group the runs by the outputs they produced |
@@ -54,6 +56,35 @@ took 24 ms
 | `--quiet` | print only the summary |
 
 A run counts as failed when the code does not compile or the simulation stops with a runtime error. Violations and failed assertions are reported separately, because a violation is a broken assumption, not a broken program.
+
+## Generated fault schedules
+
+A batch varies the seed; `--faults` also varies what goes wrong. Each run gets its own schedule, drawn from its seed, so the same command always produces the same schedules and a failing run can be reproduced by pasting its faults into the scenario.
+
+```sh
+node bin/dsp.mjs run --example floodset --seeds 1..20 --faults partition:1 --fault-window 0..2s
+```
+
+```text
+     1 Agreement broken             54     24     8     0       4       3 s
+       faults: partition {p2, p3} 345 ms–1.596 s
+       property Agreement: violated at 1.1 s on p3
+…
+property Agreement       (always)      held in 16/20 run(s), first broken at seed 1
+```
+
+| Plan | What it adds to each run |
+|---|---|
+| `crash:1` | a process crashes at a random moment in the window |
+| `recover:1` | one of the crashed processes comes back later |
+| `pause:1` | a process is paused for part of the window |
+| `partition:1` | the processes are split in two groups for part of the window |
+| `link:1` | a link goes down for part of the window, one way half of the time |
+| `omission:1` | a process omits part of its sends, receives or both |
+
+Combine them with commas: `--faults crash:1,partition:1`. The window accepts `0..3s` or a single duration, which is read as `0..that`.
+
+This is the fastest way to ask a real question about an algorithm. FloodSet keeps agreement under one crash, as it should with f = 1; one random partition breaks it in about a fifth of the seeds, and a single omitting process breaks it now and then.
 
 ## Properties across a batch
 
@@ -160,6 +191,6 @@ A summary holds what a batch needs and not the whole trace: counts of messages b
 ## What it does not do yet
 
 - **Properties are checked, not proved.** Global invariants are evaluated on the runs of the batch: more executions than a single run, never all of them. See the roadmap in the [specification](SPEC.md#10-roadmap).
-- **Fault schedules are fixed.** A batch varies the seed and the fields you override; generating crash and partition schedules automatically is the next step.
+- **Schedules are random, not systematic.** `--faults` draws a schedule per seed; it does not enumerate the interesting ones. Reducing a failing schedule to its essential faults is the next step.
 - **Runs are sequential.** The tool runs one seed at a time in one process. It is fast enough for a few hundred runs of a small scenario; the interface will run batches in parallel workers.
 - **One run is one execution.** A batch explores more executions than a single run, never all of them. See [Assumptions and simplifications](assumptions.md#what-the-playground-is-not).

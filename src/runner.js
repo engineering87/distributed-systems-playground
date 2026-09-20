@@ -47,6 +47,108 @@ function seedList(seeds) {
   return [1];
 }
 
+// ---------------------------------------------------------------- generated fault schedules
+// A plan such as "crash:1,partition:1" adds that many faults to every run of a batch, drawn from the seed of
+// the run, so a scenario stays reproducible: the same seed and the same plan give the same schedule, and the
+// schedule travels with the result, ready to be pasted back into the scenario.
+const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission'];
+
+function parsePlan(spec) {
+  const plan = {};
+  for (const part of String(spec).split(/[,\s]+/).filter(Boolean)) {
+    const m = /^([a-z]+)(?::(\d+))?$/.exec(part.toLowerCase());
+    if (!m || !PLAN_TYPES.includes(m[1])) throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ')');
+    plan[m[1]] = (plan[m[1]] || 0) + (m[2] === undefined ? 1 : +m[2]);
+  }
+  if (!Object.keys(plan).length) throw new Error('The fault plan is empty');
+  return plan;
+}
+
+// "0..3s" or "3s" (meaning from 0)
+function parseWindow(text) {
+  const t = String(text || '0..3s').trim();
+  const m = /^(?:(\S+)\s*\.\.\s*)?(\S+)$/.exec(t);
+  if (!m) throw new Error('Invalid fault window: "' + t + '" (use 0..3s)');
+  const from = C.parseDuration(m[1] === undefined ? '0ms' : m[1]);
+  const to = C.parseDuration(m[2]);
+  if (from === null || to === null || to <= from) throw new Error('Invalid fault window: "' + t + '" (the end must come after the start)');
+  return { from, to };
+}
+
+function planRng(seed, spec) {
+  let x = (seed * 2654435761) >>> 0;
+  for (let i = 0; i < String(spec).length; i++) x = (x * 31 + String(spec).charCodeAt(i)) >>> 0;
+  return () => {
+    x ^= x << 13; x >>>= 0;
+    x ^= x >> 17;
+    x ^= x << 5; x >>>= 0;
+    return x / 4294967296;
+  };
+}
+
+// the faults a given seed gets from a plan, as ordinary scenario faults
+function planFaults(spec, window, scenario, seed) {
+  const plan = typeof spec === 'string' ? parsePlan(spec) : spec;
+  const win = typeof window === 'object' && window ? window : parseWindow(window);
+  const ids = (scenario.nodes || []).map(n => Math.trunc(+n.id)).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
+  if (ids.length < 2) throw new Error('A fault plan needs at least two processes');
+  const rnd = planRng(seed, JSON.stringify([plan, win]));
+  const time = () => Math.round(win.from + rnd() * (win.to - win.from));
+  const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const out = [];
+  const crashed = [];
+  for (let i = 0; i < (plan.crash || 0); i++) {
+    const node = pick(ids.filter(id => !crashed.includes(id))) || pick(ids);
+    crashed.push(node);
+    out.push({ type: 'crash', node, at: C.fmtDuration(time()) });
+  }
+  for (let i = 0; i < (plan.recover || 0) && i < crashed.length; i++) {
+    const crash = out.filter(f => f.type === 'crash')[i];
+    const at = C.parseDuration(crash.at) + Math.round((win.to - win.from) * (0.2 + 0.6 * rnd()));
+    out.push({ type: 'recover', node: crash.node, at: C.fmtDuration(at) });
+  }
+  for (let i = 0; i < (plan.pause || 0); i++) {
+    const from = time();
+    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.1 + 0.4 * rnd()))) });
+  }
+  for (let i = 0; i < (plan.partition || 0); i++) {
+    const shuffled = ids.slice();
+    for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
+    const cut = 1 + Math.floor(rnd() * (ids.length - 1));
+    const from = time();
+    out.push({
+      type: 'partition', groups: shuffled.slice(0, cut).sort((a, b) => a - b).join(' '),
+      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+    });
+  }
+  for (let i = 0; i < (plan.link || 0); i++) {
+    const links = (scenario.links || []).filter(l => l.enabled !== false);
+    const l = links.length ? pick(links) : { a: ids[0], b: ids[1] };
+    const from = time();
+    out.push({
+      type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
+      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+    });
+  }
+  for (let i = 0; i < (plan.omission || 0); i++) {
+    const from = time();
+    out.push({
+      type: 'omission', node: pick(ids), direction: ['send', 'receive', 'both'][Math.floor(rnd() * 3)],
+      prob: Math.round((0.3 + 0.7 * rnd()) * 100) / 100,
+      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.3 + 0.6 * rnd())))
+    });
+  }
+  return out;
+}
+
+function describePlanFault(f) {
+  if (f.type === 'crash' || f.type === 'recover') return 'p' + f.node + ' ' + (f.type === 'crash' ? 'crashes' : 'recovers') + ' at ' + f.at;
+  if (f.type === 'pause') return 'p' + f.node + ' paused ' + f.from + '–' + f.to;
+  if (f.type === 'partition') return 'partition {' + f.groups.split(' ').map(x => 'p' + x).join(', ') + '} ' + f.from + '–' + f.to;
+  if (f.type === 'link') return (f.oneWay ? 'one-way ' : '') + 'link p' + f.a + '–p' + f.b + ' down ' + f.from + '–' + f.to;
+  return 'p' + f.node + ' omits ' + f.direction + ' (' + f.prob + ') ' + f.from + '–' + f.to;
+}
+
 // A compact view of one run: enough to compare runs, small enough to keep thousands of them.
 function summarize(res, seed) {
   const msgs = res.msgs || [];
@@ -73,6 +175,7 @@ function summarize(res, seed) {
     propertyFailures: (res.properties || []).filter(p => !p.ok).length,
     outputs,
     outputCount: outputs.length,
+    faults: [],
     nodesWithOutput: new Set(outputs.map(o => o.node)).size
   };
 }
@@ -88,13 +191,18 @@ function runBatch(scenario, opts) {
     if (!preset) throw new Error('Unknown preset: ' + opts.preset + ' (available: ' + Object.keys(EX.PRESETS).join(', ') + ')');
     Object.assign(base, { assumed: clone(preset.assumed), actual: clone(preset.actual), violationPolicy: preset.violationPolicy, preset: opts.preset });
   }
+  const plan = opts.faults ? parsePlan(opts.faults) : null;
+  const window = plan ? parseWindow(opts.faultWindow) : null;
   const seeds = seedList(opts.seeds !== undefined ? opts.seeds : base.seed || 1);
   const runs = [];
   const started = Date.now();
   for (const seed of seeds) {
     const scn = clone(base);
     scn.seed = seed;
+    const added = plan ? planFaults(plan, window, scn, seed) : [];
+    if (added.length) scn.faults = (scn.faults || []).concat(added);
     const summary = summarize(C.runSimulation(scn), seed);
+    summary.faults = added;
     runs.push(summary);
     if (opts.onRun && opts.onRun(summary, runs.length, seeds.length) === false) break;
     if (opts.stopOnFailure && (!summary.ok || summary.propertyFailures)) break;
@@ -167,7 +275,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);

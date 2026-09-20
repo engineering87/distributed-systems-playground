@@ -156,3 +156,55 @@ test('the command line reports properties and fails when one breaks', () => {
     return true;
   });
 });
+
+test('a fault plan adds the same faults to the same seed, and different ones to different seeds', () => {
+  const scn = scenarioOf('floodset');
+  const a = R.planFaults('crash:1,partition:1', '0..2s', scn, 7);
+  const b = R.planFaults('crash:1,partition:1', '0..2s', scn, 7);
+  const other = R.planFaults('crash:1,partition:1', '0..2s', scn, 8);
+  assert.deepEqual(a, b, 'the same seed gives the same schedule');
+  assert.notDeepEqual(a, other, 'another seed gives another schedule');
+  assert.deepEqual(a.map(f => f.type).sort(), ['crash', 'partition']);
+  const window = { from: 0, to: 2000000 };
+  for (const f of R.planFaults('crash:2,pause:1,link:1,omission:1,recover:1', window, scn, 3)) {
+    const at = C.parseDuration(f.at !== undefined ? f.at : f.from);
+    assert.ok(at >= 0 && at <= 2000000, JSON.stringify(f));
+    assert.doesNotThrow(() => C.normalizeFault(f), JSON.stringify(f));
+  }
+  assert.throws(() => R.parsePlan('nope:2'), /Unknown fault plan/);
+  assert.throws(() => R.parsePlan(''), /empty/);
+  assert.throws(() => R.parseWindow('3s..1s'), /end must come after the start/);
+});
+
+test('generated faults reach the runs and the summaries, without touching the scenario', () => {
+  const scn = scenarioOf('floodset');
+  const before = JSON.stringify(scn);
+  const plain = R.runBatch(scn, { seeds: '1..20' });
+  assert.equal(plain.summary.withPropertyFailures, 0, 'the example holds without faults');
+  const withFaults = R.runBatch(scn, { seeds: '1..20', faults: 'partition:1', faultWindow: '0..2s' });
+  assert.equal(JSON.stringify(scn), before, 'the scenario it was given is untouched');
+  assert.ok(withFaults.runs.every(r => r.faults.length === 1 && r.faults[0].type === 'partition'));
+  const agreement = withFaults.summary.properties.find(p => p.name === 'Agreement');
+  assert.ok(agreement.failed >= 1 && agreement.failed < 20, `partitions break agreement in ${agreement.failed} of 20 runs`);
+  const broken = withFaults.runs.find(r => r.propertyFailures);
+  assert.match(R.describePlanFault(broken.faults[0]), /^partition \{p\d+(, p\d+)*\} /);
+  // the schedule reproduces the failure on its own
+  const repeat = C.runSimulation(Object.assign(scenarioOf('floodset'), {
+    seed: broken.seed, faults: scenarioOf('floodset').faults.concat(broken.faults)
+  }));
+  assert.ok(repeat.properties.some(p => !p.ok), 'pasting the schedule back reproduces the broken property');
+});
+
+test('the command line accepts a fault plan and reports the schedule that broke a run', () => {
+  assert.throws(() => cli('run', '--example', 'floodset', '--seeds', '1..20', '--faults', 'partition:1', '--fault-window', '0..2s'), e => {
+    assert.equal(e.status, 1);
+    assert.match(e.stdout, /Agreement broken/);
+    assert.match(e.stdout, /faults: partition \{p\d+/);
+    return true;
+  });
+  assert.throws(() => cli('run', '--example', 'floodset', '--faults', 'nope'), e => {
+    assert.equal(e.status, 2);
+    assert.match(e.stderr, /Unknown fault plan/);
+    return true;
+  });
+});
