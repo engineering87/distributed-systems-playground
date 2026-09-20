@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.10.2]
+
+### Changed
+- The batch suite no longer depends on how fast the machine is: it stops a batch in the same tick it starts one, waits longer for results, and allows a loaded machine to answer more slowly.
+
 ## [0.10.1]
 
 ### Fixed

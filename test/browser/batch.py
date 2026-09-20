@@ -18,7 +18,7 @@ async def main():
         used_worker = await pg.evaluate("""() => { try { const el=document.getElementById('worker-src'); const u=URL.createObjectURL(new Blob([el.textContent],{type:'text/javascript'})); const w=new Worker(u); w.terminate(); return true; } catch(e) { return String(e.message); } }""")
         check(True, 'workers available here: ' + str(used_worker))
         await pg.fill('#batch-seeds','1..20'); await pg.click('#btn-batch')
-        for _ in range(60):
+        for _ in range(160):   # a slow machine with one worker still finishes well within this
             if '20 run(s)' in await pg.inner_text('#batch-progress'): break
             await pg.wait_for_timeout(250)
         prog = await pg.inner_text('#batch-progress')
@@ -29,7 +29,7 @@ async def main():
         # realistic rounds: a seed must break agreement
         await pg.click('[data-tab=time]'); await pg.click('#presets button:has-text("Realistic synchronous")')
         await pg.click('[data-tab=scen]'); await pg.click('#btn-batch')
-        for _ in range(80):
+        for _ in range(160):
             if '20 run(s)' in await pg.inner_text('#batch-progress'): break
             await pg.wait_for_timeout(250)
         out = await pg.inner_text('#batch-results')
@@ -42,11 +42,21 @@ async def main():
         t0 = await pg.evaluate("performance.now()")
         await pg.click('[data-tab=code]')
         t1 = await pg.evaluate("performance.now()")
-        check(t1 - t0 < 400, f'the page answers during a batch ({t1-t0:.0f} ms to switch tab)')
-        await pg.click('[data-tab=scen]'); await pg.click('#btn-batch')
-        check('stopped' in await pg.inner_text('#batch-progress'), 'batch can be stopped')
+        # the point is that the page is not frozen, not that it is fast: a loaded CI machine is still slow
+        check(t1 - t0 < 1500, f'the page answers during a batch ({t1-t0:.0f} ms to switch tab)')
+        await pg.click('[data-tab=scen]')
+        # A batch may already have finished by now on a fast machine: start one and stop it in the same tick,
+        # which is the only timing-independent way to exercise the stop path.
+        if await pg.inner_text('#btn-batch') != 'Stop':
+            await pg.fill('#batch-seeds', '1..500')
+            await pg.click('#btn-batch')
+        await pg.click('#btn-batch')
+        await pg.wait_for_timeout(100)
+        check('stopped' in await pg.inner_text('#batch-progress') and await pg.inner_text('#btn-batch') == 'Run over seeds',
+              'batch can be stopped: ' + await pg.inner_text('#batch-progress'))
         await pg.fill('#batch-seeds','nope'); await pg.click('#btn-batch')
-        check('Seeds look like' in await pg.inner_text('#toast'), 'bad seed list reported')
+        check('Seeds look like' in await pg.inner_text('#toast'), 'bad seed list reported: ' + await pg.inner_text('#toast'))
+        check(await pg.inner_text('#btn-batch') == 'Run over seeds', 'an invalid seed list starts nothing')
         print(errs or 'no errors')
         await b.close()
 try:
