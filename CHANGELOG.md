@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.11.1]
+
+### Security
+- No HTML is matched with regular expressions any more, anywhere: the build checks each source before inlining it, the documentation generator escapes inline markup and reads text by walking it, and the tests scan the template and the markdown instead of stripping tags. A guard test fails if a regular expression starts matching tags again.
+
 ## [0.11.0]
 
 ### Added

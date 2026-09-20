@@ -17,42 +17,63 @@ const KEEP = new Set(['Distributed Systems Playground', 'Upon', 'DELTA', 'PHI', 
   'Ctrl', 'Cmd', 'Enter', 'Space', 'Home', 'End', 'Page Up', 'Page Down', 'Delete', 'Esc', 'V', 'N', 'L', 'D', 'P', 'F', '?',
   'const(d)', 'uniform(a, b)', 'exp(mean)', 'normal(μ, σ)', 'lognormal(μ, σ)', 'pareto(xm, α)', 'empirical(a, b, …)']);
 
-// removes an element and everything inside it, given the position of one of its attributes
-function cutElement(html, at) {
-  const start = html.lastIndexOf('<', at);
-  const tag = /^<([a-z0-9]+)/i.exec(html.slice(start))[1];
-  const open = new RegExp('<' + tag + '\\b', 'gi'), close = new RegExp('</' + tag + '\\s*>', 'gi');
-  let depth = 0, i = start;
-  while (i < html.length) {
-    open.lastIndex = close.lastIndex = i;
-    const o = open.exec(html), c = close.exec(html);
-    if (!c) break;
-    if (o && o.index < c.index) { depth++; i = o.index + 1; continue; }
-    depth--;
-    i = c.index + c[0].length;
-    if (depth === 0) break;
-  }
-  return html.slice(0, start) + html.slice(i);
-}
+// Walks the template once, instead of cutting pieces out of it with regular expressions: comments, code
+// samples, scripts and the blocks translated as a whole are skipped with their content; everything else
+// contributes its text and its translatable attributes.
+const SKIPPED_TAGS = new Set(['pre', 'script', 'style']);
+const ATTRS = ['title', 'placeholder', 'aria-label'];
 
-// text nodes and translatable attributes of the page template, without code samples, build markers
-// and the blocks that are translated as a whole
-function templateTexts() {
-  let html = read('src/template.html');
-  html = html.replace(/<pre[\s\S]*?<\/pre>/g, '').replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<script[\s\S]*?<\/script>/g, '').replace(/\/\*__[A-Z]+__\*\//g, '');
-  for (let at = html.search(/data-i18n-block=/); at >= 0; at = html.search(/data-i18n-block=/)) html = cutElement(html, at);
+function scanTemplate(html) {
   const texts = new Set();
-  for (const m of html.matchAll(/>([^<>]+)</g)) {
-    const t = m[1].replace(/\s+/g, ' ').trim();
-    if (t && /[A-Za-z]{2}/.test(t)) texts.add(t);
+  const stack = [];          // open tags; when a skipped one is on it, text is ignored
+  let skipDepth = 0;         // how many tags are open inside the skipped element
+  let i = 0, text = '';
+  const flush = () => {
+    const t = text.replace(/\s+/g, ' ').trim();
+    if (t && !skipDepth && /[A-Za-z]{2}/.test(t) && !t.startsWith('/*__')) texts.add(t);
+    text = '';
+  };
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) { text += html.slice(i); break; }
+    text += html.slice(i, lt);
+    flush();
+    if (html.startsWith('<!--', lt)) {                      // comment
+      const end = html.indexOf('-->', lt + 4);
+      i = end < 0 ? html.length : end + 3;
+      continue;
+    }
+    const gt = html.indexOf('>', lt);
+    if (gt < 0) break;
+    const raw = html.slice(lt + 1, gt);
+    const closing = raw.startsWith('/');
+    const name = (closing ? raw.slice(1) : raw).split(/[\s/>]/)[0].toLowerCase();
+    if (closing) {
+      if (skipDepth) skipDepth--;
+      else while (stack.length && stack.pop() !== name);
+    } else if (!raw.endsWith('/') && !['br', 'hr', 'img', 'input', 'meta', 'link'].includes(name)) {
+      if (skipDepth) skipDepth++;
+      else if (SKIPPED_TAGS.has(name) || / data-i18n-block=/.test(raw)) skipDepth = 1;
+      else stack.push(name);
+    }
+    if (!skipDepth || skipDepth === 1) {
+      for (const attr of ATTRS) {
+        const at = raw.toLowerCase().indexOf(attr + '="');
+        if (at < 0) continue;
+        const from = at + attr.length + 2;
+        const end = raw.indexOf('"', from);
+        const v = end < 0 ? '' : raw.slice(from, end).trim();
+        if (v && /[A-Za-z]{2}/.test(v)) texts.add(v);
+      }
+    }
+    i = gt + 1;
   }
-  for (const m of html.matchAll(/(?:title|placeholder|aria-label)="([^"]+)"/g)) {
-    const t = m[1].trim();
-    if (t && /[A-Za-z]{2}/.test(t)) texts.add(t);
-  }
+  flush();
   return [...texts];
 }
+
+// text nodes and translatable attributes of the page template
+function templateTexts() { return scanTemplate(read('src/template.html')); }
 
 test('the page template is fully translated', () => {
   const missing = templateTexts().filter(t => !KEEP.has(t) && I._tr(t) === null);

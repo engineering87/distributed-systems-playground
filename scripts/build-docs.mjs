@@ -50,13 +50,42 @@ function resolveLink(url, fromSrc) {
 }
 
 // ---------------------------------------------------------------- inline markdown
+// A handful of tags may be written directly in the documentation. Everything else is escaped: the text is
+// walked once, so there is no tag-matching regular expression to get wrong.
+const INLINE_TAGS = new Set(['b', 'i', 'em', 'strong', 'kbd', 'br', 'sub', 'sup']);
+function escapeExceptSimpleTags(text) {
+  let out = '', i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (c !== '<') { out += ({ '&': '&amp;', '>': '&gt;', '"': '&quot;' })[c] || c; i++; continue; }
+    const gt = text.indexOf('>', i);
+    const inside = gt < 0 ? '' : text.slice(i + 1, gt);
+    const name = inside.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
+    if (gt > i && INLINE_TAGS.has(name)) { out += text.slice(i, gt + 1); i = gt + 1; }
+    else { out += '&lt;'; i++; }
+  }
+  return out;
+}
+
+// the text of an HTML fragment, for the search index: walked, not matched
+function plain(html) {
+  let out = '', i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) { out += html.slice(i); break; }
+    out += html.slice(i, lt) + ' ';
+    const gt = html.indexOf('>', lt);
+    if (gt < 0) break;
+    i = gt + 1;
+  }
+  return out.replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function inline(text, src) {
   const codes = [];
   let s = text.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
   s = s.replace(/\\\|/g, '|');
-  const html = [];
-  s = s.replace(/<(\/?)(b|i|em|strong|kbd|br|sub|sup)(\s*\/?)>/g, (m) => { html.push(m); return '\u0001' + (html.length - 1) + '\u0001'; });
-  s = esc(s);
+  s = escapeExceptSimpleTags(s);
   s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, url) => `<img src="${esc(resolveLink(url, src))}" alt="${alt}">`);
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, label, url) => {
     const href = resolveLink(url.replace(/&amp;/g, '&'), src);
@@ -65,7 +94,6 @@ function inline(text, src) {
   });
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^\w*])\*([^*\s][^*]*?)\*(?=[^\w*]|$)/g, '$1<em>$2</em>');
-  s = s.replace(/\u0001(\d+)\u0001/g, (m, i) => html[+i]);
   s = s.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + esc(codes[+i]) + '</code>');
   return s;
 }
@@ -188,10 +216,9 @@ function renderList(lines, src) {
   });
   return (ordered ? '<ol>' : '<ul>') + lis.join('') + (ordered ? '</ol>' : '</ul>');
 }
-function plain(html) { return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim(); }
 
 // ---------------------------------------------------------------- page layout
-const LOGO = readFileSync(join(root, 'docs/assets/logo.svg'), 'utf8').replace(/<svg /, '<svg class="logo" ');
+const LOGO = readFileSync(join(root, 'docs/assets/logo.svg'), 'utf8').replace('<svg ', '<svg class="logo" ');
 function nav(current) {
   let html = '', group = '';
   for (const [, out, title, g] of PAGES) {
@@ -402,7 +429,10 @@ PAGES.forEach((p, k) => {
   const parts = html.split(/(?=<h[23] id=")/);
   parts.forEach((part, j) => {
     const h = /^<h[23] id="([^"]+)">(.*?)<a class="anchor"/.exec(part);
-    const text = plain(part.replace(/<h[123][^>]*>.*?<\/h[123]>/, '')).slice(0, 600);
+    // the text of the section, without its own heading
+    const headEnd = part.startsWith('<h') ? part.indexOf('</h', 1) : -1;
+    const afterHead = headEnd < 0 ? part : part.slice(part.indexOf('>', headEnd) + 1);
+    const text = plain(afterHead).slice(0, 600);
     if (!h && j > 0) return;
     index.push({ u: p[1] + (h ? '#' + h[1] : ''), t: h ? plain(h[2]) : title, p: h ? p[2] : '', x: text });
   });

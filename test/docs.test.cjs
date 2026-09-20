@@ -27,6 +27,22 @@ function parse(md) {
   return { blocks, prose: prose.join('\n') };
 }
 
+// the src of every <img> written directly in the markdown, read by walking the text
+function imageSources(text) {
+  const out = [];
+  for (let at = text.indexOf('<img'); at >= 0; at = text.indexOf('<img', at + 4)) {
+    const end = text.indexOf('>', at);
+    if (end < 0) break;
+    const tag = text.slice(at, end);
+    const key = tag.indexOf('src="');
+    if (key < 0) continue;
+    const from = key + 5;
+    const quote = tag.indexOf('"', from);
+    if (quote > 0) out.push(tag.slice(from, quote));
+  }
+  return out;
+}
+
 // GitHub-style heading anchors
 function anchors(md) {
   const seen = new Map(), out = new Set();
@@ -73,7 +89,7 @@ test('relative links and anchors in the documentation resolve', () => {
     const { prose } = parse(md);
     const own = anchors(md);
     const links = [...prose.matchAll(/\]\(([^)\s]+)\)/g)].map(m => m[1])
-      .concat([...prose.matchAll(/<img[^>]+src="([^"]+)"/g)].map(m => m[1]));
+      .concat(imageSources(prose));
     for (const link of links) {
       if (/^(https?:|mailto:)/.test(link)) continue;
       const [file, anchor] = link.split('#');

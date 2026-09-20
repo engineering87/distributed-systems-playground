@@ -11,6 +11,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 // every source of the application, including the parts of the interface
 const sources = fs.readdirSync(path.join(root, 'src')).filter(f => f.endsWith('.js')).map(f => 'src/' + f)
   .concat(fs.readdirSync(path.join(root, 'src/ui')).filter(f => f.endsWith('.js')).map(f => 'src/ui/' + f));
+// the build and the test helpers read our own HTML, and must parse it rather than match it with regexps
+const tooling = fs.readdirSync(path.join(root, 'scripts')).filter(f => f.endsWith('.mjs')).map(f => 'scripts/' + f)
+  .concat(fs.readdirSync(path.join(root, 'test')).filter(f => f.endsWith('.cjs')).map(f => 'test/' + f));
 const clone = o => JSON.parse(JSON.stringify(o));
 const scenarioOf = key => clone(EXAMPLES.find(e => e.key === key).scenario);
 
@@ -25,8 +28,18 @@ test('the sources never reinterpret data as HTML or code', () => {
       if (/\.innerHTML\s*=/.test(line) && !ok) problems.push(at + ' assigns innerHTML');
       if (/\.outerHTML\s*=|insertAdjacentHTML|document\.write\(/.test(line)) problems.push(at + ' writes HTML');
       if (/\beval\s*\(|new Function\s*\(/.test(line)) problems.push(at + ' evaluates code');
-      // markup must be built safely, never cleaned up afterwards with regular expressions
-      if (/replace\(\s*\/<\s*\\?s/.test(line)) problems.push(at + ' sanitizes markup with a regular expression');
+      // markup is built safely and parsed properly: never filtered with a regular expression
+      if (/[(=,]\s*\/<[^/]/.test(line)) problems.push(at + ' matches HTML tags with a regular expression');
+    });
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('HTML is never filtered with a regular expression, in the sources or in the tooling', () => {
+  const problems = [];
+  for (const f of sources.concat(tooling)) {
+    read(f).split('\n').forEach((line, i) => {
+      if (/[(=,]\s*\/<[^/]/.test(line)) problems.push(f + ':' + (i + 1) + ' ' + line.trim());
     });
   }
   assert.deepEqual(problems, []);

@@ -29,6 +29,11 @@ for (const [marker, file] of [
   ['/*__UI__*/', 'ui/']
 ]) {
   let src = file === 'ui/' ? readUi() : read(file);
+  // a syntax error must fail the build, and name the file it came from
+  if (file.endsWith('.js') || file === 'ui/') {
+    try { new Function(src); }
+    catch (e) { throw new Error(`${file} does not parse: ${e.message}`); }
+  }
   // the worker carries its own copy of the engine: it has no access to the page's scripts
   if (file === 'worker.js') {
     src = src.replace('/*__WORKER_LIBS__*/', () => ['core.js', 'library.js', 'examples.js', 'runner.js'].map(read).join('\n'));
@@ -36,14 +41,6 @@ for (const [marker, file] of [
   if (src.toLowerCase().includes('</script')) throw new Error(`${file} contains "</script", which would break the page`);
   if (!html.includes(marker)) throw new Error(`Placeholder ${marker} is missing from the template`);
   html = html.replace(marker, () => src);
-}
-
-// a syntax error in one part must fail the build, not the page
-for (const script of html.match(/<script>([\s\S]*?)<\/script>/g) || []) {
-  const code = script.slice('<script>'.length, -'</script>'.length);
-  if (!code.trim()) continue;
-  try { new Function(code); }
-  catch (e) { throw new Error('the bundled script does not parse: ' + e.message); }
 }
 
 const out = join(root, 'index.html');
