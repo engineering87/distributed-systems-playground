@@ -1,12 +1,21 @@
 // Bundles src/ into a single self-contained index.html (servable by GitHub Pages).
 // Usage: node scripts/build.mjs          -> writes index.html
 //        node scripts/build.mjs --check  -> checks that index.html is up to date
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => readFileSync(join(root, 'src', f), 'utf8');
+// The interface is written as one scope split over several files: they are concatenated in name order and
+// wrapped once, so no part has to export anything to the others.
+function readUi() {
+  const dir = join(root, 'src', 'ui');
+  const files = readdirSync(dir).filter(f => f.endsWith('.js')).sort();
+  if (!files.length) throw new Error('src/ui/ has no parts');
+  const body = files.map(f => readFileSync(join(dir, f), 'utf8').trimEnd()).join('\n\n');
+  return "(function () {\n'use strict';\n\n" + body + "\n})();\n";
+}
 
 let html = read('template.html');
 for (const [marker, file] of [
@@ -15,12 +24,20 @@ for (const [marker, file] of [
   ['/*__LIBRARY__*/', 'library.js'],
   ['/*__I18N__*/', 'i18n.js'],
   ['/*__EXAMPLES__*/', 'examples.js'],
-  ['/*__UI__*/', 'ui.js']
+  ['/*__UI__*/', 'ui/']
 ]) {
-  const src = read(file);
+  const src = file === 'ui/' ? readUi() : read(file);
   if (src.toLowerCase().includes('</script')) throw new Error(`${file} contains "</script", which would break the page`);
   if (!html.includes(marker)) throw new Error(`Placeholder ${marker} is missing from the template`);
   html = html.replace(marker, () => src);
+}
+
+// a syntax error in one part must fail the build, not the page
+for (const script of html.match(/<script>([\s\S]*?)<\/script>/g) || []) {
+  const code = script.slice('<script>'.length, -'</script>'.length);
+  if (!code.trim()) continue;
+  try { new Function(code); }
+  catch (e) { throw new Error('the bundled script does not parse: ' + e.message); }
 }
 
 const out = join(root, 'index.html');

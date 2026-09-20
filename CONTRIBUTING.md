@@ -33,7 +33,7 @@ Open `index.html` in a browser to use the application.
 | `bin/dsp.mjs` | command line tool | no dependencies; every command covered by a test |
 | `src/library.js` | library modules written in Upon | each module documented and tested |
 | `src/examples.js` | example scenarios and timing presets | each example documented and tested |
-| `src/ui.js` | interface and animation | |
+| `src/ui/` | the interface, one file per area | the parts share one scope: the build concatenates them in name order and wraps them once, so nothing is exported between them |
 | `src/i18n.js` | Italian translation of the interface | add a translation for every new interface text |
 | `src/style.css` | styles for both themes | check light and dark |
 | `src/template.html` | page structure | |
@@ -65,7 +65,7 @@ CI runs the tests and `npm run check`, which fails if `index.html` or `manual/` 
 
 **Security.** Never clean up generated markup with regular expressions: build it safely instead, with an allowlist of elements and attributes and escaping per value. Data that comes from outside the page (imported files, shared links, local storage) is parsed without keys that could reach a prototype.
 
-**Interface.** Every new text shown to the user needs an Italian translation in `src/i18n.js`: an exact phrase, or a pattern when the text contains numbers or names. The test suite checks the texts of examples, presets and library modules. Check the change at a narrow width (about 375 pixels), on a laptop screen (1280 by 720) and on a large monitor, in both themes, with mouse and with touch emulation. Keep keyboard access working.
+**Interface.** Work inside the part that owns the area, and add a new part only for a new area; the build fails if the bundle does not parse. Every new text shown to the user needs an Italian translation in `src/i18n.js`: an exact phrase, or a pattern when the text contains numbers or names. The test suite checks the texts of examples, presets and library modules. Check the change at a narrow width (about 375 pixels), on a laptop screen (1280 by 720) and on a large monitor, in both themes, with mouse and with touch emulation. Keep keyboard access working.
 
 ## Writing documentation
 

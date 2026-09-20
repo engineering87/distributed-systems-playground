@@ -8,7 +8,9 @@ const { EXAMPLES, PRESETS } = require('../src/examples.js');
 
 const root = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const sources = fs.readdirSync(path.join(root, 'src')).filter(f => f.endsWith('.js')).map(f => 'src/' + f);
+// every source of the application, including the parts of the interface
+const sources = fs.readdirSync(path.join(root, 'src')).filter(f => f.endsWith('.js')).map(f => 'src/' + f)
+  .concat(fs.readdirSync(path.join(root, 'src/ui')).filter(f => f.endsWith('.js')).map(f => 'src/ui/' + f));
 const clone = o => JSON.parse(JSON.stringify(o));
 const scenarioOf = key => clone(EXAMPLES.find(e => e.key === key).scenario);
 
@@ -31,11 +33,14 @@ test('the sources never reinterpret data as HTML or code', () => {
 });
 
 test('data from outside the page is parsed without keys that reach a prototype', () => {
-  const ui = read('src/ui.js');
-  const parses = ui.split('\n').map((l, i) => [l, i + 1]).filter(([l]) => /JSON\.parse\(/.test(l));
-  const bad = parses.filter(([l]) => !/safeParse|reviver|UNSAFE_KEYS/.test(l)).map(([l, n]) => 'src/ui.js:' + n + ' ' + l.trim());
+  const bad = [];
+  for (const f of sources) {
+    read(f).split('\n').forEach((l, i) => {
+      if (/JSON\.parse\(/.test(l) && !/safeParse|reviver|UNSAFE_KEYS/.test(l)) bad.push(f + ':' + (i + 1) + ' ' + l.trim());
+    });
+  }
   assert.deepEqual(bad, [], 'use safeParse for anything that comes from a file, a link or storage');
-  assert.match(ui, /UNSAFE_KEYS = new Set\(\['__proto__', 'constructor', 'prototype'\]\)/);
+  assert.ok(sources.some(f => /UNSAFE_KEYS = new Set\(\['__proto__', 'constructor', 'prototype'\]\)/.test(read(f))));
   assert.match(read('src/runner.js'), /UNSAFE_KEYS/);
 });
 

@@ -4873,6 +4873,9 @@ else root.SimExamples = Examples;
 <script>
 (function () {
 'use strict';
+
+// 01-base.js — state, helpers and small utilities shared by the rest of the interface
+
 const C = window.SimCore, EX = window.SimExamples, LIB = window.SimLibrary;
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -5036,6 +5039,8 @@ function setPath(o, p, v) {
   Object.defineProperty(a, ks[ks.length - 1], { value: v, writable: true, enumerable: true, configurable: true });
 }
 
+// 02-forms.js — field validation and the forms bound to the scenario
+
 // ============================================================ validation
 function validate(kind, v) {
   v = String(v === null || v === undefined ? '' : v).trim();
@@ -5137,6 +5142,8 @@ function markStale() {
 }
 let saveT = 0;
 function scheduleSave() { clearTimeout(saveT); saveT = setTimeout(() => store.set(STORE_KEY, JSON.stringify(S.scn)), 400); }
+
+// 03-editor.js — the code editor: highlighting, diagnostics, symbols and the module menu
 
 // ============================================================ code editor
 const BI = new Set([...C.BUILTIN_VARS, ...Object.keys(C.BUILTIN_FUNS), 'timer']);
@@ -5351,6 +5358,8 @@ function insertModule(key) {
   info.hidden = false;
   info.textContent = m.name + ': ' + m.summary + ' Guarantees: ' + m.properties;
 }
+
+// 04-topology.js — the graph: editing, rendering, animation and the properties bar
 
 // ============================================================ topology
 const svg = () => $('#topo');
@@ -6174,6 +6183,8 @@ function renderFaults() {
     el('button', { type: 'button', class: 'ghost small', onclick: () => { S.scn.faults.splice(i, 1); renderFaults(); markStale(); renderProps(); } }, 'Remove'))));
 }
 
+// 05-results.js — turning a run into the indexes the views read
+
 // ============================================================ results
 function clearResults(msg) {
   stopPlay();
@@ -6313,6 +6324,8 @@ function renderChips() {
   ].filter(Boolean);
   box.append(...items);
 }
+
+// 06-diagram.js — the space-time diagram, its interaction and the causal cone
 
 // ============================================================ space-time diagram
 let ROW = 26, TOP = 26;
@@ -6810,6 +6823,8 @@ function zoomAt(tc, factor) {
   drawDiagram();
 }
 
+// 07-playback.js — playback: cursor, speeds and transport controls
+
 // ============================================================ playback
 // simulated microseconds per real second; null means "event by event"
 function speedSim() {
@@ -6910,6 +6925,8 @@ function bindTransport() {
   $('#follow').addEventListener('change', () => setCursor(S.cursor));
   $('#speed').addEventListener('change', () => { S.seg = null; updatePulse(); renderTopo(); });
 }
+
+// 08-log.js — event log, state inspector and stack view
 
 // ============================================================ event log
 const LOG_MAX = 3000;
@@ -7142,6 +7159,8 @@ function renderStack(force) {
   if (S.res.localTruncated) wrap.append(el('p', { class: 'hint' }, 'The run is long: only its first 200,000 local events were recorded.'));
 }
 
+// 09-preview.js — the delay histogram and the tab switcher
+
 // ============================================================ delay preview
 function drawPreview() {
   if (!S.scn) return;
@@ -7211,6 +7230,8 @@ function setTab(t) {
   if (t === 'time') drawPreview();
   if (t === 'code') refreshCode();
 }
+
+// 10-scenarios.js — export, import, shared links, storage and loading a scenario
 
 // ============================================================ sharing scenarios
 function b64url(u8) {
@@ -7448,6 +7469,8 @@ function bindKeys() {
   });
 }
 
+// 11-images.js — exporting the diagram and the graph as images
+
 // ============================================================ images
 // A recorder with the subset of the Canvas 2D API used by the diagram, producing SVG.
 class SvgPath {
@@ -7601,6 +7624,8 @@ async function exportImage(kind) {
   } catch (e) { msg.textContent = 'Could not create the image: ' + e.message; }
 }
 
+// 12-settings.js — settings, presentation mode, the welcome tour and the gallery
+
 // ============================================================ settings
 const SETTINGS_KEY = 'ds-playground:settings';
 const SET = Object.assign({ theme: 'system', palette: 'standard', lang: 'en' }, (() => {
@@ -7748,6 +7773,8 @@ function bindGallery() {
   $('#btn-img-diagram-png').addEventListener('click', () => exportImage('diagram-png'));
   $('#btn-img-graph-svg').addEventListener('click', () => exportImage('graph-svg'));
 }
+
+// 13-init.js — startup
 
 async function init() {
   readColors();

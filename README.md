@@ -668,7 +668,9 @@ src/
   library.js       communication modules written in Upon
   i18n.js          Italian translation of the interface
   examples.js      example scenarios and timing presets
-  ui.js            interface and animation
+  ui/              the interface, one file per area (state, forms, editor, topology,
+                   results, diagram, playback, log, preview, scenarios, images,
+                   settings, startup), concatenated into one scope at build time
   style.css        light and dark themes
   template.html    page structure
 bin/dsp.mjs        command line tool: run and check scenarios without a browser

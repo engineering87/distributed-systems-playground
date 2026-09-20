@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.9.2]
+
+### Changed
+- The interface source is split into thirteen files under `src/ui/`, one per area, concatenated into a single scope at build time. The build now also fails when the bundled script does not parse.
+
 ## [0.9.1]
 
 ### Added
