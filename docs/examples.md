@@ -14,6 +14,10 @@ For every example this page gives the setup, what to watch, a few experiments, a
 - [Reliable broadcast when the sender crashes](#reliable-broadcast-when-the-sender-crashes)
 - [Causal order broadcast: questions before answers](#causal-order-broadcast-questions-before-answers)
 - [Gossip: spreading a rumor](#gossip-spreading-a-rumor)
+- [Perfect failure detector](#perfect-failure-detector)
+- [Eventual leader election Ω](#eventual-leader-election-ω)
+- [Mutual exclusion, Ricart-Agrawala](#mutual-exclusion-ricart-agrawala)
+- [Two-phase commit and the blocked participants](#two-phase-commit-and-the-blocked-participants)
 - [Empty scenario](#empty-scenario)
 
 ## Flooding broadcast
@@ -167,6 +171,66 @@ p1 spreads a rumor. Each process that hears it for the first time forwards it to
 Try several seeds with the dice button: coverage varies from run to run, which is what *probabilistic* means.
 
 **Keep in mind.** Targets are chosen among neighbors, so the topology shapes the spread. Gossip never retries.
+
+## Perfect failure detector
+
+**Topic:** failure detection with known bounds · **Model:** timed synchronous · **Topology:** complete graph of 4 · **Seed:** 3
+
+Every process sends a heartbeat every 200 ms. A process that hears nothing from a neighbor for longer than `PERIOD + 2·DELTA + PHI` concludes it has crashed, and suspects it forever. p3 crashes at 1 s.
+
+**What to watch.** p1, p2 and p4 suspect p3 within about 220 ms of the crash, and nobody else is ever suspected. The two declared properties say exactly that: *Accuracy* (`always`, no correct process is suspected) and *Completeness* (`eventually`, every crashed process is suspected by every correct one).
+
+**Try this.**
+
+- Raise the delay distribution above `DELTA` in the *Timing* tab. Messages now break the promise the detector relies on, and *Accuracy* is reported broken: the perfect detector is only perfect while the model holds.
+- Lower `GRACE` by editing the parameter. Same effect, from the other side.
+- Compare with the ◇P example: there, a wrong suspicion is withdrawn and the timeout grows; here, a suspicion is final.
+
+**Keep in mind.** The detector is correct only because the model is timed synchronous. Under partial synchrony the same code is wrong, which is why ◇P exists.
+
+## Eventual leader election Ω
+
+**Topic:** the weakest failure detector for consensus · **Model:** partially synchronous, GST at 3 s · **Topology:** complete graph of 5 · **Seed:** 3
+
+Each process suspects the ones it does not hear from, grows its timeout after every mistake, and trusts the smallest process it does not suspect. p1, the natural leader, crashes at 4 s.
+
+**What to watch.** Before GST the trusted leader changes several times, because slow heartbeats look like crashes. After GST the processes settle on p1, and when p1 crashes they move to p2 together. The property *EventualAgreement* asks for the end state: eventually everybody trusts the same process, and that process is correct.
+
+**Try this.**
+
+- Remove the crash: the leader settles and never changes again.
+- Move GST to `8s` and watch how much longer the churn lasts.
+- Crash p2 as well, a second after p1: the leadership moves again, to p3.
+
+**Keep in mind.** Ω never promises when the churn stops, only that it does. A run that ends during the churn says nothing.
+
+## Mutual exclusion, Ricart-Agrawala
+
+**Topic:** coordination without a coordinator · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
+
+A process that wants the critical section stamps its request with a logical clock and asks everybody. A process that receives a request answers at once if it is not interested or if the request is older than its own, and defers the answer otherwise. Whoever collects every answer enters, holds the section for 300 ms, then answers the requests it deferred. p1, p2 and p3 ask within 7 ms of each other.
+
+**What to watch.** The three enter one at a time, in timestamp order, and the property *MutualExclusion* (`always`, at most one process inside) holds throughout. The deferred answers are visible on the diagram as the messages that leave right after each *Exit*.
+
+**Try this.**
+
+- Add `0ms * Acquire` to make everybody ask at the same instant: the tie is broken by process number, which is what the `ts = myTs and from < self` condition is for.
+- Crash a process while it holds the critical section: nobody enters again, and the algorithm gives no way out. That is the price of an algorithm written for a failure-free model.
+- Turn off FIFO channels: the algorithm still holds, because it depends on timestamps, not on order.
+
+## Two-phase commit and the blocked participants
+
+**Topic:** atomic commit and its famous weakness · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
+
+p1 is the coordinator: it asks everybody to prepare, collects the votes, decides and announces the outcome. Everybody votes yes here.
+
+**What to watch.** All four processes report `COMMIT`, and both properties hold: *Agreement* (`always`, nobody decides differently) and *Termination* (`eventually`, every correct process decides).
+
+**Try this.**
+
+- Crash the coordinator at `25ms`, after the votes arrive and before the announcement. Nobody decides: *Agreement* still holds, *Termination* is reported broken. The participants know their own vote and nothing else, and no timeout can help them, because a missing coordinator could have decided either way. This is the blocking problem that three-phase commit and consensus-based commit exist to solve.
+- Crash it at `60ms` instead, after the announcement has left: the others decide normally.
+- Make one participant vote `NO` by editing the `PREPARE` handler, and watch the outcome change to `ABORT`.
 
 ## Empty scenario
 

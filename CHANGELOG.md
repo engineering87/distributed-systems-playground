@@ -6,6 +6,16 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.13.0]
+
+### Added
+- Four algorithms from the catalog, each with the properties it must satisfy: perfect failure detector (P) under timed synchrony, eventual leader election (Ω) under partial synchrony, Ricart-Agrawala mutual exclusion, and two-phase commit with its blocking scenario.
+- New gallery categories: *Coordination* and *Leader election*.
+
+### Changed
+- The README opens the algorithms it can run, with the properties each one checks; the keyboard shortcuts moved to the interface guide.
+- Termination properties are written as "every correct process decided", so that a process crashing after deciding no longer breaks them.
+
 ## [0.12.0]
 
 ### Added

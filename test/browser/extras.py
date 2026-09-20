@@ -57,9 +57,11 @@ async def main():
         check(await pg.evaluate("localStorage.getItem('ds-playground:toured')") == '1', 'tour flag stored')
         # gallery
         await pg.click('#btn-gallery'); cards = await pg.locator('#gallery-grid .card').count()
-        check(cards == 9, f'gallery cards {cards}')
+        expected = await pg.evaluate("window.SimExamples.EXAMPLES.length + 1")   # every example, plus the empty scenario
+        check(cards == expected, f'gallery shows every example: {cards} of {expected}')
         await pg.click('#gallery-filter button:has-text("Broadcast")')
-        check(await pg.locator('#gallery-grid .card').count() == 4, 'gallery filter broadcast')
+        broadcast = await pg.evaluate("window.SimExamples.EXAMPLES.filter(e => e.category === 'Broadcast').length")
+        check(await pg.locator('#gallery-grid .card').count() == broadcast, f'gallery filter broadcast: {broadcast} card(s)')
         await pg.click('#gallery-grid .card:has-text("Gossip")'); await pg.wait_for_timeout(900); await pause()
         check('Village' in await pg.input_value('#top'), 'gallery loads example')
         # presentation

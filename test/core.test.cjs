@@ -638,3 +638,57 @@ test('the new faults are validated', () => {
   assert.deepEqual(C.normalizeFault({ type: 'omission', node: 3, from: '1s' }), { type: 'omission', node: 3, direction: 'both', prob: 1, from: 1000000, to: null });
   assert.equal(C.normalizeFault({ type: 'link', a: 1, b: 2, from: '0ms', oneWay: true }).oneWay, true);
 });
+
+// ---------------------------------------------------------------- catalog examples
+test('the perfect detector suspects the crashed process and nobody else', () => {
+  const r = C.runSimulation(byKey('perfect-detector'));
+  assert.equal(r.error, null);
+  assert.ok(r.properties.every(p => p.ok), JSON.stringify(r.properties));
+  assert.deepEqual([...new Set(r.outputs.map(o => o.args[0]))], ['3'], 'only p3 is suspected');
+  assert.deepEqual([...new Set(r.outputs.map(o => o.node))].sort(), [1, 2, 4], 'by every correct process');
+  assert.ok(r.outputs.every(o => o.t > 1e6 && o.t < 1.5e6), 'within half a second of the crash');
+  // when the network breaks the bound it relies on, the detector stops being perfect
+  const slow = Object.assign(clone(byKey('perfect-detector')), {});
+  slow.actual = Object.assign({}, slow.actual, { delay: 'uniform(5ms, 900ms)', bound: '' });
+  const broken = C.runSimulation(slow);
+  assert.equal(broken.properties.find(p => p.name === 'Accuracy').ok, false, 'a correct process gets suspected');
+});
+
+test('Ω settles on one correct leader, and moves when it crashes', () => {
+  const r = C.runSimulation(byKey('omega-leader'));
+  assert.equal(r.error, null);
+  assert.equal(r.properties[0].name, 'EventualAgreement');
+  assert.equal(r.properties[0].ok, true);
+  const last = {};
+  for (const o of r.outputs) last[o.node] = o.args[0];
+  delete last[1];   // p1 crashed: its own last word does not count
+  assert.deepEqual([...new Set(Object.values(last))], ['2'], 'every correct process ends up trusting p2');
+  const before = r.outputs.filter(o => o.t < 3e6).length;
+  assert.ok(before > 5, 'before GST the trusted leader changes several times: ' + before);
+});
+
+test('Ricart-Agrawala lets one process at a time into the critical section', () => {
+  const r = C.runSimulation(byKey('mutual-exclusion'));
+  assert.equal(r.error, null);
+  assert.equal(r.properties[0].ok, true);
+  const order = r.outputs.filter(o => o.ev === 'Enter').map(o => o.node);
+  assert.deepEqual(order, [1, 2, 3], 'they enter in timestamp order');
+  const events = r.outputs.map(o => o.ev);
+  for (let i = 0; i < events.length; i += 2) assert.deepEqual([events[i], events[i + 1]], ['Enter', 'Exit'], 'never two inside');
+});
+
+test('two-phase commit commits together, and blocks when the coordinator crashes in between', () => {
+  const r = C.runSimulation(byKey('two-phase-commit'));
+  assert.equal(r.error, null);
+  assert.ok(r.properties.every(p => p.ok));
+  assert.deepEqual([...new Set(r.outputs.map(o => o.args[0]))], ['COMMIT']);
+  assert.equal(r.outputs.length, 4, 'every process decides');
+
+  const blocked = C.runSimulation(Object.assign(clone(byKey('two-phase-commit')), { faults: [{ type: 'crash', node: 1, at: '25ms' }] }));
+  assert.equal(blocked.outputs.length, 0, 'nobody decides');
+  assert.equal(blocked.properties.find(p => p.name === 'Agreement').ok, true, 'agreement is not the problem');
+  assert.equal(blocked.properties.find(p => p.name === 'Termination').ok, false, 'the participants are blocked');
+
+  const late = C.runSimulation(Object.assign(clone(byKey('two-phase-commit')), { faults: [{ type: 'crash', node: 1, at: '60ms' }] }));
+  assert.ok(late.properties.every(p => p.ok), 'a crash after the announcement changes nothing');
+});

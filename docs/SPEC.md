@@ -433,7 +433,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.10** | batch runs over many seeds in workers, browser suites in the repository, interface split by area |
 | **v0.11** | generated fault schedules for batch runs |
 | **v0.12** | counterexample minimization |
-| **v1.0** | a test suite saved with the scenario, and the failure detectors of the roadmap below |
+| **v0.13** | catalog algorithms with their properties: P, Ω, mutual exclusion, two-phase commit |
+| **v1.0** | a test suite saved with the scenario |
 | **v1.1** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
 | **v1.2** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |

@@ -4041,6 +4041,15 @@ const P = (re, fn) => PAT.push([re, fn]);
   ['Reliable broadcast when the sender crashes', 'Reliable broadcast con crash del mittente'],
   ['Causal order broadcast: questions before answers', 'Broadcast causale: domande prima delle risposte'],
   ['Gossip: spreading a rumor', 'Gossip: diffondere una voce'],
+  ['Perfect failure detector (timed synchronous)', 'Failure detector perfetto (sincrono temporizzato)'],
+  ['Eventual leader election Ω (partially synchronous)', 'Elezione eventuale del leader Ω (parzialmente sincrono)'],
+  ['Mutual exclusion, Ricart-Agrawala (asynchronous)', 'Mutua esclusione, Ricart-Agrawala (asincrono)'],
+  ['Two-phase commit and the blocked participants', 'Commit a due fasi e i partecipanti bloccati'],
+  ['With known bounds, a missed heartbeat means a crash: nobody correct is ever suspected.', 'Con limiti noti, un heartbeat mancato significa crash: nessun processo corretto viene mai sospettato.'],
+  ['Heartbeats with a growing timeout: after GST everybody trusts the same correct leader.', 'Heartbeat con timeout crescente: dopo GST tutti si fidano dello stesso leader corretto.'],
+  ['Timestamped requests and deferred replies keep two processes out of the critical section.', 'Richieste con timestamp e risposte rinviate tengono due processi fuori dalla sezione critica.'],
+  ['Everybody commits together; crash the coordinator before it announces and the others are blocked.', 'O tutti commettono, o nessuno; se il coordinatore cade prima di annunciare, gli altri restano bloccati.'],
+  ['Coordination', 'Coordinamento'],
   ['Two messages spread across a grid; each process forwards what it has not seen yet.', 'Due messaggi si diffondono su una griglia; ogni processo inoltra ciò che non ha ancora visto.'],
   ['Identifiers travel around a directed ring until the largest one comes back.', 'Gli identificatori girano su un anello orientato finché il più grande non torna indietro.'],
   ['Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.', 'Consenso in f + 1 round, e cosa succede quando i round sono solo un\'ipotesi.'],
@@ -4531,7 +4540,7 @@ property Validity always
 end
 
 property Termination eventually
-  keys(defined(decision)) = correct
+  correct ⊆ keys(defined(decision))
 end
 `;
 
@@ -4854,18 +4863,7 @@ EXAMPLES.push({
   })()
 });
 
-// Gallery metadata
-const META = {
-  'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
-  'chang-roberts': { category: 'Leader election', summary: 'Identifiers travel around a directed ring until the largest one comes back.' },
-  'floodset': { category: 'Consensus', summary: 'Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.' },
-  'epfd': { category: 'Failure detection', summary: 'Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.' },
-  'epfd-partition': { category: 'Failure detection', summary: 'The same detector through a network partition, a crash and a recovery.' },
-  'reliable-broadcast': { category: 'Broadcast', summary: 'The sender crashes on a lossy network; relays make sure every correct process gets the news.' },
-  'causal-broadcast': { category: 'Broadcast', summary: 'Vector clocks keep answers after their questions, even when the network reorders them.' },
-  'gossip': { category: 'Broadcast', summary: 'A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.' }
-};
-for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
+
 
 // Timing model presets: they only change assumed/actual/policy
 const PRESETS = {
@@ -4912,6 +4910,314 @@ const PRESETS = {
     violationPolicy: 'deliver-late'
   }
 };
+
+// ---- examples from the catalog: failure detection, coordination, atomic commit
+const PFD_CODE = `// Perfect failure detector in a timed synchronous system.
+// Every process sends a heartbeat every PERIOD; a process that misses one
+// for longer than the model allows has crashed, and is suspected forever.
+interface FailureDetector
+  indication Suspect(p)
+end
+
+algorithm PerfectDetector
+  implements FailureDetector as fd
+  uses Net as net
+  params
+    PERIOD := 200ms
+    GRACE := PERIOD + 2 * DELTA + PHI
+  state
+    alive := ∅
+    suspected := ∅
+
+  upon event ⟨fd, Init⟩ do
+    alive := Π \\ {self}
+    starttimer(beat, PERIOD)
+    starttimer(check, GRACE)
+  end
+
+  upon event ⟨timer, Timeout | beat⟩ do
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [HEARTBEAT]⟩
+    end
+    starttimer(beat, PERIOD)
+  end
+
+  upon event ⟨net, Deliver | p, [HEARTBEAT]⟩ do
+    alive := alive ∪ {p}
+  end
+
+  upon event ⟨timer, Timeout | check⟩ do
+    forall q in Π \\ {self} where q ∉ alive and q ∉ suspected do
+      suspected := suspected ∪ {q}
+      trigger ⟨fd, Suspect | q⟩
+    end
+    alive := ∅
+    starttimer(check, GRACE)
+  end
+end
+
+// A correct process is never suspected, and every crashed one eventually is.
+property Accuracy always
+  #{p in Π where #(suspected[p] \\ crashed) > 0} = 0
+end
+
+property Completeness eventually
+  #{p in correct where not (crashed ⊆ suspected[p])} = 0
+end
+`;
+const OMEGA_CODE = `// Eventual leader election (Ω) under partial synchrony.
+// Heartbeats with a timeout that grows after every mistake; the leader is the
+// smallest process nobody suspects. After GST every correct process trusts the
+// same correct leader, forever.
+interface Leader
+  indication Trust(p)
+end
+
+algorithm EventualLeader
+  implements Leader as om
+  uses Net as net
+  params
+    PERIOD := 100ms
+    DELTA0 := 100ms
+  state
+    delay := DELTA0
+    alive := ∅
+    suspected := ∅
+    leader := nil
+
+  upon event ⟨om, Init⟩ do
+    starttimer(beat, PERIOD)
+    starttimer(check, delay)
+  end
+
+  upon event ⟨timer, Timeout | beat⟩ do
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [HEARTBEAT]⟩
+    end
+    starttimer(beat, PERIOD)
+  end
+
+  upon event ⟨net, Deliver | p, [HEARTBEAT]⟩ do
+    alive := alive ∪ {p}
+  end
+
+  upon event ⟨timer, Timeout | check⟩ do
+    if #(alive ∩ suspected) > 0 then
+      delay := delay + DELTA0
+      suspected := suspected \\ alive
+    end
+    forall q in Π \\ {self} where q ∉ alive and q ∉ suspected do
+      suspected := suspected ∪ {q}
+    end
+    alive := ∅
+    call elect()
+    starttimer(check, delay)
+  end
+
+  function elect()
+    candidates := Π \\ suspected
+    if #candidates > 0 and leader ≠ min(candidates) then
+      leader := min(candidates)
+      trigger ⟨om, Trust | leader⟩
+    end
+  end
+end
+
+// Eventually every correct process trusts the same process, and it is a correct one.
+property EventualAgreement eventually
+  #toset(values(defined(leader))) = 1 and min(toset(values(defined(leader)))) ∉ crashed
+end
+`;
+const MUTEX_CODE = `// Mutual exclusion, Ricart and Agrawala.
+// A process asks everybody for permission, stamped with a logical clock, and
+// enters the critical section once everybody has answered. A request that is
+// older than mine gets its answer at once; a younger one waits until I leave.
+interface Lock
+  request Acquire()
+  indication Enter()
+  indication Exit()
+end
+
+algorithm RicartAgrawala
+  implements Lock as lock
+  uses Net as net
+  params
+    HOLD := 300ms
+  state
+    clock := 0
+    myTs := nil
+    replies := ∅
+    deferred := ∅
+    inCS := false
+
+  upon event ⟨lock, Acquire⟩ where myTs = nil do
+    clock := clock + 1
+    myTs := clock
+    replies := ∅
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [REQUEST, myTs, self]⟩
+    end
+  end
+
+  upon event ⟨lock, Acquire⟩ where myTs ≠ nil do
+    skip    // already asking
+  end
+
+  upon event ⟨net, Deliver | p, [REQUEST, ts, from]⟩ do
+    clock := max({clock, ts}) + 1
+    if myTs = nil or ts < myTs or (ts = myTs and from < self) then
+      trigger ⟨net, Send | from, [REPLY]⟩
+    else
+      deferred := deferred ∪ {from}
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [REPLY]⟩ do
+    replies := replies ∪ {p}
+  end
+
+  upon condition myTs ≠ nil and not inCS and replies = Π \\ {self} do
+    inCS := true
+    trigger ⟨lock, Enter⟩
+    starttimer(release, HOLD)
+  end
+
+  upon event ⟨timer, Timeout | release⟩ do
+    inCS := false
+    myTs := nil
+    trigger ⟨lock, Exit⟩
+    forall q in deferred do
+      trigger ⟨net, Send | q, [REPLY]⟩
+    end
+    deferred := ∅
+  end
+end
+
+// Never two processes inside the critical section at the same time.
+property MutualExclusion always
+  #{p in Π where inCS[p]} ≤ 1
+end
+`;
+const TWOPC_CODE = `// Two-phase commit. p1 is the coordinator: it asks everybody to prepare,
+// collects the votes and announces the outcome.
+// Crash the coordinator between the votes and the announcement, and the
+// participants are blocked: they know their vote and nothing else.
+interface Transaction
+  request Begin()
+  indication Outcome(d)
+end
+
+algorithm TwoPhaseCommit
+  implements Transaction as tx
+  uses Net as net
+  state
+    votes := map()
+    decision := nil
+
+  upon event ⟨tx, Begin⟩ do
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [PREPARE]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [PREPARE]⟩ do
+    trigger ⟨net, Send | p, [VOTE, YES]⟩
+  end
+
+  upon event ⟨net, Deliver | p, [VOTE, v]⟩ do
+    votes[p] := v
+    if #keys(votes) = N - 1 then
+      if #{q in keys(votes) where votes[q] = NO} > 0 then
+        decision := ABORT
+      else
+        decision := COMMIT
+      end
+      trigger ⟨tx, Outcome | decision⟩
+      forall q in Π \\ {self} do
+        trigger ⟨net, Send | q, [DECISION, decision]⟩
+      end
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [DECISION, d]⟩ do
+    decision := d
+    trigger ⟨tx, Outcome | d⟩
+  end
+end
+
+// Nobody decides differently, and everybody that stays up decides in the end.
+property Agreement always
+  #toset(values(defined(decision))) ≤ 1
+end
+
+property Termination eventually
+  correct ⊆ keys(defined(decision))
+end
+`;
+
+const UNSAFE_KEYS = ['__proto__', 'constructor', 'prototype'];
+const copy = o => JSON.parse(JSON.stringify(o), (k, v) => (UNSAFE_KEYS.includes(k) ? undefined : v));
+function catalogScenario(opts) {
+  const ids = Array.from({ length: opts.n }, (_, i) => i + 1);
+  const preset = PRESETS[opts.preset];
+  return {
+    version: 1, seed: opts.seed, nodes: ringLayout(ids, 330, 230, 165), links: complete(ids),
+    code: opts.code, top: opts.top, inputs: opts.inputs || '', faults: opts.faults || [],
+    preset: opts.preset, assumed: copy(preset.assumed), actual: copy(preset.actual),
+    violationPolicy: preset.violationPolicy, tieBreak: 'stable', stopAt: opts.stopAt
+  };
+}
+
+EXAMPLES.push({
+  key: 'perfect-detector',
+  title: 'Perfect failure detector (timed synchronous)',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'sync-timed', code: PFD_CODE, top: 'PerfectDetector',
+    faults: [{ type: 'crash', node: 3, at: '1s' }], stopAt: '4s'
+  })
+});
+EXAMPLES.push({
+  key: 'omega-leader',
+  title: 'Eventual leader election Ω (partially synchronous)',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'partial', code: OMEGA_CODE, top: 'EventualLeader',
+    faults: [{ type: 'crash', node: 1, at: '4s' }], stopAt: '10s'
+  })
+});
+EXAMPLES.push({
+  key: 'mutual-exclusion',
+  title: 'Mutual exclusion, Ricart-Agrawala (asynchronous)',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: MUTEX_CODE, top: 'RicartAgrawala',
+    inputs: '0ms 1 Acquire\n5ms 2 Acquire\n7ms 3 Acquire', stopAt: '3s'
+  })
+});
+EXAMPLES.push({
+  key: 'two-phase-commit',
+  title: 'Two-phase commit and the blocked participants',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: TWOPC_CODE, top: 'TwoPhaseCommit',
+    inputs: '0ms 1 Begin', stopAt: '2s'
+  })
+});
+
+
+// Gallery metadata
+const META = {
+  'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
+  'chang-roberts': { category: 'Leader election', summary: 'Identifiers travel around a directed ring until the largest one comes back.' },
+  'floodset': { category: 'Consensus', summary: 'Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.' },
+  'epfd': { category: 'Failure detection', summary: 'Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.' },
+  'epfd-partition': { category: 'Failure detection', summary: 'The same detector through a network partition, a crash and a recovery.' },
+  'reliable-broadcast': { category: 'Broadcast', summary: 'The sender crashes on a lossy network; relays make sure every correct process gets the news.' },
+  'causal-broadcast': { category: 'Broadcast', summary: 'Vector clocks keep answers after their questions, even when the network reorders them.' },
+  'gossip': { category: 'Broadcast', summary: 'A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.' },
+  'perfect-detector': { category: 'Failure detection', summary: 'With known bounds, a missed heartbeat means a crash: nobody correct is ever suspected.' },
+  'omega-leader': { category: 'Leader election', summary: 'Heartbeats with a growing timeout: after GST everybody trusts the same correct leader.' },
+  'mutual-exclusion': { category: 'Coordination', summary: 'Timestamped requests and deferred replies keep two processes out of the critical section.' },
+  'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' }
+};
+for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 
 const Examples = { EXAMPLES, PRESETS, ringLayout, complete };
 if (typeof module !== 'undefined' && module.exports) module.exports = Examples;
@@ -8306,7 +8612,7 @@ property Validity always
 end
 
 property Termination eventually
-  keys(defined(decision)) = correct
+  correct ⊆ keys(defined(decision))
 end
 `;
 
@@ -8629,18 +8935,7 @@ EXAMPLES.push({
   })()
 });
 
-// Gallery metadata
-const META = {
-  'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
-  'chang-roberts': { category: 'Leader election', summary: 'Identifiers travel around a directed ring until the largest one comes back.' },
-  'floodset': { category: 'Consensus', summary: 'Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.' },
-  'epfd': { category: 'Failure detection', summary: 'Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.' },
-  'epfd-partition': { category: 'Failure detection', summary: 'The same detector through a network partition, a crash and a recovery.' },
-  'reliable-broadcast': { category: 'Broadcast', summary: 'The sender crashes on a lossy network; relays make sure every correct process gets the news.' },
-  'causal-broadcast': { category: 'Broadcast', summary: 'Vector clocks keep answers after their questions, even when the network reorders them.' },
-  'gossip': { category: 'Broadcast', summary: 'A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.' }
-};
-for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
+
 
 // Timing model presets: they only change assumed/actual/policy
 const PRESETS = {
@@ -8687,6 +8982,314 @@ const PRESETS = {
     violationPolicy: 'deliver-late'
   }
 };
+
+// ---- examples from the catalog: failure detection, coordination, atomic commit
+const PFD_CODE = `// Perfect failure detector in a timed synchronous system.
+// Every process sends a heartbeat every PERIOD; a process that misses one
+// for longer than the model allows has crashed, and is suspected forever.
+interface FailureDetector
+  indication Suspect(p)
+end
+
+algorithm PerfectDetector
+  implements FailureDetector as fd
+  uses Net as net
+  params
+    PERIOD := 200ms
+    GRACE := PERIOD + 2 * DELTA + PHI
+  state
+    alive := ∅
+    suspected := ∅
+
+  upon event ⟨fd, Init⟩ do
+    alive := Π \\ {self}
+    starttimer(beat, PERIOD)
+    starttimer(check, GRACE)
+  end
+
+  upon event ⟨timer, Timeout | beat⟩ do
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [HEARTBEAT]⟩
+    end
+    starttimer(beat, PERIOD)
+  end
+
+  upon event ⟨net, Deliver | p, [HEARTBEAT]⟩ do
+    alive := alive ∪ {p}
+  end
+
+  upon event ⟨timer, Timeout | check⟩ do
+    forall q in Π \\ {self} where q ∉ alive and q ∉ suspected do
+      suspected := suspected ∪ {q}
+      trigger ⟨fd, Suspect | q⟩
+    end
+    alive := ∅
+    starttimer(check, GRACE)
+  end
+end
+
+// A correct process is never suspected, and every crashed one eventually is.
+property Accuracy always
+  #{p in Π where #(suspected[p] \\ crashed) > 0} = 0
+end
+
+property Completeness eventually
+  #{p in correct where not (crashed ⊆ suspected[p])} = 0
+end
+`;
+const OMEGA_CODE = `// Eventual leader election (Ω) under partial synchrony.
+// Heartbeats with a timeout that grows after every mistake; the leader is the
+// smallest process nobody suspects. After GST every correct process trusts the
+// same correct leader, forever.
+interface Leader
+  indication Trust(p)
+end
+
+algorithm EventualLeader
+  implements Leader as om
+  uses Net as net
+  params
+    PERIOD := 100ms
+    DELTA0 := 100ms
+  state
+    delay := DELTA0
+    alive := ∅
+    suspected := ∅
+    leader := nil
+
+  upon event ⟨om, Init⟩ do
+    starttimer(beat, PERIOD)
+    starttimer(check, delay)
+  end
+
+  upon event ⟨timer, Timeout | beat⟩ do
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [HEARTBEAT]⟩
+    end
+    starttimer(beat, PERIOD)
+  end
+
+  upon event ⟨net, Deliver | p, [HEARTBEAT]⟩ do
+    alive := alive ∪ {p}
+  end
+
+  upon event ⟨timer, Timeout | check⟩ do
+    if #(alive ∩ suspected) > 0 then
+      delay := delay + DELTA0
+      suspected := suspected \\ alive
+    end
+    forall q in Π \\ {self} where q ∉ alive and q ∉ suspected do
+      suspected := suspected ∪ {q}
+    end
+    alive := ∅
+    call elect()
+    starttimer(check, delay)
+  end
+
+  function elect()
+    candidates := Π \\ suspected
+    if #candidates > 0 and leader ≠ min(candidates) then
+      leader := min(candidates)
+      trigger ⟨om, Trust | leader⟩
+    end
+  end
+end
+
+// Eventually every correct process trusts the same process, and it is a correct one.
+property EventualAgreement eventually
+  #toset(values(defined(leader))) = 1 and min(toset(values(defined(leader)))) ∉ crashed
+end
+`;
+const MUTEX_CODE = `// Mutual exclusion, Ricart and Agrawala.
+// A process asks everybody for permission, stamped with a logical clock, and
+// enters the critical section once everybody has answered. A request that is
+// older than mine gets its answer at once; a younger one waits until I leave.
+interface Lock
+  request Acquire()
+  indication Enter()
+  indication Exit()
+end
+
+algorithm RicartAgrawala
+  implements Lock as lock
+  uses Net as net
+  params
+    HOLD := 300ms
+  state
+    clock := 0
+    myTs := nil
+    replies := ∅
+    deferred := ∅
+    inCS := false
+
+  upon event ⟨lock, Acquire⟩ where myTs = nil do
+    clock := clock + 1
+    myTs := clock
+    replies := ∅
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [REQUEST, myTs, self]⟩
+    end
+  end
+
+  upon event ⟨lock, Acquire⟩ where myTs ≠ nil do
+    skip    // already asking
+  end
+
+  upon event ⟨net, Deliver | p, [REQUEST, ts, from]⟩ do
+    clock := max({clock, ts}) + 1
+    if myTs = nil or ts < myTs or (ts = myTs and from < self) then
+      trigger ⟨net, Send | from, [REPLY]⟩
+    else
+      deferred := deferred ∪ {from}
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [REPLY]⟩ do
+    replies := replies ∪ {p}
+  end
+
+  upon condition myTs ≠ nil and not inCS and replies = Π \\ {self} do
+    inCS := true
+    trigger ⟨lock, Enter⟩
+    starttimer(release, HOLD)
+  end
+
+  upon event ⟨timer, Timeout | release⟩ do
+    inCS := false
+    myTs := nil
+    trigger ⟨lock, Exit⟩
+    forall q in deferred do
+      trigger ⟨net, Send | q, [REPLY]⟩
+    end
+    deferred := ∅
+  end
+end
+
+// Never two processes inside the critical section at the same time.
+property MutualExclusion always
+  #{p in Π where inCS[p]} ≤ 1
+end
+`;
+const TWOPC_CODE = `// Two-phase commit. p1 is the coordinator: it asks everybody to prepare,
+// collects the votes and announces the outcome.
+// Crash the coordinator between the votes and the announcement, and the
+// participants are blocked: they know their vote and nothing else.
+interface Transaction
+  request Begin()
+  indication Outcome(d)
+end
+
+algorithm TwoPhaseCommit
+  implements Transaction as tx
+  uses Net as net
+  state
+    votes := map()
+    decision := nil
+
+  upon event ⟨tx, Begin⟩ do
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [PREPARE]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [PREPARE]⟩ do
+    trigger ⟨net, Send | p, [VOTE, YES]⟩
+  end
+
+  upon event ⟨net, Deliver | p, [VOTE, v]⟩ do
+    votes[p] := v
+    if #keys(votes) = N - 1 then
+      if #{q in keys(votes) where votes[q] = NO} > 0 then
+        decision := ABORT
+      else
+        decision := COMMIT
+      end
+      trigger ⟨tx, Outcome | decision⟩
+      forall q in Π \\ {self} do
+        trigger ⟨net, Send | q, [DECISION, decision]⟩
+      end
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [DECISION, d]⟩ do
+    decision := d
+    trigger ⟨tx, Outcome | d⟩
+  end
+end
+
+// Nobody decides differently, and everybody that stays up decides in the end.
+property Agreement always
+  #toset(values(defined(decision))) ≤ 1
+end
+
+property Termination eventually
+  correct ⊆ keys(defined(decision))
+end
+`;
+
+const UNSAFE_KEYS = ['__proto__', 'constructor', 'prototype'];
+const copy = o => JSON.parse(JSON.stringify(o), (k, v) => (UNSAFE_KEYS.includes(k) ? undefined : v));
+function catalogScenario(opts) {
+  const ids = Array.from({ length: opts.n }, (_, i) => i + 1);
+  const preset = PRESETS[opts.preset];
+  return {
+    version: 1, seed: opts.seed, nodes: ringLayout(ids, 330, 230, 165), links: complete(ids),
+    code: opts.code, top: opts.top, inputs: opts.inputs || '', faults: opts.faults || [],
+    preset: opts.preset, assumed: copy(preset.assumed), actual: copy(preset.actual),
+    violationPolicy: preset.violationPolicy, tieBreak: 'stable', stopAt: opts.stopAt
+  };
+}
+
+EXAMPLES.push({
+  key: 'perfect-detector',
+  title: 'Perfect failure detector (timed synchronous)',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'sync-timed', code: PFD_CODE, top: 'PerfectDetector',
+    faults: [{ type: 'crash', node: 3, at: '1s' }], stopAt: '4s'
+  })
+});
+EXAMPLES.push({
+  key: 'omega-leader',
+  title: 'Eventual leader election Ω (partially synchronous)',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'partial', code: OMEGA_CODE, top: 'EventualLeader',
+    faults: [{ type: 'crash', node: 1, at: '4s' }], stopAt: '10s'
+  })
+});
+EXAMPLES.push({
+  key: 'mutual-exclusion',
+  title: 'Mutual exclusion, Ricart-Agrawala (asynchronous)',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: MUTEX_CODE, top: 'RicartAgrawala',
+    inputs: '0ms 1 Acquire\n5ms 2 Acquire\n7ms 3 Acquire', stopAt: '3s'
+  })
+});
+EXAMPLES.push({
+  key: 'two-phase-commit',
+  title: 'Two-phase commit and the blocked participants',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: TWOPC_CODE, top: 'TwoPhaseCommit',
+    inputs: '0ms 1 Begin', stopAt: '2s'
+  })
+});
+
+
+// Gallery metadata
+const META = {
+  'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
+  'chang-roberts': { category: 'Leader election', summary: 'Identifiers travel around a directed ring until the largest one comes back.' },
+  'floodset': { category: 'Consensus', summary: 'Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.' },
+  'epfd': { category: 'Failure detection', summary: 'Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.' },
+  'epfd-partition': { category: 'Failure detection', summary: 'The same detector through a network partition, a crash and a recovery.' },
+  'reliable-broadcast': { category: 'Broadcast', summary: 'The sender crashes on a lossy network; relays make sure every correct process gets the news.' },
+  'causal-broadcast': { category: 'Broadcast', summary: 'Vector clocks keep answers after their questions, even when the network reorders them.' },
+  'gossip': { category: 'Broadcast', summary: 'A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.' },
+  'perfect-detector': { category: 'Failure detection', summary: 'With known bounds, a missed heartbeat means a crash: nobody correct is ever suspected.' },
+  'omega-leader': { category: 'Leader election', summary: 'Heartbeats with a growing timeout: after GST everybody trusts the same correct leader.' },
+  'mutual-exclusion': { category: 'Coordination', summary: 'Timestamped requests and deferred replies keep two processes out of the critical section.' },
+  'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' }
+};
+for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 
 const Examples = { EXAMPLES, PRESETS, ringLayout, complete };
 if (typeof module !== 'undefined' && module.exports) module.exports = Examples;

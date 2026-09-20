@@ -48,6 +48,7 @@ Everything runs in the browser from a single HTML file. There is no server to de
 - [What the playground is for](#what-the-playground-is-for)
 - [Features](#features)
 - [Quick start](#quick-start)
+- [Algorithms you can run](#algorithms-you-can-run)
 - [Documentation](#documentation)
 - [A guided tour](#a-guided-tour)
   - [1. Flooding on a grid](#1-flooding-on-a-grid)
@@ -213,24 +214,30 @@ cd distributed-systems-playground
 open index.html        # or double-click the file
 ```
 
-**Keyboard shortcuts**
+Press `?` in the page for the keyboard shortcuts, or read them in [the interface guide](docs/interface.md#keyboard-shortcuts).
 
-Shortcuts work everywhere except while typing in a text field.
+## Algorithms you can run
 
-| Key | Action |
-|---|---|
-| `?` | Show all shortcuts |
-| `P` | Presentation mode |
-| `F` | Full screen |
-| `Page Up` / `Page Down` | Previous or next event (works with presentation clickers) |
-| `Ctrl` / `Cmd` + `Enter` | Run the simulation |
-| `Space` | Play or pause |
-| `←` `→` | Previous or next event |
-| `Home` `End` | Start or end of the run |
-| `V` `N` `L` `D` | Select, add a node, add a link, delete |
-| `Delete` | Remove the selected process or link |
-| `Esc` | Clear the selection |
-| `Ctrl` + mouse wheel on the diagram | Zoom the timeline |
+Every algorithm below ships as a scenario: the code in Upon, a topology, a timing model, the faults, and the properties it must satisfy, checked after every step. Open one from the *Gallery*, press Run, and change something.
+
+| Algorithm | Model | What it shows | Properties checked |
+|---|---|---|---|
+| **Flooding broadcast** | asynchronous | a message spreads over an arbitrary graph, each process forwarding once | — |
+| **Chang-Roberts election** | asynchronous | the largest identifier travels a directed ring and comes back | — |
+| **FloodSet consensus** | synchronous rounds | consensus in f + 1 rounds, and what happens when the rounds are only an assumption | agreement, validity, termination |
+| **Perfect failure detector (P)** | timed synchronous | with known bounds a missed heartbeat means a crash, and nobody correct is ever suspected | accuracy, completeness |
+| **◇P failure detector** | partially synchronous | a growing timeout: wrong suspicions before GST, a crash detected after | — |
+| **◇P through a partition** | partially synchronous | each side of a partition sees the other as crashed, then a crash and a recovery | — |
+| **Ω, eventual leader** | partially synchronous | the churn before GST, and one correct leader afterwards, the same for everybody | eventual agreement on a correct leader |
+| **Reliable broadcast** | asynchronous, lossy | the sender crashes mid-broadcast; relays save the message | — |
+| **Causal order broadcast** | asynchronous, reordering | vector clocks keep answers after their questions | — |
+| **Gossip** | asynchronous | a rumor over random neighbors: reach against cost | — |
+| **Ricart-Agrawala mutual exclusion** | asynchronous | timestamps and deferred replies, with no coordinator | mutual exclusion |
+| **Two-phase commit** | asynchronous | everybody commits together, and the participants block when the coordinator crashes in between | agreement, termination |
+
+Ten more algorithms come as **library modules** you can build on, written in the same language: stubborn, perfect and FIFO links, best-effort, reliable, uniform reliable, FIFO, causal and probabilistic broadcast. See [the module library](docs/library.md).
+
+Each example is described in [Examples](docs/examples.md), with what to watch and experiments to try. To ask whether an algorithm holds in general rather than in one run, use the batch runs described in [the interface guide](docs/interface.md#batch-runs) or the [command line](docs/cli.md).
 
 ## Documentation
 
@@ -639,6 +646,10 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Reliable broadcast when the sender crashes | asynchronous, 40% loss | complete graph of 5 | Switch to best-effort broadcast and compare who reads the news. |
 | Causal order broadcast | asynchronous, no FIFO | complete graph of 5 | Switch to reliable broadcast and find the answers read before their questions. |
 | Gossip | asynchronous | 16 processes, 4 neighbors each | Change `FANOUT` and `ROUNDS` and compare reach and cost. |
+| Perfect failure detector | timed synchronous | complete graph of 4 | Raise the delays above `DELTA` and watch accuracy break. |
+| Eventual leader election Ω | partially synchronous | complete graph of 5 | Crash the second leader too and follow the handover. |
+| Mutual exclusion, Ricart-Agrawala | asynchronous | complete graph of 4 | Make everybody ask at the same instant and see how the tie is broken. |
+| Two-phase commit | asynchronous | complete graph of 4 | Crash the coordinator at `25ms` and watch the participants block. |
 
 The *Example* menu also offers an empty scenario to start from.
 
