@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.12.0]
+
+### Added
+- Shrinking of a counterexample: a generated schedule that breaks a property is reduced to the faults that still produce the same failure, then shortened. Available as **minimize** next to a failing seed in the *Scenario* tab, and as `--minimize` on the command line.
+
 ## [0.11.2]
 
 ### Security

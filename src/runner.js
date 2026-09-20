@@ -243,6 +243,81 @@ function aggregate(runs) {
   };
 }
 
+// ---------------------------------------------------------------- shrinking a counterexample
+// What went wrong in a run, as a comparable string: minimizing must keep the same failure, not any failure.
+function failureSignature(summary) {
+  const parts = summary.properties.filter(p => !p.ok).map(p => 'property:' + p.name).sort();
+  if (!summary.ok) parts.push('error');
+  if (summary.assertions) parts.push('assertion');
+  return parts.join(',');
+}
+
+function runWith(scenario, seed, faults) {
+  const scn = clone(scenario);
+  scn.seed = seed;
+  scn.faults = (scn.faults || []).concat(clone(faults));
+  return summarize(C.runSimulation(scn), seed);
+}
+
+// Shrinks a fault schedule to the part that still produces the same failure: first by dropping faults one by
+// one, then by shortening the ones that last for a while and by lowering omission probabilities. Every step
+// is a whole simulation, so the number of them is capped.
+function minimize(scenario, opts) {
+  opts = opts || {};
+  const seed = opts.seed !== undefined ? opts.seed : scenario.seed || 1;
+  const maxRuns = opts.maxRuns || 200;
+  const base = clone(scenario);
+  let faults = clone(opts.faults || []);
+  let runs = 0;
+  const fails = candidate => {
+    if (runs >= maxRuns) return false;
+    runs++;
+    return failureSignature(runWith(base, seed, candidate)) === signature;
+  };
+  const first = runWith(base, seed, faults);
+  runs++;
+  const signature = failureSignature(first);
+  if (!signature) return { ok: false, reason: 'this run does not fail: there is nothing to shrink', faults, runs, signature: '' };
+
+  // 1. drop faults, repeatedly, until no single one can be removed
+  let changed = true;
+  while (changed && runs < maxRuns) {
+    changed = false;
+    for (let i = 0; i < faults.length; i++) {
+      const without = faults.slice(0, i).concat(faults.slice(i + 1));
+      if (fails(without)) { faults = without; changed = true; break; }
+    }
+  }
+  // 2. shorten what is left: a fault that lasts, and an omission that drops less, are easier to read
+  const dur = v => { try { return C.parseDuration(v); } catch (e) { return null; } };
+  for (let i = 0; i < faults.length && runs < maxRuns; i++) {
+    const f = faults[i];
+    if (f.from !== undefined && f.to) {
+      let from = dur(f.from), to = dur(f.to);
+      if (from === null || to === null) continue;
+      for (let step = 0; step < 6 && runs < maxRuns && to - from > 1000; step++) {
+        const shorter = Object.assign({}, f, { to: C.fmtDuration(from + Math.round((to - from) / 2)) });
+        const candidate = faults.slice();
+        candidate[i] = shorter;
+        if (!fails(candidate)) break;
+        faults = candidate;
+        to = dur(shorter.to);
+      }
+    }
+    if (faults[i].type === 'omission' && faults[i].prob > 0.1) {
+      for (let step = 0; step < 4 && runs < maxRuns; step++) {
+        const lower = Object.assign({}, faults[i], { prob: Math.round(faults[i].prob * 50) / 100 });
+        if (lower.prob < 0.05) break;
+        const candidate = faults.slice();
+        candidate[i] = lower;
+        if (!fails(candidate)) break;
+        faults = candidate;
+      }
+    }
+  }
+  return { ok: true, faults, runs, signature, removed: (opts.faults || []).length - faults.length };
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -275,7 +350,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);

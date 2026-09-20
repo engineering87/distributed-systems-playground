@@ -3,8 +3,12 @@
 'use strict';
 /*__WORKER_LIBS__*/
 self.onmessage = function (e) {
-  const { scenario, seed } = e.data;
+  const { scenario, seed, minimize } = e.data;
   try {
+    if (minimize) {
+      self.postMessage(Object.assign({ seed, minimized: true }, SimRunner.minimize(scenario, { seed, faults: minimize })));
+      return;
+    }
     const res = SimRunner.runBatch(scenario, { seeds: [seed] });
     self.postMessage(res.runs[0]);
   } catch (err) {

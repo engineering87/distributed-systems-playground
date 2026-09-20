@@ -4190,7 +4190,10 @@ M('Seeds', 'Semi'); M('Faults per run', 'Guasti per esecuzione'); M('Generated f
 M('Window', 'Finestra'); M('When the generated faults happen', 'Quando avvengono i guasti generati');
 M('Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1',
   'Guasti estratti dal seme di ogni esecuzione: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
-M('none', 'nessuno'); M('Open this run', 'Apri questa esecuzione');
+M('none', 'nessuno'); M('minimize', 'riduci'); M('shrinking…', 'riduzione…');
+M('Find the faults that are enough to produce this failure', 'Trova i guasti che bastano a produrre questo problema');
+M('This run could not be shrunk.', 'Questa esecuzione non si è potuta ridurre.');
+P(/^(\d+) faults reduced to (\d+) in (\d+) runs\.$/, m => m[1] + ' guasti ridotti a ' + m[2] + ' in ' + m[3] + ' esecuzioni.'); M('Open this run', 'Apri questa esecuzione');
 M('Open this run, with its generated faults', 'Apri questa esecuzione, con i suoi guasti generati');
 P(/^Added the faults of seed (\d+) to the scenario\.$/, m => 'Aggiunti allo scenario i guasti del seme ' + m[1] + '.'); M('Run over seeds', 'Esegui sui semi'); M('Seeds to run', 'Semi da eseguire'); M('Stop', 'Ferma');
 M('Open this run', 'Apri questa esecuzione'); M('stopped', 'fermato'); M('all clean', 'tutto a posto');
@@ -5162,6 +5165,81 @@ function aggregate(runs) {
   };
 }
 
+// ---------------------------------------------------------------- shrinking a counterexample
+// What went wrong in a run, as a comparable string: minimizing must keep the same failure, not any failure.
+function failureSignature(summary) {
+  const parts = summary.properties.filter(p => !p.ok).map(p => 'property:' + p.name).sort();
+  if (!summary.ok) parts.push('error');
+  if (summary.assertions) parts.push('assertion');
+  return parts.join(',');
+}
+
+function runWith(scenario, seed, faults) {
+  const scn = clone(scenario);
+  scn.seed = seed;
+  scn.faults = (scn.faults || []).concat(clone(faults));
+  return summarize(C.runSimulation(scn), seed);
+}
+
+// Shrinks a fault schedule to the part that still produces the same failure: first by dropping faults one by
+// one, then by shortening the ones that last for a while and by lowering omission probabilities. Every step
+// is a whole simulation, so the number of them is capped.
+function minimize(scenario, opts) {
+  opts = opts || {};
+  const seed = opts.seed !== undefined ? opts.seed : scenario.seed || 1;
+  const maxRuns = opts.maxRuns || 200;
+  const base = clone(scenario);
+  let faults = clone(opts.faults || []);
+  let runs = 0;
+  const fails = candidate => {
+    if (runs >= maxRuns) return false;
+    runs++;
+    return failureSignature(runWith(base, seed, candidate)) === signature;
+  };
+  const first = runWith(base, seed, faults);
+  runs++;
+  const signature = failureSignature(first);
+  if (!signature) return { ok: false, reason: 'this run does not fail: there is nothing to shrink', faults, runs, signature: '' };
+
+  // 1. drop faults, repeatedly, until no single one can be removed
+  let changed = true;
+  while (changed && runs < maxRuns) {
+    changed = false;
+    for (let i = 0; i < faults.length; i++) {
+      const without = faults.slice(0, i).concat(faults.slice(i + 1));
+      if (fails(without)) { faults = without; changed = true; break; }
+    }
+  }
+  // 2. shorten what is left: a fault that lasts, and an omission that drops less, are easier to read
+  const dur = v => { try { return C.parseDuration(v); } catch (e) { return null; } };
+  for (let i = 0; i < faults.length && runs < maxRuns; i++) {
+    const f = faults[i];
+    if (f.from !== undefined && f.to) {
+      let from = dur(f.from), to = dur(f.to);
+      if (from === null || to === null) continue;
+      for (let step = 0; step < 6 && runs < maxRuns && to - from > 1000; step++) {
+        const shorter = Object.assign({}, f, { to: C.fmtDuration(from + Math.round((to - from) / 2)) });
+        const candidate = faults.slice();
+        candidate[i] = shorter;
+        if (!fails(candidate)) break;
+        faults = candidate;
+        to = dur(shorter.to);
+      }
+    }
+    if (faults[i].type === 'omission' && faults[i].prob > 0.1) {
+      for (let step = 0; step < 4 && runs < maxRuns; step++) {
+        const lower = Object.assign({}, faults[i], { prob: Math.round(faults[i].prob * 50) / 100 });
+        if (lower.prob < 0.05) break;
+        const candidate = faults.slice();
+        candidate[i] = lower;
+        if (!fails(candidate)) break;
+        faults = candidate;
+      }
+    }
+  }
+  return { ok: true, faults, runs, signature, removed: (opts.faults || []).length - faults.length };
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -5194,7 +5272,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);
@@ -8860,6 +8938,81 @@ function aggregate(runs) {
   };
 }
 
+// ---------------------------------------------------------------- shrinking a counterexample
+// What went wrong in a run, as a comparable string: minimizing must keep the same failure, not any failure.
+function failureSignature(summary) {
+  const parts = summary.properties.filter(p => !p.ok).map(p => 'property:' + p.name).sort();
+  if (!summary.ok) parts.push('error');
+  if (summary.assertions) parts.push('assertion');
+  return parts.join(',');
+}
+
+function runWith(scenario, seed, faults) {
+  const scn = clone(scenario);
+  scn.seed = seed;
+  scn.faults = (scn.faults || []).concat(clone(faults));
+  return summarize(C.runSimulation(scn), seed);
+}
+
+// Shrinks a fault schedule to the part that still produces the same failure: first by dropping faults one by
+// one, then by shortening the ones that last for a while and by lowering omission probabilities. Every step
+// is a whole simulation, so the number of them is capped.
+function minimize(scenario, opts) {
+  opts = opts || {};
+  const seed = opts.seed !== undefined ? opts.seed : scenario.seed || 1;
+  const maxRuns = opts.maxRuns || 200;
+  const base = clone(scenario);
+  let faults = clone(opts.faults || []);
+  let runs = 0;
+  const fails = candidate => {
+    if (runs >= maxRuns) return false;
+    runs++;
+    return failureSignature(runWith(base, seed, candidate)) === signature;
+  };
+  const first = runWith(base, seed, faults);
+  runs++;
+  const signature = failureSignature(first);
+  if (!signature) return { ok: false, reason: 'this run does not fail: there is nothing to shrink', faults, runs, signature: '' };
+
+  // 1. drop faults, repeatedly, until no single one can be removed
+  let changed = true;
+  while (changed && runs < maxRuns) {
+    changed = false;
+    for (let i = 0; i < faults.length; i++) {
+      const without = faults.slice(0, i).concat(faults.slice(i + 1));
+      if (fails(without)) { faults = without; changed = true; break; }
+    }
+  }
+  // 2. shorten what is left: a fault that lasts, and an omission that drops less, are easier to read
+  const dur = v => { try { return C.parseDuration(v); } catch (e) { return null; } };
+  for (let i = 0; i < faults.length && runs < maxRuns; i++) {
+    const f = faults[i];
+    if (f.from !== undefined && f.to) {
+      let from = dur(f.from), to = dur(f.to);
+      if (from === null || to === null) continue;
+      for (let step = 0; step < 6 && runs < maxRuns && to - from > 1000; step++) {
+        const shorter = Object.assign({}, f, { to: C.fmtDuration(from + Math.round((to - from) / 2)) });
+        const candidate = faults.slice();
+        candidate[i] = shorter;
+        if (!fails(candidate)) break;
+        faults = candidate;
+        to = dur(shorter.to);
+      }
+    }
+    if (faults[i].type === 'omission' && faults[i].prob > 0.1) {
+      for (let step = 0; step < 4 && runs < maxRuns; step++) {
+        const lower = Object.assign({}, faults[i], { prob: Math.round(faults[i].prob * 50) / 100 });
+        if (lower.prob < 0.05) break;
+        const candidate = faults.slice();
+        candidate[i] = lower;
+        if (!fails(candidate)) break;
+        faults = candidate;
+      }
+    }
+  }
+  return { ok: true, faults, runs, signature, removed: (opts.faults || []).length - faults.length };
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -8892,14 +9045,18 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);
 
 self.onmessage = function (e) {
-  const { scenario, seed } = e.data;
+  const { scenario, seed, minimize } = e.data;
   try {
+    if (minimize) {
+      self.postMessage(Object.assign({ seed, minimized: true }, SimRunner.minimize(scenario, { seed, faults: minimize })));
+      return;
+    }
     const res = SimRunner.runBatch(scenario, { seeds: [seed] });
     self.postMessage(res.runs[0]);
   } catch (err) {
@@ -11895,12 +12052,31 @@ function runBatch(scenario, seeds, onRun, onDone, faultsFor) {
   return { cancel() { cancelled = true; } };
 }
 
+// Shrinks the schedule of one run to the faults that still produce the same failure. One worker, or the
+// page itself where workers are refused.
+function minimizeRun(r, done) {
+  const scenario = clone(S.scn);
+  const url = batchWorkerUrl();
+  if (url) {
+    let w = null;
+    try { w = new Worker(url); } catch (e) { w = null; }
+    if (w) {
+      w.onmessage = e => { w.terminate(); done(e.data); };
+      w.onerror = () => { w.terminate(); done(null); };
+      w.postMessage({ scenario, seed: r.seed, minimize: r.faults });
+      return;
+    }
+  }
+  setTimeout(() => done(window.SimRunner.minimize(scenario, { seed: r.seed, faults: r.faults })), 0);
+}
 let batchHandle = null;
 function parseSeedSpec(text) {
   try { return window.SimRunner.seedList(text.trim() || '1'); }
   catch (e) { return null; }
 }
+let lastRuns = [], lastSeeds = [];
 function renderBatchResults(runs, seeds) {
+  lastRuns = runs; lastSeeds = seeds;
   const box = $('#batch-results');
   box.textContent = '';
   if (!runs.length) return;
@@ -11933,7 +12109,26 @@ function renderBatchResults(runs, seeds) {
         onclick: () => openBatchRun(r)
       }, 'seed ' + r.seed),
       el('span', { class: r.ok && !broken.length && !r.assertions ? '' : 'bad' }, ' ' + what),
-      el('span', { class: 'hint' }, faults ? '  ' + faults : '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs')));
+      el('span', { class: 'hint' }, faults ? '  ' + faults : '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs'),
+      (r.faults || []).length > 1 && (!r.ok || r.propertyFailures || r.assertions)
+        ? el('button', {
+          type: 'button', class: 'link', title: 'Find the faults that are enough to produce this failure',
+          onclick: ev => {
+            const b = ev.target;
+            b.disabled = true;
+            b.textContent = 'shrinking…';
+            minimizeRun(r, res => {
+              b.disabled = false;
+              b.textContent = 'minimize';
+              if (!res || !res.ok) { toast('This run could not be shrunk.'); return; }
+              const was = r.faults.length;
+              r.faults = res.faults;
+              toast(was + ' faults reduced to ' + res.faults.length + ' in ' + res.runs + ' runs.');
+              renderBatchResults(lastRuns, lastSeeds);
+            });
+          }
+        }, 'minimize')
+        : null));
   }
   box.append(list);
   if (shown.length > 60) box.append(el('p', { class: 'hint' }, 'showing the first 60 of ' + shown.length + '.'));

@@ -122,6 +122,8 @@ Write the seeds as `1..50`, `7`, or `1,4,9`, press **Run over seeds**, and the r
 - for each declared [property](language.md#properties), in how many runs it held and the first seed that broke it;
 - a list of the runs with a problem, or of all of them when there is none.
 
+Runs that failed with more than one generated fault also offer **minimize**: it shrinks the schedule to the faults that still produce the same failure, usually turning four into one, and shows the result in place.
+
 Click a seed to load that run in the page, with everything in place to watch what happened. **Stop** ends a batch early.
 
 The runs use Web Workers, as many as a few cores allow, each with its own copy of the engine. Where a browser does not allow them, for example when the page is opened from disk in some configurations, the batch falls back to running one seed at a time on the page, still without freezing it.

@@ -295,7 +295,10 @@ M('Seeds', 'Semi'); M('Faults per run', 'Guasti per esecuzione'); M('Generated f
 M('Window', 'Finestra'); M('When the generated faults happen', 'Quando avvengono i guasti generati');
 M('Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1',
   'Guasti estratti dal seme di ogni esecuzione: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
-M('none', 'nessuno'); M('Open this run', 'Apri questa esecuzione');
+M('none', 'nessuno'); M('minimize', 'riduci'); M('shrinking…', 'riduzione…');
+M('Find the faults that are enough to produce this failure', 'Trova i guasti che bastano a produrre questo problema');
+M('This run could not be shrunk.', 'Questa esecuzione non si è potuta ridurre.');
+P(/^(\d+) faults reduced to (\d+) in (\d+) runs\.$/, m => m[1] + ' guasti ridotti a ' + m[2] + ' in ' + m[3] + ' esecuzioni.'); M('Open this run', 'Apri questa esecuzione');
 M('Open this run, with its generated faults', 'Apri questa esecuzione, con i suoi guasti generati');
 P(/^Added the faults of seed (\d+) to the scenario\.$/, m => 'Aggiunti allo scenario i guasti del seme ' + m[1] + '.'); M('Run over seeds', 'Esegui sui semi'); M('Seeds to run', 'Semi da eseguire'); M('Stop', 'Ferma');
 M('Open this run', 'Apri questa esecuzione'); M('stopped', 'fermato'); M('all clean', 'tutto a posto');

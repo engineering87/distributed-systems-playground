@@ -208,3 +208,53 @@ test('the command line accepts a fault plan and reports the schedule that broke 
     return true;
   });
 });
+
+test('a failing schedule is shrunk to the faults that still produce the same failure', () => {
+  const scn = scenarioOf('floodset');
+  const batch = R.runBatch(scn, { seeds: '1..20', faults: 'crash:1,partition:1,pause:1,omission:1', faultWindow: '0..2s' });
+  const broken = batch.runs.find(r => r.propertyFailures);
+  assert.ok(broken, 'the plan breaks a property in some seed');
+  assert.equal(broken.faults.length, 4);
+
+  const m = R.minimize(scn, { seed: broken.seed, faults: broken.faults });
+  assert.equal(m.ok, true);
+  assert.ok(m.faults.length < broken.faults.length, 'something was removed');
+  assert.equal(m.removed, broken.faults.length - m.faults.length);
+  assert.ok(m.runs > 1 && m.runs <= 200, 'it ran a bounded number of simulations: ' + m.runs);
+
+  // what is left still produces the same failure, and it is the same when run again
+  const again = R.minimize(scn, { seed: broken.seed, faults: broken.faults });
+  assert.deepEqual(again.faults, m.faults, 'shrinking is deterministic');
+  const repeat = C.runSimulation(Object.assign(scenarioOf('floodset'), {
+    seed: broken.seed, faults: scenarioOf('floodset').faults.concat(m.faults)
+  }));
+  assert.equal(R.failureSignature(R.summarize(repeat, broken.seed)), m.signature);
+
+  // removing the last fault must stop the failure, otherwise it was not minimal
+  for (let i = 0; i < m.faults.length; i++) {
+    const without = m.faults.slice(0, i).concat(m.faults.slice(i + 1));
+    const res = C.runSimulation(Object.assign(scenarioOf('floodset'), {
+      seed: broken.seed, faults: scenarioOf('floodset').faults.concat(without)
+    }));
+    assert.notEqual(R.failureSignature(R.summarize(res, broken.seed)), m.signature, 'fault ' + i + ' is necessary');
+  }
+});
+
+test('shrinking a run that does not fail says so, and respects its budget', () => {
+  const scn = scenarioOf('floodset');
+  const none = R.minimize(scn, { seed: 1, faults: [] });
+  assert.equal(none.ok, false);
+  assert.match(none.reason, /does not fail/);
+  const capped = R.minimize(scn, { seed: 1, faults: [{ type: 'partition', groups: '1 2', from: '0ms', to: '2s' }], maxRuns: 2 });
+  assert.ok(capped.runs <= 2);
+});
+
+test('the command line can shrink the schedules it generated', () => {
+  // a broken property is an exit code of 1, so the output arrives through the error
+  assert.throws(() => cli('run', '--example', 'floodset', '--seeds', '1..6', '--faults',
+    'crash:1,partition:1,pause:1,omission:1', '--fault-window', '0..2s', '--minimize', '--quiet'), e => {
+    assert.equal(e.status, 1);
+    assert.match(e.stdout, /seed \d+: \d of 4 fault\(s\) are enough \(\d+ runs\)/);
+    return true;
+  });
+});

@@ -72,12 +72,31 @@ function runBatch(scenario, seeds, onRun, onDone, faultsFor) {
   return { cancel() { cancelled = true; } };
 }
 
+// Shrinks the schedule of one run to the faults that still produce the same failure. One worker, or the
+// page itself where workers are refused.
+function minimizeRun(r, done) {
+  const scenario = clone(S.scn);
+  const url = batchWorkerUrl();
+  if (url) {
+    let w = null;
+    try { w = new Worker(url); } catch (e) { w = null; }
+    if (w) {
+      w.onmessage = e => { w.terminate(); done(e.data); };
+      w.onerror = () => { w.terminate(); done(null); };
+      w.postMessage({ scenario, seed: r.seed, minimize: r.faults });
+      return;
+    }
+  }
+  setTimeout(() => done(window.SimRunner.minimize(scenario, { seed: r.seed, faults: r.faults })), 0);
+}
 let batchHandle = null;
 function parseSeedSpec(text) {
   try { return window.SimRunner.seedList(text.trim() || '1'); }
   catch (e) { return null; }
 }
+let lastRuns = [], lastSeeds = [];
 function renderBatchResults(runs, seeds) {
+  lastRuns = runs; lastSeeds = seeds;
   const box = $('#batch-results');
   box.textContent = '';
   if (!runs.length) return;
@@ -110,7 +129,26 @@ function renderBatchResults(runs, seeds) {
         onclick: () => openBatchRun(r)
       }, 'seed ' + r.seed),
       el('span', { class: r.ok && !broken.length && !r.assertions ? '' : 'bad' }, ' ' + what),
-      el('span', { class: 'hint' }, faults ? '  ' + faults : '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs')));
+      el('span', { class: 'hint' }, faults ? '  ' + faults : '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs'),
+      (r.faults || []).length > 1 && (!r.ok || r.propertyFailures || r.assertions)
+        ? el('button', {
+          type: 'button', class: 'link', title: 'Find the faults that are enough to produce this failure',
+          onclick: ev => {
+            const b = ev.target;
+            b.disabled = true;
+            b.textContent = 'shrinking…';
+            minimizeRun(r, res => {
+              b.disabled = false;
+              b.textContent = 'minimize';
+              if (!res || !res.ok) { toast('This run could not be shrunk.'); return; }
+              const was = r.faults.length;
+              r.faults = res.faults;
+              toast(was + ' faults reduced to ' + res.faults.length + ' in ' + res.runs + ' runs.');
+              renderBatchResults(lastRuns, lastSeeds);
+            });
+          }
+        }, 'minimize')
+        : null));
   }
   box.append(list);
   if (shown.length > 60) box.append(el('p', { class: 'hint' }, 'showing the first 60 of ' + shown.length + '.'));

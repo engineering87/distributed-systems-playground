@@ -52,6 +52,23 @@ async def main():
         faults_after = len((await pg.inner_text('#faults')).split('Remove')) - 1
         check(faults_after == faults_before + 1, f'opening a seed adds its schedule to the scenario ({faults_before} -> {faults_after})')
         check('Agreement' in await pg.inner_text('#chips') or 'properties' in await pg.inner_text('#chips'), 'the reopened run is simulated')
+        # shrinking the schedule of a failing seed
+        await pg.fill('#batch-faults','crash:1,partition:1,pause:1,omission:1'); await pg.fill('#batch-window','0..2s')
+        await pg.click('#btn-batch')
+        for _ in range(160):
+            if '20 run(s)' in await pg.inner_text('#batch-progress'): break
+            await pg.wait_for_timeout(250)
+        mini = pg.locator('#batch-results button:has-text("minimize")')
+        check(await mini.count() > 0, 'failing seeds offer to shrink their schedule')
+        before = await pg.inner_text('#batch-results')
+        await mini.first.click()
+        for _ in range(60):
+            if 'reduced to' in await pg.inner_text('#toast'): break
+            await pg.wait_for_timeout(250)
+        toast = await pg.inner_text('#toast')
+        check('reduced to' in toast, 'schedule shrunk: ' + toast)
+        after = await pg.inner_text('#batch-results')
+        check(after != before, 'the shown schedule is updated after shrinking')
         for f in ['#batch-faults']: await pg.fill(f, 'nope:1')
         await pg.click('#btn-batch')
         check('Unknown fault plan' in await pg.inner_text('#toast'), 'bad fault plan reported: ' + await pg.inner_text('#toast'))

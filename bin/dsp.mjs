@@ -35,6 +35,8 @@ Options:
                         crash:1, partition:1, pause:1, link:1, omission:1, recover:1
                         (combine them: --faults crash:1,partition:1)
   --fault-window <w>    when those faults happen, 0..3s by default
+  --minimize            for each run that failed, shrink its generated schedule
+                        to the faults that still produce the same failure
   --stop-on-failure     stop at the first run that fails or breaks a property
   --outcomes            group the runs by the outputs they produced
   --outputs             print the outputs of every run
@@ -67,7 +69,8 @@ function parseArgs(argv) {
       const eq = kv.indexOf('=');
       if (eq < 1) fail('Expected --set path=value, found ' + kv);
       out.set[kv.slice(0, eq)] = kv.slice(eq + 1);
-    } else if (a === '--stop-on-failure') out.stopOnFailure = true;
+    } else if (a === '--minimize') out.minimize = true;
+    else if (a === '--stop-on-failure') out.stopOnFailure = true;
     else if (a === '--outcomes') out.outcomes = true;
     else if (a === '--outputs') out.outputs = true;
     else if (a === '--json') out.json = true;
@@ -158,6 +161,18 @@ function cmdRun(args) {
       faults: args.faults, faultWindow: args.faultWindow
     });
   } catch (e) { fail(e.message); }
+  if (args.minimize) {
+    for (const r of res.runs) {
+      if (!r.faults.length || (r.ok && !r.propertyFailures && !r.assertions)) continue;
+      const m = R.minimize(res.scenario, { seed: r.seed, faults: r.faults });
+      r.minimized = m.ok ? m.faults : null;
+      if (m.ok && !args.json) {
+        process.stdout.write('seed ' + r.seed + ': ' + m.faults.length + ' of ' + r.faults.length +
+          ' fault(s) are enough (' + m.runs + ' runs)\n');
+        for (const f of m.faults) process.stdout.write('       ' + R.describePlanFault(f) + '\n');
+      }
+    }
+  }
   if (args.json) {
     process.stdout.write(JSON.stringify({ summary: res.summary, runs: res.runs, ms: res.ms }, null, 2) + '\n');
   } else {

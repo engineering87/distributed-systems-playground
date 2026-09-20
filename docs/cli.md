@@ -49,6 +49,7 @@ took 24 ms
 | `--set <path=value>` | change one scenario field, repeatable |
 | `--faults <plan>` | add generated faults to every run, drawn from its seed |
 | `--fault-window <w>` | when those faults happen, `0..3s` by default |
+| `--minimize` | shrink the schedule of every run that failed |
 | `--stop-on-failure` | stop at the first run that fails |
 | `--outputs` | print the outputs of every run |
 | `--outcomes` | group the runs by the outputs they produced |
@@ -85,6 +86,24 @@ property Agreement       (always)      held in 16/20 run(s), first broken at see
 Combine them with commas: `--faults crash:1,partition:1`. The window accepts `0..3s` or a single duration, which is read as `0..that`.
 
 This is the fastest way to ask a real question about an algorithm. FloodSet keeps agreement under one crash, as it should with f = 1; one random partition breaks it in about a fifth of the seeds, and a single omitting process breaks it now and then.
+
+## Shrinking a counterexample
+
+A generated schedule that breaks a property usually contains faults that had nothing to do with it. `--minimize` removes them:
+
+```sh
+node bin/dsp.mjs run --example floodset --seeds 1..6 \
+  --faults crash:1,partition:1,pause:1,omission:1 --fault-window 0..2s --minimize
+```
+
+```text
+seed 1: 1 of 4 fault(s) are enough (7 runs)
+       p4 omits receive (0.72) 215 ms–1.915 s
+```
+
+The four faults of that run become one: a single process dropping part of what it receives is enough to make FloodSet disagree. Shrinking drops faults one at a time while the run keeps failing **in the same way** (the same properties broken, the same error, the same failed assertions), then shortens what is left and lowers omission probabilities. Each attempt is a whole simulation, and the number of them is capped, so it stays quick.
+
+The same button is in the page, next to the failing seeds of a batch.
 
 ## Properties across a batch
 
@@ -191,6 +210,7 @@ A summary holds what a batch needs and not the whole trace: counts of messages b
 ## What it does not do yet
 
 - **Properties are checked, not proved.** Global invariants are evaluated on the runs of the batch: more executions than a single run, never all of them. See the roadmap in the [specification](SPEC.md#10-roadmap).
-- **Schedules are random, not systematic.** `--faults` draws a schedule per seed; it does not enumerate the interesting ones. Reducing a failing schedule to its essential faults is the next step.
+- **Schedules are random, not systematic.** `--faults` draws a schedule per seed; it does not enumerate the interesting ones.
+- **Shrinking is greedy.** It removes faults one at a time and shortens what remains; it does not search for a different, smaller schedule that would fail for the same reason.
 - **Runs are sequential.** The tool runs one seed at a time in one process. It is fast enough for a few hundred runs of a small scenario; the interface will run batches in parallel workers.
 - **One run is one execution.** A batch explores more executions than a single run, never all of them. See [Assumptions and simplifications](assumptions.md#what-the-playground-is-not).
