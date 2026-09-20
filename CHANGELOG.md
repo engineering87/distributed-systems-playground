@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.11.2]
+
+### Security
+- The version check compares plain strings instead of building a regular expression from the version number, which only escaped dots. A guard test now fails if any regular expression is built from data.
+
 ## [0.11.1]
 
 ### Security

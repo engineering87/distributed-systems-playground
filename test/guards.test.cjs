@@ -35,6 +35,16 @@ test('the sources never reinterpret data as HTML or code', () => {
   assert.deepEqual(problems, []);
 });
 
+test('regular expressions are never built from data', () => {
+  const problems = [];
+  for (const f of sources.concat(tooling)) {
+    read(f).split('\n').forEach((line, i) => {
+      if (/new RegExp\(/.test(line)) problems.push(f + ':' + (i + 1) + ' ' + line.trim());
+    });
+  }
+  assert.deepEqual(problems, [], 'compare strings, or write the pattern as a literal');
+});
+
 test('HTML is never filtered with a regular expression, in the sources or in the tooling', () => {
   const problems = [];
   for (const f of sources.concat(tooling)) {
@@ -59,7 +69,8 @@ test('data from outside the page is parsed without keys that reach a prototype',
 
 test('the version is the same everywhere and has a changelog entry', () => {
   const version = JSON.parse(read('package.json')).version;
-  assert.match(read('CITATION.cff'), new RegExp('version: "' + version.replace(/\./g, '\\.') + '"'));
+  // plain text comparisons: a version built into a regular expression would need escaping to be right
+  assert.ok(read('CITATION.cff').includes('version: "' + version + '"'), 'CITATION.cff does not carry ' + version);
   assert.ok(read('CHANGELOG.md').includes('## [' + version + ']'), 'CHANGELOG.md has no section for ' + version);
 });
 
