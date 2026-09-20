@@ -1,0 +1,44 @@
+# Browser suites
+
+These check the application itself: the controls, the visuals, the layouts and the defenses. The Node suites
+(`npm test`) cover the engine, the runner, the documentation and the language; everything that needs a page
+lives here.
+
+## Running them
+
+```sh
+pip install playwright
+playwright install chromium
+python test/browser/run_all.py              # every suite
+python test/browser/run_all.py commands     # one of them
+```
+
+They run against `index.html` in the repository, so build first if you changed anything in `src/`:
+
+```sh
+npm run build && python test/browser/run_all.py
+```
+
+`DSP_INDEX` points them somewhere else (another file, or a URL), `DSP_OUT` chooses where screenshots and
+downloaded files go (`test/browser/out` by default, which is not committed).
+
+## The suites
+
+| Suite | What it checks |
+|---|---|
+| `commands` | every control of the interface: examples, tools, generators, properties panel, tabs, forms, playback, diagram, log, shortcuts, import and export, shared links, storage |
+| `features` | the module library, the stack view, layer colors and the causality mode |
+| `extras` | settings, themes, the palette for color vision deficiency, the Italian interface, presentation mode, the welcome tour, the gallery and image export |
+| `props` | global properties: counters, the log filter, the diagnostics and the translation |
+| `faults` | one-way link failures, process pauses and omissions: form, log, drawing and injection at the cursor |
+| `security` | markup typed in the editor, prototype pollution from imports, links and storage, what a saved file contains, and what an exported image may carry |
+| `touch` | a phone: taps, dragging a process, scrolling over the graph, target sizes and dialogs |
+| `layout` | eleven screen sizes, from 320×640 to 2560×1440: overflow, clipping and touch target sizes |
+| `perf` | frames per second and long tasks during playback, including a complete graph of 40 processes |
+
+`layout` and `perf` report measurements: the runner does not fail on their numbers, but it prints them.
+
+## Writing a new one
+
+Start from an existing file. Keep the shape: a list of `check(condition, message)` calls, a `print` of the
+page errors at the end, and no assumption about where the file is run from (`common.py` resolves paths).

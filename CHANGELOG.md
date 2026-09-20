@@ -6,6 +6,16 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.9.1]
+
+### Added
+- The browser suites live in `test/browser/` and run with `npm run test:browser`: 233 checks over controls, library, settings, properties, faults, security, touch, layouts and playback speed. A separate CI job runs them on every push.
+- Guard tests: no assignment of data to `innerHTML`, no `eval`, no markup cleaned up with regular expressions, external JSON parsed without keys that reach a prototype.
+- A test that the version is the same in `package.json` and `CITATION.cff` and has a changelog entry.
+- A test that the numbers quoted in the documentation still match what the engine produces.
+- Fuzzing of the parser and the checker over three thousand malformed programs.
+- A test that the interface is fully translated, blocks included.
+
 ## [0.9.0]
 
 ### Added

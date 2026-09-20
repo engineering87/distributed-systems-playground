@@ -19,3 +19,14 @@ jobs:
           node-version: 20
       - run: npm test
       - run: npm run check
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright
+      - run: playwright install --with-deps chromium
+      - run: python test/browser/run_all.py

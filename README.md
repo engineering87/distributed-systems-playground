@@ -685,7 +685,8 @@ manual/            generated documentation site
 Requires Node.js 18 or later. There are no dependencies to install.
 
 ```sh
-npm test         # run the test suite
+npm test         # engine, library, language, guards, documentation
+npm run test:browser   # the interface, with Playwright (pip install playwright)
 npm run dsp -- run --example floodset --seeds 1..8 --outcomes   # run scenarios from a terminal
 npm run build    # rebuild index.html and the documentation site
 npm run check    # fail if index.html or manual/ is out of date
@@ -779,7 +780,7 @@ Issues and pull requests are welcome. Useful contributions include:
 The workflow and the writing guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a pull request, run:
 
 ```sh
-npm test && npm run build && npm run check
+npm test && npm run build && npm run check && npm run test:browser
 ```
 
 ## References

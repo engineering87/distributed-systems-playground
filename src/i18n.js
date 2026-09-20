@@ -457,5 +457,5 @@ function setLang(l) {
 }
 function t(s) { if (lang !== 'it') return s; const r = tr(s); return r === null || r === undefined ? s : r; }
 
-root.SimI18n = { setLang, t, lang: () => lang, _tr: tr };
+root.SimI18n = { setLang, t, lang: () => lang, _tr: tr, _blocks: () => Object.keys(BLOCKS) };
 })(typeof self !== 'undefined' ? self : this);

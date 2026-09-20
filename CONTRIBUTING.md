@@ -12,6 +12,16 @@ cd distributed-systems-playground
 npm test
 ```
 
+The suites that need a page are separate, because they need a browser:
+
+```sh
+pip install playwright && playwright install chromium
+npm run build && npm run test:browser
+```
+
+Both run in CI on every push. `npm test` covers the engine, the runner, the language, the documentation and
+the translations; `npm run test:browser` covers the interface. Details in [test/browser/README.md](test/browser/README.md).
+
 Open `index.html` in a browser to use the application.
 
 ## How the code is organized
@@ -29,7 +39,8 @@ Open `index.html` in a browser to use the application.
 | `src/template.html` | page structure | |
 | `scripts/build.mjs` | bundles `src/` into `index.html` | |
 | `scripts/build-docs.mjs` | generates the documentation site in `manual/` | no dependencies; supports the Markdown used in `docs/` |
-| `test/` | tests for the engine, the library, the examples and the documentation | |
+| `test/` | Node tests: engine, library, examples, guards, translations, documentation |
+| `test/browser/` | Playwright suites for the interface, one file per area | |
 | `docs/` | documentation | see [Writing documentation](#writing-documentation) |
 
 `index.html` and `manual/` are generated but committed, so that GitHub Pages can serve the repository as it is. After changing anything in `src/` or `docs/`:
