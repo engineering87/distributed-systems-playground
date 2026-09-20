@@ -19,6 +19,8 @@ pip install playwright && playwright install chromium
 npm run build && npm run test:browser
 ```
 
+`DSP_BROWSER=firefox` or `DSP_BROWSER=webkit` runs the same suites on another engine.
+
 Both run in CI on every push. `npm test` covers the engine, the runner, the language, the documentation and
 the translations; `npm run test:browser` covers the interface. Details in [test/browser/README.md](test/browser/README.md).
 

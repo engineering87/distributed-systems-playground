@@ -550,6 +550,16 @@ body.present .pk text { font-size: 12px; }
   body.present .app { grid-template-rows: minmax(0, 1fr) clamp(220px, 36vh, 560px); }
 }
 
+/* ---------- batch runs ---------- */
+#batch-results { margin-top: 8px; }
+.batch-summary, .batch-prop { margin: 2px 0; font-size: 13.5px; }
+.batch-prop.bad b, .batch-summary .bad { color: var(--red); }
+.batch-summary .good { color: var(--green); }
+.batch-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 220px; overflow: auto; font-size: 13px; }
+.batch-list li { padding: 2px 0; border-bottom: 1px solid var(--grid); display: flex; gap: 8px; align-items: baseline; }
+.batch-list .bad { color: var(--red); }
+.batch-list .hint { margin-left: auto; white-space: nowrap; }
+
 </style>
 </head>
 <body data-timing="asynchronous">
@@ -799,6 +809,15 @@ uses PerfectLinks as pl via AckLinks</pre>
       <div class="row">
         <label class="field"><span>Simulated duration</span><input data-bind="stopAt" data-kind="dur" class="narrow"></label>
         <label class="check"><input type="checkbox" data-bind="haltOnAssert"> Stop at the first failed assertion</label>
+
+    <h3>Run over many seeds</h3>
+    <p class="hint">The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.</p>
+    <div class="row">
+      <label class="field inline"><span>Seeds</span><input id="batch-seeds" value="1..50" class="narrow" aria-label="Seeds to run"></label>
+      <button type="button" id="btn-batch" class="ghost">Run over seeds</button>
+      <span id="batch-progress" class="hint"></span>
+    </div>
+    <div id="batch-results"></div>
       </div>
     </div>
 
@@ -4162,6 +4181,25 @@ const LIBTXT = {
 P(/^(\w+): (.+?) Guarantees: (.+)$/, m => LIBTXT[m[2]] ? m[1] + ': ' + LIBTXT[m[2]] + ' Garanzie: ' + (LIBTXT[m[3]] || m[3]) : null);
 M('Links', 'Collegamenti');
 M('or', 'o');
+M('Run over many seeds', 'Esecuzione su molti semi');
+M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
+  'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
+M('Seeds', 'Semi'); M('Run over seeds', 'Esegui sui semi'); M('Seeds to run', 'Semi da eseguire'); M('Stop', 'Ferma');
+M('Open this run', 'Apri questa esecuzione'); M('stopped', 'fermato'); M('all clean', 'tutto a posto');
+M('Seeds look like 1..50, or 3, or 1,4,9.', 'I semi si scrivono come 1..50, oppure 3, oppure 1,4,9.');
+M('That is a lot of seeds: try at most 500.', 'Sono molti semi: al massimo 500.');
+P(/^(\d+) \/ (\d+)$/, m => null);
+P(/^(\d+) of (\d+) run\(s\), $/, m => m[1] + ' di ' + m[2] + ' esecuzioni, ');
+P(/^(\d+) with a problem$/, m => m[1] + ' con un problema');
+P(/^(\d+) run\(s\) in ([\d.]+) s$/, m => m[1] + ' esecuzioni in ' + m[2] + ' s');
+P(/^ \((always|eventually)\) held in (\d+)\/(\d+) run\(s\)(, first broken at seed (\d+))?$/, m =>
+  ' (' + (m[1] === 'always' ? 'sempre' : 'prima o poi') + ') vale in ' + m[2] + '/' + m[3] + ' esecuzioni' + (m[5] ? ', prima rottura al seme ' + m[5] : ''));
+P(/^seed (\d+)$/, m => 'seme ' + m[1]);
+P(/^ (\w+(?:, \w+)*) broken$/, m => ' ' + m[1] + ' violata');
+P(/^ (\d+) violation\(s\)$/, m => ' ' + m[1] + ' violazioni');
+P(/^ (\d+) failed assertion\(s\)$/, m => ' ' + m[1] + ' asserzioni violate');
+P(/^  (\d+) messages, (\d+) outputs$/, m => '  ' + m[1] + ' messaggi, ' + m[2] + ' output');
+P(/^showing the first 60 of (\d+)\.$/, m => 'mostrate le prime 60 di ' + m[1] + '.');
 M('Process pause', 'Pausa di processo'); M('Omission', 'Omissione'); M('One way', 'Unidirezionale');
 M('Only the messages from the first process to the second are lost', 'Si perdono solo i messaggi dal primo processo al secondo');
 M('Omits', 'Omette'); M('sends and receives', 'invii e ricezioni'); M('sends', 'invii'); M('receives', 'ricezioni');
@@ -4868,6 +4906,3786 @@ const Examples = { EXAMPLES, PRESETS, ringLayout, complete };
 if (typeof module !== 'undefined' && module.exports) module.exports = Examples;
 else root.SimExamples = Examples;
 })(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+/* Distributed Systems Playground — batch runner.
+   Runs a scenario many times without touching the page: several seeds, several variants, compact summaries.
+   Used by the command line tool, by the test suite, and (later) by the worker pool of the interface. */
+(function (root) {
+'use strict';
+
+const C = (typeof module !== 'undefined' && module.exports) ? require('./core.js') : root.SimCore;
+const EX = (typeof module !== 'undefined' && module.exports) ? require('./examples.js') : root.SimExamples;
+
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function clone(o) { return JSON.parse(JSON.stringify(o), (k, v) => (UNSAFE_KEYS.has(k) ? undefined : v)); }
+
+// "actual.loss=0.3" style overrides, applied to a copy of the scenario
+function applyOverride(scn, path, value) {
+  const ks = String(path).split('.');
+  if (ks.some(k => !k || UNSAFE_KEYS.has(k))) throw new Error('Invalid property path: ' + path);
+  let a = scn;
+  for (let i = 0; i < ks.length - 1; i++) {
+    if (a[ks[i]] === null || typeof a[ks[i]] !== 'object') a[ks[i]] = {};
+    a = a[ks[i]];
+  }
+  const last = ks[ks.length - 1];
+  const n = Number(value);
+  a[last] = (value === 'true' || value === 'false') ? value === 'true'
+    : (value !== '' && Number.isFinite(n) && String(n) === String(value).trim()) ? n
+      : value;
+  return scn;
+}
+
+// seeds: [1, 2, 3] or "1..50" or { from, to }
+function seedList(seeds) {
+  if (Array.isArray(seeds)) return seeds.map(Number);
+  if (typeof seeds === 'string') {
+    const m = /^(\d+)\s*\.\.\s*(\d+)$/.exec(seeds.trim());
+    if (m) return seedList({ from: +m[1], to: +m[2] });
+    if (/^\d+(\s*,\s*\d+)*$/.test(seeds.trim())) return seeds.split(',').map(s => +s.trim());
+    throw new Error('Invalid seed list: ' + seeds);
+  }
+  if (seeds && typeof seeds === 'object') {
+    const from = +seeds.from, to = +seeds.to;
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) throw new Error('Invalid seed range');
+    if (to - from > 10000) throw new Error('Too many seeds: ' + (to - from + 1));
+    const out = [];
+    for (let s = from; s <= to; s++) out.push(s);
+    return out;
+  }
+  return [1];
+}
+
+// A compact view of one run: enough to compare runs, small enough to keep thousands of them.
+function summarize(res, seed) {
+  const msgs = res.msgs || [];
+  const byStatus = {};
+  for (const m of msgs) byStatus[m.status] = (byStatus[m.status] || 0) + 1;
+  const outputs = (res.outputs || []).map(o => ({ t: o.t, node: o.node, ev: o.ev, args: o.args.slice(), text: o.text }));
+  return {
+    seed,
+    ok: !res.error && (!res.compile || !res.compile.errors.length),
+    error: res.error || null,
+    errorLine: res.errorLine || null,
+    compileErrors: res.compile ? res.compile.errors.map(e => ({ line: e.line, msg: e.msg })) : [],
+    warnings: (res.warnings || []).slice(),
+    stopReason: res.stopReason || null,
+    endT: res.endT || 0,
+    eventCount: res.eventCount || 0,
+    messages: msgs.length,
+    byStatus,
+    delivered: byStatus.delivered || 0,
+    lost: msgs.length - (byStatus.delivered || 0) - (byStatus.pending || 0),
+    violations: res.violations || 0,
+    assertions: (res.log || []).filter(e => e.kind === 'assert').length,
+    properties: (res.properties || []).map(p => ({ name: p.name, kind: p.kind, ok: p.ok, at: p.at, node: p.node, error: p.error })),
+    propertyFailures: (res.properties || []).filter(p => !p.ok).length,
+    outputs,
+    outputCount: outputs.length,
+    nodesWithOutput: new Set(outputs.map(o => o.node)).size
+  };
+}
+
+// Runs the same scenario over several seeds. `onRun` is called with each summary as soon as it is ready,
+// which lets a caller stream progress; returning false from it stops the batch.
+function runBatch(scenario, opts) {
+  opts = opts || {};
+  const base = clone(scenario);
+  for (const [path, value] of Object.entries(opts.set || {})) applyOverride(base, path, value);
+  if (opts.preset) {
+    const preset = EX.PRESETS[opts.preset];
+    if (!preset) throw new Error('Unknown preset: ' + opts.preset + ' (available: ' + Object.keys(EX.PRESETS).join(', ') + ')');
+    Object.assign(base, { assumed: clone(preset.assumed), actual: clone(preset.actual), violationPolicy: preset.violationPolicy, preset: opts.preset });
+  }
+  const seeds = seedList(opts.seeds !== undefined ? opts.seeds : base.seed || 1);
+  const runs = [];
+  const started = Date.now();
+  for (const seed of seeds) {
+    const scn = clone(base);
+    scn.seed = seed;
+    const summary = summarize(C.runSimulation(scn), seed);
+    runs.push(summary);
+    if (opts.onRun && opts.onRun(summary, runs.length, seeds.length) === false) break;
+    if (opts.stopOnFailure && (!summary.ok || summary.propertyFailures)) break;
+  }
+  return { scenario: base, runs, summary: aggregate(runs), ms: Date.now() - started };
+}
+
+function aggregate(runs) {
+  const n = runs.length || 1;
+  const sum = k => runs.reduce((a, r) => a + r[k], 0);
+  const failed = runs.filter(r => !r.ok);
+  const withViolations = runs.filter(r => r.violations > 0);
+  const withAssertions = runs.filter(r => r.assertions > 0);
+  const withPropertyFailures = runs.filter(r => r.propertyFailures > 0);
+  const byProperty = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = byProperty[p.name] = byProperty[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  return {
+    runs: runs.length,
+    failed: failed.length,
+    firstFailure: failed.length ? failed[0].seed : null,
+    withViolations: withViolations.length,
+    firstViolation: withViolations.length ? withViolations[0].seed : null,
+    withAssertions: withAssertions.length,
+    firstAssertion: withAssertions.length ? withAssertions[0].seed : null,
+    withPropertyFailures: withPropertyFailures.length,
+    firstPropertyFailure: withPropertyFailures.length ? withPropertyFailures[0].seed : null,
+    properties: Object.values(byProperty),
+    avgMessages: +(sum('messages') / n).toFixed(1),
+    avgDelivered: +(sum('delivered') / n).toFixed(1),
+    avgLost: +(sum('lost') / n).toFixed(1),
+    avgViolations: +(sum('violations') / n).toFixed(2),
+    avgOutputs: +(sum('outputCount') / n).toFixed(1),
+    avgEvents: Math.round(sum('eventCount') / n)
+  };
+}
+
+// Groups the runs by the values the processes produced, which is the usual question asked of a batch:
+// "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
+function outcomes(runs, pick) {
+  const key = pick || (o => o.text);
+  const groups = new Map();
+  for (const r of runs) {
+    const values = r.outputs.map(key).sort();
+    const k = JSON.stringify(values);
+    if (!groups.has(k)) groups.set(k, { values, seeds: [], count: 0 });
+    const g = groups.get(k);
+    g.count++;
+    if (g.seeds.length < 10) g.seeds.push(r.seed);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+// Compile-only check, for a quick "does this program make sense in this model?"
+function checkScenario(scenario) {
+  const scn = clone(scenario);
+  let prog;
+  try { prog = C.parseProgram(scn.code || ''); }
+  catch (e) { return { ok: false, errors: [{ line: e.line || null, msg: e.message }], warnings: [] }; }
+  const assumed = scn.assumed || {};
+  const known = {
+    DELTA: assumed.DELTA && assumed.DELTA !== 'unknown' ? C.parseDuration(assumed.DELTA) : null,
+    PHI: assumed.PHI && assumed.PHI !== 'unknown' ? C.parseDuration(assumed.PHI) : null,
+    RHO: assumed.RHO && assumed.RHO !== 'unknown' ? Number(assumed.RHO) : null
+  };
+  const res = C.check(prog, { timing: assumed.timing || 'asynchronous', roundMode: (scn.actual && scn.actual.roundMode) || 'lockstep', known });
+  return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
+}
+
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario };
+if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
+else root.SimRunner = Runner;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script id="worker-src" type="text/plain">
+/* Distributed Systems Playground — batch worker.
+   Runs one simulation per message, with the same engine as the page. It never touches the DOM. */
+'use strict';
+/* Distributed Systems Playground — simulator core (no DOM dependencies) */
+(function (root) {
+'use strict';
+
+// ============================================================
+// Errors
+// ============================================================
+class DslError extends Error {
+  constructor(msg, line, col) { super(msg); this.line = line || 0; this.col = col || 0; }
+}
+
+// ============================================================
+// Durations and distributions
+// ============================================================
+const UNIT = { us: 1, ms: 1000, s: 1000000 };
+
+function parseDuration(str) {
+  if (str === null || str === undefined) return null;
+  const s = String(str).trim();
+  if (s === '' || s === 'none' || s === 'unknown') return null;
+  const m = /^(-?\d+(?:\.\d+)?(?:e-?\d+)?)\s*(us|ms|s)?$/i.exec(s);
+  if (!m) throw new Error('Invalid duration: "' + s + '" (examples: 50ms, 2s, 300us)');
+  const unit = (m[2] || 'ms').toLowerCase();
+  return Math.round(parseFloat(m[1]) * UNIT[unit]);
+}
+
+function fmtDuration(us) {
+  if (us === null || us === undefined) return '—';
+  const a = Math.abs(us);
+  const trim = s => s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s;
+  if (a >= 1e6) return trim((us / 1e6).toFixed(a >= 1e7 ? 1 : 3)) + ' s';
+  if (a >= 1e3) return trim((us / 1e3).toFixed(a >= 1e5 ? 0 : 2)) + ' ms';
+  return us + ' µs';
+}
+
+// Distributions: unitless arguments are milliseconds, except shape parameters.
+// dimensionless=true: arguments are plain numbers (e.g. clock drift rho).
+const DIST_SHAPE = {
+  const: ['d'], uniform: ['d', 'd'], exp: ['d'], normal: ['d', 'd'],
+  lognormal: ['x', 'x'], pareto: ['d', 'x'], empirical: null
+};
+
+function parseDist(str, dimensionless) {
+  const s = String(str).trim();
+  const m = /^([a-z]+)\s*\(([^)]*)\)$/i.exec(s);
+  if (!m) {
+    // a plain number or duration = constant
+    if (dimensionless) {
+      const v = parseFloat(s);
+      if (isNaN(v)) throw new Error('Invalid value: "' + s + '"');
+      return { name: 'const', args: [v], src: s };
+    }
+    return { name: 'const', args: [parseDuration(s)], src: s };
+  }
+  const name = m[1].toLowerCase();
+  if (!(name in DIST_SHAPE)) throw new Error('Unknown distribution: ' + name +
+    ' (available: const, uniform, exp, normal, lognormal, pareto, empirical)');
+  const raw = m[2].split(',').map(x => x.trim()).filter(x => x !== '');
+  const shape = DIST_SHAPE[name];
+  if (shape && raw.length !== shape.length)
+    throw new Error(name + ' takes ' + shape.length + ' argument(s)');
+  const args = raw.map((a, i) => {
+    const kind = shape ? shape[i] : 'd';
+    if (dimensionless || kind === 'x') {
+      const v = parseFloat(a);
+      if (isNaN(v)) throw new Error('Invalid argument in ' + name + ': ' + a);
+      return v;
+    }
+    return parseDuration(a);
+  });
+  return { name, args, src: s };
+}
+
+function sampleDist(d, rng) {
+  const a = d.args;
+  switch (d.name) {
+    case 'const': return a[0];
+    case 'uniform': return a[0] + (a[1] - a[0]) * rng.next();
+    case 'exp': return -a[0] * Math.log(1 - rng.next());
+    case 'normal': return a[0] + a[1] * rng.gauss();
+    case 'lognormal': return Math.exp(a[0] + a[1] * rng.gauss()) * 1000; // mu,sigma in log(ms)
+    case 'pareto': return a[0] / Math.pow(1 - rng.next(), 1 / a[1]);
+    case 'empirical': return a[Math.floor(rng.next() * a.length)];
+  }
+  return 0;
+}
+
+// ============================================================
+// Deterministic PRNG: xoshiro128** with substreams derived via splitmix32
+// ============================================================
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+function splitmix32(a) {
+  return function () {
+    a |= 0; a = (a + 0x9e3779b9) | 0;
+    let t = a ^ (a >>> 16); t = Math.imul(t, 0x21f0aaad);
+    t = t ^ (t >>> 15); t = Math.imul(t, 0x735a2d97);
+    return ((t = t ^ (t >>> 15)) >>> 0);
+  };
+}
+class Rng {
+  constructor(seed, stream) {
+    const sm = splitmix32((seed >>> 0) ^ fnv1a(stream));
+    this.s = [sm(), sm(), sm(), sm()];
+    if (!(this.s[0] | this.s[1] | this.s[2] | this.s[3])) this.s[0] = 1;
+    this._g = null;
+  }
+  u32() {
+    const s = this.s;
+    const r = Math.imul(rotl(Math.imul(s[1], 5), 7), 9);
+    const t = s[1] << 11;
+    s[2] ^= s[0]; s[3] ^= s[1]; s[1] ^= s[2]; s[0] ^= s[3];
+    s[2] ^= t; s[3] = rotl(s[3], 11);
+    return r >>> 0;
+  }
+  next() { return this.u32() / 4294967296; }
+  gauss() {
+    if (this._g !== null) { const g = this._g; this._g = null; return g; }
+    let u = 0; while (u === 0) u = this.next();
+    const v = this.next();
+    const r = Math.sqrt(-2 * Math.log(u));
+    this._g = r * Math.sin(2 * Math.PI * v);
+    return r * Math.cos(2 * Math.PI * v);
+  }
+  int(a, b) { return a + Math.floor(this.next() * (b - a + 1)); }
+}
+function rotl(x, k) { return (x << k) | (x >>> (32 - k)); }
+class Streams {
+  constructor(seed) { this.seed = seed >>> 0; this.map = new Map(); }
+  get(name) {
+    let r = this.map.get(name);
+    if (!r) { r = new Rng(this.seed, name); this.map.set(name, r); }
+    return r;
+  }
+}
+
+// ============================================================
+// Values (immutable)
+// ============================================================
+class Atom { constructor(name) { this.name = name; } }
+class Tup { constructor(items) { this.items = items; } }
+class VSet {
+  constructor(entries) { this.m = entries || new Map(); this._sorted = null; }
+  static of(arr) { const m = new Map(); for (const v of arr) m.set(key(v), v); return new VSet(m); }
+  sorted() { if (!this._sorted) this._sorted = [...this.m.values()].sort(compare); return this._sorted; }
+  get size() { return this.m.size; }
+}
+class VMap {
+  constructor(entries) { this.m = entries || new Map(); this._sorted = null; }
+  sorted() { if (!this._sorted) this._sorted = [...this.m.values()].sort((a, b) => compare(a[0], b[0])); return this._sorted; }
+  get size() { return this.m.size; }
+}
+const atomCache = new Map();
+function atom(name) { let a = atomCache.get(name); if (!a) { a = new Atom(name); atomCache.set(name, a); } return a; }
+
+function key(v) {
+  if (v === null || v === undefined) return 'z';
+  switch (typeof v) {
+    case 'number': return 'n' + v;
+    case 'boolean': return v ? 'bT' : 'bF';
+    case 'string': return 's' + JSON.stringify(v);
+  }
+  if (v._k !== undefined) return v._k;
+  let k;
+  if (v instanceof Atom) k = 'a' + v.name;
+  else if (v instanceof Tup) k = 't[' + v.items.map(key).join(',') + ']';
+  else if (v instanceof VSet) k = 'S{' + v.sorted().map(key).join(',') + '}';
+  else if (v instanceof VMap) k = 'M{' + v.sorted().map(e => key(e[0]) + ':' + key(e[1])).join(',') + '}';
+  else k = '?';
+  Object.defineProperty(v, '_k', { value: k, enumerable: false });
+  return k;
+}
+function rank(v) {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'boolean') return 1;
+  if (typeof v === 'number') return 2;
+  if (typeof v === 'string') return 3;
+  if (v instanceof Atom) return 4;
+  if (v instanceof Tup) return 5;
+  if (v instanceof VSet) return 6;
+  if (v instanceof VMap) return 7;
+  return 8;
+}
+function compare(a, b) {
+  const ra = rank(a), rb = rank(b);
+  if (ra !== rb) return ra - rb;
+  switch (ra) {
+    case 0: return 0;
+    case 1: return (a ? 1 : 0) - (b ? 1 : 0);
+    case 2: return a < b ? -1 : a > b ? 1 : 0;
+    case 3: return a < b ? -1 : a > b ? 1 : 0;
+    case 4: return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+    case 5: return cmpList(a.items, b.items);
+    case 6: return cmpList(a.sorted(), b.sorted());
+    case 7: return cmpList(a.sorted().map(e => new Tup(e)), b.sorted().map(e => new Tup(e)));
+  }
+  return 0;
+}
+function cmpList(x, y) {
+  const n = Math.min(x.length, y.length);
+  for (let i = 0; i < n; i++) { const c = compare(x[i], y[i]); if (c) return c; }
+  return x.length - y.length;
+}
+function eq(a, b) { return a === b || key(a) === key(b); }
+
+function fmt(v) {
+  if (v === null || v === undefined) return 'nil';
+  switch (typeof v) {
+    case 'number': return String(v);
+    case 'boolean': return v ? 'true' : 'false';
+    case 'string': return JSON.stringify(v);
+  }
+  if (v instanceof Atom) return v.name;
+  if (v instanceof Tup) return '[' + v.items.map(fmt).join(', ') + ']';
+  if (v instanceof VSet) return v.size ? '{' + v.sorted().map(fmt).join(', ') + '}' : '∅';
+  if (v instanceof VMap) return '{' + v.sorted().map(e => fmt(e[0]) + ' ↦ ' + fmt(e[1])).join(', ') + '}';
+  return '?';
+}
+function typeName(v) {
+  return ['nil', 'boolean', 'number', 'string', 'atom', 'tuple', 'set', 'map', '?'][rank(v)];
+}
+
+// ============================================================
+// Lexer
+// ============================================================
+const KEYWORDS = new Set(('interface request indication algorithm implements as uses params state stable ' +
+  'upon event where condition exists in do end trigger if then elif else forall while starttimer ' +
+  'canceltimer assert log skip and or not notin union inter minus subseteq true false nil function return call via ' +
+  'property always eventually').split(' '));
+
+const UNICODE_MAP = {
+  '∪': ['kw', 'union'], '∩': ['kw', 'inter'], '∈': ['kw', 'in'], '∉': ['kw', 'notin'],
+  '∧': ['kw', 'and'], '∨': ['kw', 'or'], '¬': ['kw', 'not'], '⊆': ['kw', 'subseteq'],
+  '∀': ['kw', 'forall'], '≠': ['op', '!='], '≤': ['op', '<='], '≥': ['op', '>='],
+  '←': ['op', ':='], '⟨': ['op', 'LANG'], '⟩': ['op', 'RANG'], '∅': ['op', 'EMPTY'],
+  '\\': ['kw', 'minus'], '↦': ['op', '->']
+};
+
+function isAtomName(name) { return name.length >= 2 && /^[A-Z][A-Z0-9_]*$/.test(name); }
+
+function lex(src) {
+  const toks = [];
+  let i = 0, line = 1, col = 1;
+  const n = src.length;
+  function adv(k) {
+    for (let j = 0; j < k; j++) { if (src[i] === '\n') { line++; col = 1; } else col++; i++; }
+  }
+  while (i < n) {
+    const c = src[i];
+    if (c === ' ' || c === '\t' || c === '\r' || c === '\n') { adv(1); continue; }
+    if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n') adv(1); continue; }
+    if (c === '/' && src[i + 1] === '*') {
+      const l0 = line, c0 = col; adv(2);
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) adv(1);
+      if (i >= n) throw new DslError('Unterminated comment', l0, c0);
+      adv(2); continue;
+    }
+    const L = line, C = col;
+    if (c === 'Π') { toks.push({ t: 'id', v: 'Procs', line: L, col: C }); adv(1); continue; }
+    if (UNICODE_MAP[c]) { const [t, v] = UNICODE_MAP[c]; toks.push({ t, v, line: L, col: C }); adv(1); continue; }
+    if (/[0-9]/.test(c)) {
+      const m = /^(\d+(?:\.\d+)?(?:[eE]-?\d+)?)(us|ms|s)?(?![A-Za-z0-9_])/.exec(src.slice(i));
+      if (!m) throw new DslError('Invalid number', L, C);
+      let v = parseFloat(m[1]);
+      let isDur = false;
+      if (m[2]) { v = Math.round(v * UNIT[m[2]]); isDur = true; }
+      toks.push({ t: 'num', v, dur: isDur, line: L, col: C });
+      adv(m[0].length); continue;
+    }
+    if (/[A-Za-z_]/.test(c)) {
+      const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(src.slice(i));
+      const w = m[0];
+      if (KEYWORDS.has(w)) toks.push({ t: 'kw', v: w, line: L, col: C });
+      else toks.push({ t: 'id', v: w, line: L, col: C });
+      adv(w.length); continue;
+    }
+    if (c === '"') {
+      let j = i + 1, s = '';
+      while (j < n && src[j] !== '"') {
+        if (src[j] === '\n') throw new DslError('Unterminated string', L, C);
+        if (src[j] === '\\' && j + 1 < n) { s += src[j + 1]; j += 2; } else { s += src[j]; j++; }
+      }
+      if (j >= n) throw new DslError('Unterminated string', L, C);
+      toks.push({ t: 'str', v: s, line: L, col: C });
+      adv(j + 1 - i); continue;
+    }
+    const two = src.substr(i, 2);
+    if ([':=', '<=', '>=', '!=', '->'].includes(two)) { toks.push({ t: 'op', v: two, line: L, col: C }); adv(2); continue; }
+    if ('<>=()[]{},|+-*/%#;:'.includes(c)) { toks.push({ t: 'op', v: c, line: L, col: C }); adv(1); continue; }
+    throw new DslError('Unexpected character "' + c + '"', L, C);
+  }
+  toks.push({ t: 'eof', v: '', line, col });
+  return toks;
+}
+
+// ============================================================
+// Parser
+// ============================================================
+class Parser {
+  constructor(src) { this.toks = lex(src); this.p = 0; this.noAngle = false; }
+  get tok() { return this.toks[this.p]; }
+  peek(k) { return this.toks[this.p + (k || 1)]; }
+  is(t, v) { const k = this.tok; return k.t === t && (v === undefined || k.v === v); }
+  isKw(v) { return this.is('kw', v); }
+  isOp(v) { return this.is('op', v); }
+  err(msg, tok) { tok = tok || this.tok; throw new DslError(msg, tok.line, tok.col); }
+  desc(tok) { return tok.t === 'eof' ? 'end of input' : '"' + tok.v + '"'; }
+  eat(t, v, what) {
+    if (!this.is(t, v)) this.err('Expected ' + (what || '"' + v + '"') + ', found ' + this.desc(this.tok));
+    return this.toks[this.p++];
+  }
+  kw(v) { return this.eat('kw', v); }
+  op(v) { return this.eat('op', v); }
+  ident(what) { return this.eat('id', undefined, what || 'an identifier'); }
+  lang() {
+    if (this.isOp('LANG') || this.isOp('<')) return this.toks[this.p++];
+    this.err('Expected "⟨" (or "<"), found ' + this.desc(this.tok));
+  }
+  rang() {
+    if (this.isOp('RANG') || this.isOp('>')) return this.toks[this.p++];
+    this.err('Expected "⟩" (or ">"), found ' + this.desc(this.tok));
+  }
+  skipSemis() { while (this.isOp(';')) this.p++; }
+
+  program() {
+    const prog = { interfaces: new Map(), algorithms: [], properties: [] };
+    while (!this.is('eof')) {
+      if (this.isKw('interface')) {
+        const it = this.iface();
+        if (prog.interfaces.has(it.name)) this.err('Interface "' + it.name + '" is already defined', it.tok);
+        prog.interfaces.set(it.name, it);
+      } else if (this.isKw('algorithm')) prog.algorithms.push(this.algorithm());
+      else if (this.isKw('property')) prog.properties.push(this.property());
+      else this.err('Expected "interface", "algorithm" or "property", found ' + this.desc(this.tok));
+    }
+    return prog;
+  }
+
+  // property Name always <expression> end   |   property Name eventually <expression> end
+  property() {
+    this.kw('property');
+    const name = this.ident('the property name');
+    let kind;
+    if (this.isKw('always')) kind = 'always';
+    else if (this.isKw('eventually')) kind = 'eventually';
+    else this.err('Expected "always" or "eventually", found ' + this.desc(this.tok));
+    this.p++;
+    const expr = this.expr();
+    this.kw('end');
+    return { name: name.v, kind, expr, tok: name, line: name.line };
+  }
+
+  iface() {
+    const tok = this.kw('interface');
+    const name = this.ident('the interface name').v;
+    const it = { name, tok, requests: new Map(), indications: new Map(), builtin: false };
+    while (this.isKw('request') || this.isKw('indication')) {
+      const dir = this.tok.v; this.p++;
+      const ev = this.ident('the event name');
+      let params = [];
+      if (this.isOp('(')) {
+        this.p++;
+        if (!this.isOp(')')) { params.push(this.ident().v); while (this.isOp(',')) { this.p++; params.push(this.ident().v); } }
+        this.op(')');
+      }
+      const tgt = dir === 'request' ? it.requests : it.indications;
+      if (tgt.has(ev.v)) this.err('Event "' + ev.v + '" is already declared', ev);
+      tgt.set(ev.v, params.length);
+    }
+    this.kw('end');
+    return it;
+  }
+
+  algorithm() {
+    const tok = this.kw('algorithm');
+    const name = this.ident('the algorithm name').v;
+    this.kw('implements');
+    const implType = this.ident('the name of the implemented interface');
+    this.kw('as');
+    const implAlias = this.ident('the instance name').v;
+    const uses = [];
+    while (this.isKw('uses')) {
+      this.p++;
+      const t = this.ident('the name of the used interface');
+      this.kw('as');
+      const a = this.ident('the instance name');
+      let via = null;
+      if (this.isKw('via')) { this.p++; via = this.ident('the name of the algorithm to use'); }
+      uses.push({ type: t.v, alias: a.v, tok: t, via: via ? via.v : null, viaTok: via });
+    }
+    const params = [], state = [];
+    if (this.isKw('params')) {
+      this.p++;
+      while (this.is('id') && this.peek().t === 'op' && this.peek().v === ':=') {
+        const id = this.ident(); this.op(':=');
+        params.push({ name: id.v, expr: this.expr(), tok: id });
+        this.skipSemis();
+      }
+    }
+    if (this.isKw('state')) {
+      this.p++;
+      while ((this.is('id') && this.peek().t === 'op' && this.peek().v === ':=') || this.isKw('stable')) {
+        let stable = false;
+        if (this.isKw('stable')) { stable = true; this.p++; }
+        const id = this.ident(); this.op(':=');
+        state.push({ name: id.v, expr: this.expr(), stable, tok: id });
+        this.skipSemis();
+      }
+    }
+    const handlers = [], functions = [];
+    while (this.isKw('upon') || this.isKw('function')) {
+      if (this.isKw('upon')) handlers.push(this.handler());
+      else functions.push(this.functionDecl());
+    }
+    this.kw('end');
+    return { name, tok, implType: implType.v, implTok: implType, implAlias, uses, params, state, handlers, functions };
+  }
+
+  functionDecl() {
+    const tok = this.kw('function');
+    const name = this.ident('the function name');
+    this.op('(');
+    const params = [];
+    if (!this.isOp(')')) { params.push(this.ident().v); while (this.isOp(',')) { this.p++; params.push(this.ident().v); } }
+    this.op(')');
+    const body = this.block();
+    this.kw('end');
+    return { name: name.v, tok: name, params, body, line: tok.line };
+  }
+
+  handler() {
+    const tok = this.kw('upon');
+    let h;
+    if (this.isKw('event')) {
+      this.p++;
+      this.lang();
+      const inst = this.ident('the instance name');
+      let ev, pats = [];
+      if (this.isOp(',')) {
+        this.p++;
+        ev = this.ident('the event name');
+        if (this.isOp('|')) {
+          this.p++;
+          pats.push(this.pattern());
+          while (this.isOp(',')) { this.p++; pats.push(this.pattern()); }
+        }
+      } else {
+        // the short form ⟨Timeout⟩ is not supported: an instance is required
+        this.err('Expected "," after the instance name (form: ⟨instance, Event | args⟩)');
+      }
+      this.rang();
+      let where = null;
+      if (this.isKw('where')) { this.p++; where = this.expr(); }
+      h = { kind: 'event', inst: inst.v, instTok: inst, ev: ev.v, evTok: ev, pats, where };
+    } else if (this.isKw('condition')) {
+      this.p++;
+      h = { kind: 'cond', expr: this.expr() };
+    } else if (this.isKw('exists')) {
+      this.p++;
+      const v = this.ident().v;
+      this.kw('in');
+      const set = this.expr();
+      this.kw('where');
+      h = { kind: 'exists', var: v, set, where: this.expr() };
+    } else this.err('"upon" must be followed by "event", "condition" or "exists"');
+    this.kw('do');
+    h.body = this.block();
+    this.kw('end');
+    h.tok = tok; h.line = tok.line;
+    return h;
+  }
+
+  pattern() {
+    const tok = this.tok;
+    if (this.is('id')) { this.p++; return { k: tok.v === '_' ? 'wild' : 'id', name: tok.v, tok }; }
+    if (this.isOp('[')) {
+      this.p++;
+      const items = [];
+      if (!this.isOp(']')) { items.push(this.pattern()); while (this.isOp(',')) { this.p++; items.push(this.pattern()); } }
+      this.op(']');
+      return { k: 'tup', items, tok };
+    }
+    if (this.is('num')) { this.p++; return { k: 'lit', value: tok.v, tok }; }
+    if (this.is('str')) { this.p++; return { k: 'lit', value: tok.v, tok }; }
+    if (this.isKw('true') || this.isKw('false')) { this.p++; return { k: 'lit', value: tok.v === 'true', tok }; }
+    if (this.isKw('nil')) { this.p++; return { k: 'lit', value: null, tok }; }
+    if (this.isOp('-') && this.peek().t === 'num') { this.p += 2; return { k: 'lit', value: -this.toks[this.p - 1].v, tok }; }
+    this.err('Invalid pattern: ' + this.desc(tok));
+  }
+
+  block() {
+    const stmts = [];
+    for (;;) {
+      this.skipSemis();
+      const k = this.tok;
+      if (k.t === 'eof' || (k.t === 'kw' && ['end', 'elif', 'else'].includes(k.v))) break;
+      stmts.push(this.stmt());
+    }
+    return stmts;
+  }
+
+  stmt() {
+    const tok = this.tok;
+    const line = tok.line;
+    if (tok.t === 'id') {
+      const target = this.ident();
+      const idx = [];
+      while (this.isOp('[')) { this.p++; idx.push(this.withAngles(() => this.expr())); this.op(']'); }
+      if (!this.isOp(':=')) this.err('Expected ":=" (statements start with a keyword or an assignment)');
+      this.p++;
+      return { s: 'assign', name: target.v, idx, expr: this.expr(), line, tok: target };
+    }
+    if (tok.t !== 'kw') this.err('Invalid statement: ' + this.desc(tok));
+    switch (tok.v) {
+      case 'trigger': {
+        this.p++;
+        this.lang();
+        const inst = this.ident('the instance name');
+        this.op(',');
+        const ev = this.ident('the event name');
+        const args = [];
+        if (this.isOp('|')) {
+          this.p++;
+          const saved = this.noAngle; this.noAngle = true;
+          args.push(this.expr());
+          while (this.isOp(',')) { this.p++; args.push(this.expr()); }
+          this.noAngle = saved;
+        }
+        this.rang();
+        return { s: 'trigger', inst: inst.v, instTok: inst, ev: ev.v, evTok: ev, args, line };
+      }
+      case 'if': {
+        this.p++;
+        const branches = [];
+        const c = this.expr(); this.kw('then');
+        branches.push({ cond: c, body: this.block() });
+        let els = null;
+        while (this.isKw('elif')) { this.p++; const c2 = this.expr(); this.kw('then'); branches.push({ cond: c2, body: this.block() }); }
+        if (this.isKw('else')) { this.p++; els = this.block(); }
+        this.kw('end');
+        return { s: 'if', branches, els, line };
+      }
+      case 'forall': {
+        this.p++;
+        const v = this.ident().v;
+        this.kw('in');
+        const set = this.expr();
+        let where = null;
+        if (this.isKw('where')) { this.p++; where = this.expr(); }
+        this.kw('do');
+        const body = this.block();
+        this.kw('end');
+        return { s: 'forall', var: v, set, where, body, line };
+      }
+      case 'while': {
+        this.p++;
+        const cond = this.expr();
+        this.kw('do');
+        const body = this.block();
+        this.kw('end');
+        return { s: 'while', cond, body, line };
+      }
+      case 'starttimer': {
+        this.p++; this.op('(');
+        const id = this.ident('the timer name');
+        this.op(',');
+        const d = this.withAngles(() => this.expr());
+        this.op(')');
+        return { s: 'starttimer', id: id.v, dur: d, line, tok: id };
+      }
+      case 'canceltimer': {
+        this.p++; this.op('(');
+        const id = this.ident('the timer name');
+        this.op(')');
+        return { s: 'canceltimer', id: id.v, line, tok: id };
+      }
+      case 'assert': {
+        this.p++;
+        const e = this.expr();
+        let msg = null;
+        if (this.isOp(',')) { this.p++; msg = this.expr(); }
+        return { s: 'assert', expr: e, msg, line };
+      }
+      case 'log': {
+        this.p++;
+        const args = [this.expr()];
+        while (this.isOp(',')) { this.p++; args.push(this.expr()); }
+        return { s: 'log', args, line };
+      }
+      case 'skip': this.p++; return { s: 'skip', line };
+      case 'return': {
+        this.p++;
+        const k = this.tok;
+        const bare = k.t === 'eof' || (k.t === 'op' && k.v === ';') ||
+          (k.t === 'kw' && ['end', 'elif', 'else', 'if', 'forall', 'while', 'trigger', 'starttimer', 'canceltimer',
+            'assert', 'log', 'skip', 'return', 'call'].includes(k.v));
+        return { s: 'return', expr: bare ? null : this.expr(), line, tok };
+      }
+      case 'call': {
+        this.p++;
+        const name = this.ident('the function name');
+        this.op('(');
+        const args = [];
+        this.withAngles(() => {
+          if (!this.isOp(')')) { args.push(this.expr()); while (this.isOp(',')) { this.p++; args.push(this.expr()); } }
+        });
+        this.op(')');
+        return { s: 'call', name: name.v, args, line, tok: name };
+      }
+    }
+    this.err('Invalid statement: ' + this.desc(tok));
+  }
+
+  withAngles(fn) { const s = this.noAngle; this.noAngle = false; try { return fn(); } finally { this.noAngle = s; } }
+
+  // ----- espressioni -----
+  expr() { return this.orExpr(); }
+  orExpr() {
+    let l = this.andExpr();
+    while (this.isKw('or')) { const t = this.tok; this.p++; l = { e: 'bin', op: 'or', l, r: this.andExpr(), tok: t }; }
+    return l;
+  }
+  andExpr() {
+    let l = this.notExpr();
+    while (this.isKw('and')) { const t = this.tok; this.p++; l = { e: 'bin', op: 'and', l, r: this.notExpr(), tok: t }; }
+    return l;
+  }
+  notExpr() {
+    if (this.isKw('not')) { const t = this.tok; this.p++; return { e: 'un', op: 'not', x: this.notExpr(), tok: t }; }
+    return this.cmpExpr();
+  }
+  cmpExpr() {
+    const l = this.setExpr();
+    const k = this.tok;
+    let op = null;
+    if (k.t === 'op' && ['=', '!=', '<=', '>='].includes(k.v)) op = k.v;
+    else if (k.t === 'op' && (k.v === '<' || k.v === '>') && !this.noAngle) op = k.v;
+    else if (k.t === 'kw' && ['in', 'notin', 'subseteq'].includes(k.v)) op = k.v;
+    if (!op) return l;
+    this.p++;
+    return { e: 'bin', op, l, r: this.setExpr(), tok: k };
+  }
+  setExpr() {
+    let l = this.addExpr();
+    while (this.isKw('union') || this.isKw('inter') || this.isKw('minus')) {
+      const t = this.tok; this.p++;
+      l = { e: 'bin', op: t.v, l, r: this.addExpr(), tok: t };
+    }
+    return l;
+  }
+  addExpr() {
+    let l = this.mulExpr();
+    while (this.isOp('+') || this.isOp('-')) { const t = this.tok; this.p++; l = { e: 'bin', op: t.v, l, r: this.mulExpr(), tok: t }; }
+    return l;
+  }
+  mulExpr() {
+    let l = this.unary();
+    while (this.isOp('*') || this.isOp('/') || this.isOp('%')) { const t = this.tok; this.p++; l = { e: 'bin', op: t.v, l, r: this.unary(), tok: t }; }
+    return l;
+  }
+  unary() {
+    if (this.isOp('-')) { const t = this.tok; this.p++; return { e: 'un', op: 'neg', x: this.unary(), tok: t }; }
+    if (this.isOp('#')) { const t = this.tok; this.p++; return { e: 'un', op: 'card', x: this.unary(), tok: t }; }
+    return this.postfix();
+  }
+  postfix() {
+    let x = this.primary();
+    for (;;) {
+      if (this.isOp('[')) {
+        const t = this.tok; this.p++;
+        const i = this.withAngles(() => this.expr());
+        this.op(']');
+        x = { e: 'index', x, i, tok: t };
+      } else if (this.isOp('(')) {
+        const t = this.tok;
+        if (x.e !== 'var') this.err('Only built-in functions can be called', t);
+        this.p++;
+        const args = [];
+        this.withAngles(() => {
+          if (!this.isOp(')')) { args.push(this.expr()); while (this.isOp(',')) { this.p++; args.push(this.expr()); } }
+        });
+        this.op(')');
+        x = { e: 'call', name: x.name, args, tok: x.tok };
+      } else break;
+    }
+    return x;
+  }
+  primary() {
+    const t = this.tok;
+    if (t.t === 'num') { this.p++; return { e: 'lit', v: t.v, tok: t }; }
+    if (t.t === 'str') { this.p++; return { e: 'lit', v: t.v, tok: t }; }
+    if (t.t === 'kw' && (t.v === 'true' || t.v === 'false')) { this.p++; return { e: 'lit', v: t.v === 'true', tok: t }; }
+    if (t.t === 'kw' && t.v === 'nil') { this.p++; return { e: 'lit', v: null, tok: t }; }
+    if (t.t === 'op' && t.v === 'EMPTY') { this.p++; return { e: 'setlit', items: [], tok: t }; }
+    if (t.t === 'id') { this.p++; return { e: 'var', name: t.v, tok: t }; }
+    if (t.t === 'op' && t.v === '(') {
+      this.p++;
+      const x = this.withAngles(() => this.expr());
+      this.op(')');
+      return x;
+    }
+    if (t.t === 'op' && t.v === '[') {
+      this.p++;
+      const items = [];
+      this.withAngles(() => {
+        if (!this.isOp(']')) { items.push(this.expr()); while (this.isOp(',')) { this.p++; items.push(this.expr()); } }
+      });
+      this.op(']');
+      return { e: 'tuplit', items, tok: t };
+    }
+    if (t.t === 'op' && t.v === '{') {
+      this.p++;
+      return this.withAngles(() => {
+        if (this.is('id') && this.peek().t === 'kw' && this.peek().v === 'in') {
+          const v = this.ident().v; this.kw('in');
+          const set = this.expr();
+          this.kw('where', 'in a comprehension "{x in S where condition}"');
+          const where = this.expr();
+          this.op('}');
+          return { e: 'compr', var: v, set, where, tok: t };
+        }
+        const items = [];
+        if (!this.isOp('}')) { items.push(this.expr()); while (this.isOp(',')) { this.p++; items.push(this.expr()); } }
+        this.op('}');
+        return { e: 'setlit', items, tok: t };
+      });
+    }
+    this.err('Expected an expression, found ' + this.desc(t));
+  }
+}
+
+function parseProgram(src) { return new Parser(src).program(); }
+
+function parseExprOnly(src) {
+  const p = new Parser(src);
+  const e = p.expr();
+  if (!p.is('eof')) p.err('Unexpected text after the expression: ' + p.desc(p.tok));
+  return e;
+}
+
+// ============================================================
+// Built-in interfaces
+// ============================================================
+function builtinIfaces() {
+  const m = new Map();
+  m.set('Net', { name: 'Net', builtin: true, requests: new Map([['Send', 2]]), indications: new Map([['Deliver', 2]]) });
+  m.set('Rounds', { name: 'Rounds', builtin: true, requests: new Map([['Send', 2]]),
+    indications: new Map([['RoundStart', 1], ['Deliver', 2], ['RoundEnd', 1]]) });
+  return m;
+}
+
+const BUILTIN_VARS = new Set(['self', 'Procs', 'neighbors', 'N', 'DELTA', 'PHI', 'RHO', 'round']);
+// what a property can name besides the state variables of the algorithms
+const PROPERTY_VARS = new Set(['Procs', 'N', 'crashed', 'correct', 'up', 't']);
+// built-ins that depend on one process or on chance, and so make no sense in a property
+const PROPERTY_NO_FUNS = new Map([['now', 'use "t" for the current time'], ['random', 'a property must not depend on chance'], ['pick', 'a property must not depend on chance']]);
+const BUILTIN_FUNS = {
+  min: [1, 1], max: [1, 1], choose: [1, 1], size: [1, 1], keys: [1, 1], values: [1, 1],
+  map: [0, 0], random: [2, 2], now: [0, 0], abs: [1, 1], append: [2, 2], toset: [1, 1], str: [1, 1], defined: [1, 1],
+  head: [1, 1], tail: [1, 1], last: [1, 1], sort: [1, 1], reverse: [1, 1], slice: [3, 3], range: [2, 2],
+  remove: [2, 2], get: [3, 3], sum: [1, 1], mean: [1, 1], argmin: [1, 1], argmax: [1, 1], pick: [1, 1],
+  sqrt: [1, 1], ln: [1, 1], exp: [1, 1], pow: [2, 2], floor: [1, 1], ceil: [1, 1], round: [1, 1]
+};
+
+// ============================================================
+// Static checks
+// ============================================================
+// ctx: { timing, roundMode, known: {DELTA,PHI,RHO} }
+function check(prog, ctx) {
+  const errors = [], warnings = [];
+  const E = (msg, tok) => errors.push({ msg, line: tok ? tok.line : 0, col: tok ? tok.col : 0 });
+  const W = (msg, tok) => warnings.push({ msg, line: tok ? tok.line : 0, col: tok ? tok.col : 0 });
+  const ifaces = new Map([...builtinIfaces(), ...prog.interfaces]);
+  const rounds = ctx.timing === 'synchronous-rounds';
+  const lockstep = rounds && ctx.roundMode === 'lockstep';
+
+  const names = new Set();
+  for (const a of prog.algorithms) {
+    if (names.has(a.name)) E('Algorithm "' + a.name + '" is already defined', a.tok);
+    names.add(a.name);
+    const impl = ifaces.get(a.implType);
+    if (!impl) { E('Interface "' + a.implType + '" is not declared', a.implTok); continue; }
+    if (impl.builtin) E('The built-in interface "' + a.implType + '" cannot be implemented', a.implTok);
+    const aliases = new Map();
+    aliases.set(a.implAlias, { role: 'impl', iface: impl });
+    for (const u of a.uses) {
+      const it = ifaces.get(u.type);
+      if (!it) { E('Interface "' + u.type + '" is not declared', u.tok); continue; }
+      if (u.type === 'Rounds' && !rounds)
+        E('"Rounds" is only available when the assumed model is "synchronous rounds". Use "Net".', u.tok);
+      if (u.type === 'Net' && rounds)
+        E('With the "synchronous rounds" assumed model, messages go through "Rounds", not "Net".', u.tok);
+      if (aliases.has(u.alias)) E('Duplicate instance name "' + u.alias + '"', u.tok);
+      aliases.set(u.alias, { role: 'use', iface: it });
+    }
+    // user functions
+    const funcs = new Map();
+    for (const f of a.functions || []) {
+      if (funcs.has(f.name)) E('Function "' + f.name + '" is already defined', f.tok);
+      else if (BUILTIN_FUNS[f.name]) E('"' + f.name + '" is a built-in function', f.tok);
+      funcs.set(f.name, f);
+      if (new Set(f.params).size !== f.params.length) E('Repeated parameter in "' + f.name + '"', f.tok);
+    }
+    a.funcs = funcs;
+    for (const u of a.uses) {
+      if (!u.via) continue;
+      if (u.type === 'Net' || u.type === 'Rounds') { E('"via" cannot be used with the provided module ' + u.type, u.viaTok); continue; }
+      const target = prog.algorithms.find(x => x.name === u.via);
+      if (!target) E('Algorithm "' + u.via + '" is not defined', u.viaTok);
+      else if (target.implType !== u.type) E('"' + u.via + '" implements ' + target.implType + ', not ' + u.type, u.viaTok);
+    }
+    // timers used
+    const timers = new Set();
+    walkStmts(a.handlers.flatMap(h => h.body).concat((a.functions || []).flatMap(f => f.body)), s => {
+      if (s.s === 'starttimer' || s.s === 'canceltimer') timers.add(s.id);
+    });
+    a.timers = timers;
+    if (timers.size && lockstep) W('Timers in lockstep mode: time does not flow inside a round, use RoundStart/RoundEnd instead.', a.tok);
+
+    const stateNames = new Set(a.state.map(s => s.name));
+    const paramNames = new Set(a.params.map(p => p.name));
+    for (const p of a.params) if (BUILTIN_VARS.has(p.name)) E('"' + p.name + '" is a built-in name', p.tok);
+    for (const s of a.state) {
+      if (BUILTIN_VARS.has(s.name)) E('"' + s.name + '" is a built-in name', s.tok);
+      if (paramNames.has(s.name)) E('"' + s.name + '" is already a parameter', s.tok);
+    }
+
+    const checkVar = (name, tok, scope) => {
+      if (scope.has(name) || stateNames.has(name) || paramNames.has(name)) return;
+      if (BUILTIN_VARS.has(name)) {
+        if (['DELTA', 'PHI', 'RHO'].includes(name) && ctx.known[name] === null)
+          E('"' + name + '" is not available: its value is unknown in the assumed model' +
+            (ctx.timing === 'asynchronous' ? ' (asynchronous system)' : ''), tok);
+        if (name === 'round' && !rounds) E('"round" only exists in the synchronous rounds model', tok);
+        return;
+      }
+      if (isAtomName(name)) return;
+      E('Variable "' + name + '" is not declared', tok);
+    };
+    const checkExpr = (e, scope) => {
+      if (!e) return;
+      switch (e.e) {
+        case 'lit': return;
+        case 'var': return checkVar(e.name, e.tok, scope);
+        case 'bin': checkExpr(e.l, scope); checkExpr(e.r, scope); return;
+        case 'un': return checkExpr(e.x, scope);
+        case 'index': checkExpr(e.x, scope); checkExpr(e.i, scope); return;
+        case 'tuplit': case 'setlit': e.items.forEach(x => checkExpr(x, scope)); return;
+        case 'compr': {
+          checkExpr(e.set, scope);
+          const s2 = new Set(scope); s2.add(e.var);
+          checkExpr(e.where, s2); return;
+        }
+        case 'call': {
+          if (funcs.has(e.name)) {
+            const fd = funcs.get(e.name);
+            if (e.args.length !== fd.params.length) E('"' + e.name + '" takes ' + fd.params.length + ' argument(s)', e.tok);
+            e.args.forEach(x => checkExpr(x, scope));
+            return;
+          }
+          const f = BUILTIN_FUNS[e.name];
+          if (!f) { E('Unknown function "' + e.name + '"', e.tok); return; }
+          if (e.args.length < f[0] || e.args.length > f[1])
+            E('"' + e.name + '" takes ' + f[0] + (f[1] !== f[0] ? '–' + f[1] : '') + ' argument(s)', e.tok);
+          if (e.name === 'now' && lockstep) E('"now()" is not available in lockstep mode', e.tok);
+          e.args.forEach(x => checkExpr(x, scope));
+          return;
+        }
+      }
+    };
+    const patVars = (p, scope, out) => {
+      if (p.k === 'id') {
+        if (scope.has(p.name) || stateNames.has(p.name) || paramNames.has(p.name) || BUILTIN_VARS.has(p.name)) return;
+        if (isAtomName(p.name)) return;
+        out.add(p.name);
+      } else if (p.k === 'tup') p.items.forEach(x => patVars(x, scope, out));
+    };
+    const collectAssigned = (stmts, out) => walkStmts(stmts, s => {
+      if (s.s === 'assign' && !stateNames.has(s.name)) out.add(s.name);
+    });
+    const checkBlock = (stmts, scope) => {
+      for (const s of stmts) {
+        switch (s.s) {
+          case 'assign':
+            if (paramNames.has(s.name)) E('Parameter "' + s.name + '" cannot be modified', s.tok);
+            if (BUILTIN_VARS.has(s.name)) E('"' + s.name + '" is built-in and cannot be modified', s.tok);
+            if (s.idx.length && !stateNames.has(s.name) && !scope.has(s.name))
+              E('"' + s.name + '" is not declared', s.tok);
+            s.idx.forEach(x => checkExpr(x, scope));
+            checkExpr(s.expr, scope); break;
+          case 'trigger': {
+            const al = aliases.get(s.inst);
+            if (!al) { E('Unknown instance "' + s.inst + '" in this algorithm', s.instTok); break; }
+            if (al.role === 'impl') {
+              if (!al.iface.indications.has(s.ev))
+                E('"' + s.ev + '" is not an indication of ' + al.iface.name + ' (only indications can be emitted upwards)', s.evTok);
+              else if (al.iface.indications.get(s.ev) !== s.args.length)
+                E('"' + s.ev + '" takes ' + al.iface.indications.get(s.ev) + ' argument(s)', s.evTok);
+            } else {
+              if (!al.iface.requests.has(s.ev))
+                E('"' + s.ev + '" is not a request of ' + al.iface.name + ' (only requests can be sent downwards)', s.evTok);
+              else if (al.iface.requests.get(s.ev) !== s.args.length)
+                E('"' + s.ev + '" takes ' + al.iface.requests.get(s.ev) + ' argument(s)', s.evTok);
+            }
+            s.args.forEach(x => checkExpr(x, scope));
+            break;
+          }
+          case 'if':
+            s.branches.forEach(b => { checkExpr(b.cond, scope); checkBlock(b.body, scope); });
+            if (s.els) checkBlock(s.els, scope);
+            break;
+          case 'forall': {
+            checkExpr(s.set, scope);
+            const s2 = new Set(scope); s2.add(s.var);
+            checkExpr(s.where, s2); checkBlock(s.body, s2); break;
+          }
+          case 'while': checkExpr(s.cond, scope); checkBlock(s.body, scope); break;
+          case 'starttimer':
+            if (rounds && lockstep) E('Timers are not available in lockstep mode', s.tok);
+            checkExpr(s.dur, scope); break;
+          case 'canceltimer': break;
+          case 'assert': checkExpr(s.expr, scope); checkExpr(s.msg, scope); break;
+          case 'log': s.args.forEach(x => checkExpr(x, scope)); break;
+          case 'return':
+            if (!scope.has('#function')) E('"return" can only be used inside a function', s.tok);
+            checkExpr(s.expr, scope); break;
+          case 'call':
+            if (!funcs.has(s.name)) E(BUILTIN_FUNS[s.name] ? '"call" is for your own functions; use "' + s.name + '(…)" in an expression'
+              : 'Unknown function "' + s.name + '"', s.tok);
+            else if (funcs.get(s.name).params.length !== s.args.length) E('"' + s.name + '" takes ' + funcs.get(s.name).params.length + ' argument(s)', s.tok);
+            s.args.forEach(x => checkExpr(x, scope)); break;
+        }
+      }
+    };
+
+    const seenEv = new Set();
+    for (const h of a.handlers) {
+      const scope = new Set();
+      if (h.kind === 'event') {
+        if (h.inst === 'timer') {
+          if (h.ev !== 'Timeout') E('The "timer" instance only produces the "Timeout" event', h.evTok);
+          else if (h.pats.length !== 1) E('"Timeout" has one argument (the timer name)', h.evTok);
+          else if (h.pats[0].k === 'id' && !timers.has(h.pats[0].name))
+            W('Timer "' + h.pats[0].name + '" is never started in this algorithm', h.pats[0].tok);
+          if (h.pats[0] && h.pats[0].k === 'id') h.pats[0].k = 'timer';
+        } else {
+          const al = aliases.get(h.inst);
+          if (!al) E('Unknown instance "' + h.inst + '" in this algorithm', h.instTok);
+          else if (al.role === 'impl') {
+            if (h.ev === 'Init' || h.ev === 'Recovery') {
+              if (h.pats.length) E('"' + h.ev + '" has no arguments', h.evTok);
+            } else if (!al.iface.requests.has(h.ev))
+              E('"' + h.ev + '" is not a request of ' + al.iface.name + ' (only requests arrive from above)', h.evTok);
+            else if (al.iface.requests.get(h.ev) !== h.pats.length)
+              E('"' + h.ev + '" has ' + al.iface.requests.get(h.ev) + ' argument(s)', h.evTok);
+          } else {
+            if (!al.iface.indications.has(h.ev))
+              E('"' + h.ev + '" is not an indication of ' + al.iface.name + ' (only indications arrive from below)', h.evTok);
+            else if (al.iface.indications.get(h.ev) !== h.pats.length)
+              E('"' + h.ev + '" has ' + al.iface.indications.get(h.ev) + ' argument(s)', h.evTok);
+          }
+        }
+        seenEv.add(h.inst + '.' + h.ev);
+        const pv = new Set();
+        h.pats.forEach(p => patVars(p, scope, pv));
+        pv.forEach(v => scope.add(v));
+        h.binds = pv;
+        checkExpr(h.where, scope);
+      } else if (h.kind === 'cond') {
+        checkExpr(h.expr, scope);
+      } else {
+        checkExpr(h.set, scope);
+        scope.add(h.var);
+        checkExpr(h.where, scope);
+      }
+      collectAssigned(h.body, scope);
+      checkBlock(h.body, scope);
+    }
+    for (const f of a.functions || []) {
+      const scope = new Set(f.params);
+      scope.add('#function');
+      collectAssigned(f.body, scope);
+      checkBlock(f.body, scope);
+    }
+    // indications from lower layers that are never handled
+    for (const u of a.uses) {
+      const it = ifaces.get(u.type);
+      if (!it) continue;
+      for (const ev of it.indications.keys())
+        if (!seenEv.has(u.alias + '.' + ev) && !(u.type === 'Rounds' && ev !== 'Deliver'))
+          W('No handler for ⟨' + u.alias + ', ' + ev + '⟩: these events will be ignored', u.tok);
+    }
+    // initializers
+    for (const p of a.params) checkExpr(p.expr, new Set());
+    for (const s of a.state) checkExpr(s.expr, new Set());
+  }
+  // ---- properties: one boolean expression evaluated over the state of every process
+  const stateNames = new Set();
+  for (const a of prog.algorithms) for (const st of a.state) stateNames.add(st.name);
+  const propNames = new Set();
+  for (const pr of prog.properties || []) {
+    if (propNames.has(pr.name)) E('Property "' + pr.name + '" is already defined', pr.tok);
+    propNames.add(pr.name);
+    (function walk(e, bound) {
+      if (!e) return;
+      switch (e.e) {
+        case 'lit': return;
+        case 'var':
+          if (bound.has(e.name) || stateNames.has(e.name) || PROPERTY_VARS.has(e.name) || isAtomName(e.name)) return;
+          E(BUILTIN_VARS.has(e.name)
+            ? '"' + e.name + '" is not available in a property: a property sees every process at once'
+            : '"' + e.name + '" is not a state variable of any algorithm', e.tok);
+          return;
+        case 'bin': walk(e.l, bound); walk(e.r, bound); return;
+        case 'un': return walk(e.x, bound);
+        case 'index': walk(e.x, bound); walk(e.i, bound); return;
+        case 'tuplit': case 'setlit': e.items.forEach(x => walk(x, bound)); return;
+        case 'compr': {
+          walk(e.set, bound);
+          const b2 = new Set(bound); b2.add(e.var);
+          walk(e.where, b2);
+          return;
+        }
+        case 'call': {
+          const f = BUILTIN_FUNS[e.name];
+          if (!f) E('Unknown function "' + e.name + '" (a property can only use built-in functions)', e.tok);
+          else if (PROPERTY_NO_FUNS.has(e.name)) E('"' + e.name + '" is not available in a property: ' + PROPERTY_NO_FUNS.get(e.name), e.tok);
+          else if (e.args.length < f[0] || e.args.length > f[1])
+            E('"' + e.name + '" takes ' + (f[0] === f[1] ? f[0] : f[0] + ' to ' + f[1]) + ' argument(s)', e.tok);
+          e.args.forEach(x => walk(x, bound));
+          return;
+        }
+        default:
+          for (const k in e) {
+            const v = e[k];
+            if (Array.isArray(v)) v.forEach(x => { if (x && x.e) walk(x, bound); });
+            else if (v && typeof v === 'object' && v.e) walk(v, bound);
+          }
+      }
+    })(pr.expr, new Set());
+  }
+  return { errors, warnings, ifaces };
+}
+
+function walkStmts(stmts, fn) {
+  for (const s of stmts) {
+    fn(s);
+    if (s.s === 'if') { s.branches.forEach(b => walkStmts(b.body, fn)); if (s.els) walkStmts(s.els, fn); }
+    else if (s.s === 'forall' || s.s === 'while') walkStmts(s.body, fn);
+  }
+}
+
+// ============================================================
+// Instance stack resolution
+// ============================================================
+function resolveStack(prog, topName) {
+  const byName = new Map(prog.algorithms.map(a => [a.name, a]));
+  const top = byName.get(topName);
+  if (!top) throw new Error('Main algorithm "' + topName + '" not found');
+  const byIface = new Map();
+  for (const a of prog.algorithms) {
+    if (!byIface.has(a.implType)) byIface.set(a.implType, []);
+    byIface.get(a.implType).push(a);
+  }
+  const warnings = [];
+  const specs = [];
+  function build(algo, path, parent, aliasInParent, chain) {
+    if (chain.includes(algo.name)) throw new Error('Circular dependency: ' + chain.concat(algo.name).join(' → '));
+    const spec = { id: specs.length, algo, path, parent, aliasInParent, bind: {} };
+    specs.push(spec);
+    for (const u of algo.uses) {
+      if (u.type === 'Net' || u.type === 'Rounds') { spec.bind[u.alias] = { builtin: u.type }; continue; }
+      let chosen;
+      if (u.via) {
+        chosen = byName.get(u.via);
+        if (!chosen || chosen.implType !== u.type) throw new Error('"' + u.via + '" does not implement ' + u.type);
+      } else {
+        const cands = byIface.get(u.type) || [];
+        if (!cands.length) throw new Error('No algorithm implements "' + u.type + '" (required by ' + algo.name + ')');
+        if (cands.length > 1) warnings.push('Several algorithms implement ' + u.type + ': ' + algo.name + ' uses ' + cands[0].name +
+          ' (write "uses ' + u.type + ' as ' + u.alias + ' via …" to choose)');
+        chosen = cands[0];
+      }
+      const child = build(chosen, path + '/' + u.alias, spec.id, u.alias, chain.concat(algo.name));
+      spec.bind[u.alias] = { inst: child.id };
+    }
+    return spec;
+  }
+  build(top, top.implAlias, null, null, []);
+  return { specs, warnings };
+}
+
+// ============================================================
+// Interpreter
+// ============================================================
+class RtError extends Error { constructor(msg, line) { super(msg); this.line = line; } }
+class HaltSignal extends Error { constructor(msg) { super(msg); } }
+class ReturnSignal { constructor(value) { this.value = value; } }
+const MAX_CALL_DEPTH = 200;
+function callUser(fd, args, env, line) {
+  const depth = (env.depth || 0) + 1;
+  if (depth > MAX_CALL_DEPTH) throw new RtError('Function calls nested deeper than ' + MAX_CALL_DEPTH + ' (infinite recursion?)', line);
+  const locals = new Map();
+  fd.params.forEach((p, i) => locals.set(p, args[i]));
+  const fenv = { node: env.node, inst: env.inst, locals, sim: env.sim, rng: env.rng, time: env.time, depth, origin: env.origin };
+  try { execBlock(fd.body, fenv); }
+  catch (e) { if (e instanceof ReturnSignal) return e.value; throw e; }
+  return null;
+}
+
+function needType(v, pred, what, line) {
+  if (!pred(v)) throw new RtError('Expected ' + what + ', found ' + typeName(v) + ' (' + fmt(v) + ')', line);
+  return v;
+}
+const isNum = v => typeof v === 'number';
+const isBool = v => typeof v === 'boolean';
+const isSet = v => v instanceof VSet;
+
+function elems(v, line) {
+  if (v instanceof VSet) return v.sorted();
+  if (v instanceof Tup) return v.items;
+  if (v instanceof VMap) return v.sorted().map(e => e[0]);
+  throw new RtError('Cannot iterate over a ' + typeName(v), line);
+}
+
+// env: { node, inst, locals(Map), sim }
+function evalExpr(e, env) {
+  const line = e.tok ? e.tok.line : 0;
+  switch (e.e) {
+    case 'lit': return e.v;
+    case 'var': return lookup(e.name, env, line);
+    case 'tuplit': return new Tup(e.items.map(x => evalExpr(x, env)));
+    case 'setlit': return VSet.of(e.items.map(x => evalExpr(x, env)));
+    case 'compr': {
+      const s = evalExpr(e.set, env);
+      const out = [];
+      for (const x of elems(s, line)) {
+        env.locals.set(e.var, x);
+        if (needType(evalExpr(e.where, env), isBool, 'a boolean in the comprehension', line)) out.push(x);
+      }
+      env.locals.delete(e.var);
+      return VSet.of(out);
+    }
+    case 'un': {
+      const x = evalExpr(e.x, env);
+      if (e.op === 'not') return !needType(x, isBool, 'a boolean', line);
+      if (e.op === 'neg') return -needType(x, isNum, 'a number', line);
+      if (e.op === 'card') {
+        if (x instanceof VSet || x instanceof VMap) return x.size;
+        if (x instanceof Tup) return x.items.length;
+        if (typeof x === 'string') return x.length;
+        throw new RtError('# does not apply to a ' + typeName(x), line);
+      }
+      break;
+    }
+    case 'bin': {
+      if (e.op === 'and') {
+        if (!needType(evalExpr(e.l, env), isBool, 'a boolean', line)) return false;
+        return needType(evalExpr(e.r, env), isBool, 'a boolean', line);
+      }
+      if (e.op === 'or') {
+        if (needType(evalExpr(e.l, env), isBool, 'a boolean', line)) return true;
+        return needType(evalExpr(e.r, env), isBool, 'a boolean', line);
+      }
+      const a = evalExpr(e.l, env), b = evalExpr(e.r, env);
+      return binop(e.op, a, b, line);
+    }
+    case 'index': {
+      const x = evalExpr(e.x, env), i = evalExpr(e.i, env);
+      if (x instanceof Tup) {
+        needType(i, isNum, 'a numeric index', line);
+        if (i < 0 || i >= x.items.length || i !== Math.floor(i)) throw new RtError('Index ' + i + ' is out of range for tuple ' + fmt(x), line);
+        return x.items[i];
+      }
+      if (x instanceof VMap) { const en = x.m.get(key(i)); return en ? en[1] : null; }
+      throw new RtError('Cannot index a ' + typeName(x), line);
+    }
+    case 'call': {
+      const fd = env.inst.algo.funcs && env.inst.algo.funcs.get(e.name);
+      const args = e.args.map(a => evalExpr(a, env));
+      return fd ? callUser(fd, args, env, line) : callBuiltin(e.name, args, env, line);
+    }
+  }
+  throw new RtError('Unsupported expression', line);
+}
+
+function binop(op, a, b, line) {
+  switch (op) {
+    case '=': return eq(a, b);
+    case '!=': return !eq(a, b);
+    case '<': return compare(a, b) < 0;
+    case '>': return compare(a, b) > 0;
+    case '<=': return compare(a, b) <= 0;
+    case '>=': return compare(a, b) >= 0;
+    case 'in':
+      if (b instanceof VSet) return b.m.has(key(a));
+      if (b instanceof VMap) return b.m.has(key(a));
+      if (b instanceof Tup) return b.items.some(x => eq(x, a));
+      throw new RtError('"in" requires a set, a tuple or a map, found ' + typeName(b), line);
+    case 'notin': return !binop('in', a, b, line);
+    case 'subseteq':
+      needType(a, isSet, 'a set', line); needType(b, isSet, 'a set', line);
+      for (const k of a.m.keys()) if (!b.m.has(k)) return false;
+      return true;
+    case 'union': {
+      needType(a, isSet, 'a set on the left of ∪', line); needType(b, isSet, 'a set on the right of ∪', line);
+      if (b.size === 0) return a;
+      const m = new Map(a.m); for (const [k, v] of b.m) m.set(k, v); return new VSet(m);
+    }
+    case 'inter': {
+      needType(a, isSet, 'a set', line); needType(b, isSet, 'a set', line);
+      const m = new Map(); for (const [k, v] of a.m) if (b.m.has(k)) m.set(k, v); return new VSet(m);
+    }
+    case 'minus': {
+      needType(a, isSet, 'a set', line); needType(b, isSet, 'a set', line);
+      const m = new Map(); for (const [k, v] of a.m) if (!b.m.has(k)) m.set(k, v); return new VSet(m);
+    }
+    case '+':
+      if (isNum(a) && isNum(b)) return a + b;
+      if (typeof a === 'string' || typeof b === 'string') return (typeof a === 'string' ? a : fmt(a)) + (typeof b === 'string' ? b : fmt(b));
+      if (a instanceof Tup && b instanceof Tup) return new Tup(a.items.concat(b.items));
+      throw new RtError('"+" does not apply to ' + typeName(a) + ' and ' + typeName(b), line);
+    case '-': case '*': case '/': case '%':
+      needType(a, isNum, 'a number', line); needType(b, isNum, 'a number', line);
+      if (op === '-') return a - b;
+      if (op === '*') return a * b;
+      if (b === 0) throw new RtError('Division by zero', line);
+      if (op === '/') return Number.isInteger(a) && Number.isInteger(b) ? Math.trunc(a / b) : a / b;
+      return a % b;
+  }
+  throw new RtError('Unknown operator ' + op, line);
+}
+
+function lookup(name, env, line) {
+  if (env.locals.has(name)) return env.locals.get(name);
+  if (env.property) throw new RtError('"' + name + '" is not available in a property', line);
+  const inst = env.inst;
+  if (name in inst.state) return inst.state[name];
+  if (name in inst.params) return inst.params[name];
+  const sim = env.sim, node = env.node;
+  switch (name) {
+    case 'self': return node.id;
+    case 'Procs': return sim.procSet;
+    case 'N': return sim.nodes.length;
+    case 'neighbors': return node.neighborSet;
+    case 'DELTA': case 'PHI': case 'RHO': return sim.known[name];
+    case 'round': return node.round;
+  }
+  if (isAtomName(name)) return atom(name);
+  if (env.assignedLocals && env.assignedLocals.has(name))
+    throw new RtError('Local variable "' + name + '" read before assignment', line);
+  throw new RtError('Variable "' + name + '" is not defined', line);
+}
+
+function seqOf(a, name, line) {
+  if (a instanceof Tup) return a.items;
+  if (a instanceof VSet) return a.sorted();
+  throw new RtError(name + ' requires a tuple or a set, found ' + typeName(a), line);
+}
+function callBuiltin(name, args, env, line) {
+  const a = args[0];
+  switch (name) {
+    case 'min': case 'max': {
+      const xs = elems(a, line);
+      if (!xs.length) throw new RtError(name + ' of an empty set', line);
+      let best = xs[0];
+      for (const x of xs) if (name === 'min' ? compare(x, best) < 0 : compare(x, best) > 0) best = x;
+      return best;
+    }
+    case 'choose': {
+      const xs = elems(a, line);
+      if (!xs.length) throw new RtError('choose of an empty set', line);
+      return xs[0];
+    }
+    case 'size':
+      if (a instanceof VSet || a instanceof VMap) return a.size;
+      if (a instanceof Tup) return a.items.length;
+      if (typeof a === 'string') return a.length;
+      throw new RtError('size does not apply to a ' + typeName(a), line);
+    case 'keys': needType(a, v => v instanceof VMap, 'a map', line); return VSet.of(a.sorted().map(e => e[0]));
+    case 'values': needType(a, v => v instanceof VMap, 'a map', line); return VSet.of(a.sorted().map(e => e[1]));
+    case 'map': return new VMap();
+    case 'random': {
+      needType(args[0], isNum, 'a number', line); needType(args[1], isNum, 'a number', line);
+      return env.rng.int(Math.ceil(args[0]), Math.floor(args[1]));
+    }
+    case 'now': return env.sim.localClock(env.node, env.time);
+    case 'abs': return Math.abs(needType(a, isNum, 'a number', line));
+    case 'append': needType(a, v => v instanceof Tup, 'a tuple', line); return new Tup(a.items.concat([args[1]]));
+    case 'toset': return VSet.of(elems(a, line));
+    case 'str': return typeof a === 'string' ? a : fmt(a);
+    case 'defined': {
+      needType(a, v => v instanceof VMap, 'a map', line);
+      const m = new Map();
+      for (const [k, v] of a.m) if (v[1] !== null) m.set(k, v);
+      return new VMap(m);
+    }
+    case 'head': case 'last': {
+      const xs = seqOf(a, name, line);
+      if (!xs.length) throw new RtError(name + ' of an empty ' + typeName(a), line);
+      return name === 'head' ? xs[0] : xs[xs.length - 1];
+    }
+    case 'tail': return new Tup(seqOf(a, name, line).slice(1));
+    case 'sort': return new Tup(elems(a, line).slice().sort(compare));
+    case 'reverse': return new Tup(seqOf(a, name, line).slice().reverse());
+    case 'slice': {
+      needType(args[1], isNum, 'a number', line); needType(args[2], isNum, 'a number', line);
+      return new Tup(seqOf(a, name, line).slice(args[1], args[2]));
+    }
+    case 'range': {
+      needType(args[0], isNum, 'a number', line); needType(args[1], isNum, 'a number', line);
+      if (args[1] - args[0] > 100000) throw new RtError('range is too large', line);
+      const out = [];
+      for (let i = Math.ceil(args[0]); i < args[1]; i++) out.push(i);
+      return new Tup(out);
+    }
+    case 'remove': {
+      const x = args[1];
+      if (a instanceof VSet) { const m = new Map(a.m); m.delete(key(x)); return new VSet(m); }
+      if (a instanceof VMap) { const m = new Map(a.m); m.delete(key(x)); return new VMap(m); }
+      if (a instanceof Tup) { const i = a.items.findIndex(v => eq(v, x)); return i < 0 ? a : new Tup(a.items.slice(0, i).concat(a.items.slice(i + 1))); }
+      throw new RtError('remove does not apply to a ' + typeName(a), line);
+    }
+    case 'get': {
+      if (a instanceof VMap) { const en = a.m.get(key(args[1])); return en ? en[1] : args[2]; }
+      if (a instanceof Tup) { const i = args[1]; return (isNum(i) && i >= 0 && i < a.items.length) ? a.items[i] : args[2]; }
+      if (a === null) return args[2];
+      throw new RtError('get does not apply to a ' + typeName(a), line);
+    }
+    case 'sum': case 'mean': {
+      const xs = a instanceof VMap ? a.sorted().map(e => e[1]) : elems(a, line);
+      let t = 0;
+      for (const x of xs) t += needType(x, isNum, 'numbers in ' + name, line);
+      if (name === 'sum') return t;
+      if (!xs.length) throw new RtError('mean of an empty collection', line);
+      return t / xs.length;
+    }
+    case 'argmin': case 'argmax': {
+      needType(a, v => v instanceof VMap, 'a map', line);
+      const es = a.sorted();
+      if (!es.length) throw new RtError(name + ' of an empty map', line);
+      let best = es[0];
+      for (const e of es) if (name === 'argmin' ? compare(e[1], best[1]) < 0 : compare(e[1], best[1]) > 0) best = e;
+      return best[0];
+    }
+    case 'pick': {
+      const xs = elems(a, line);
+      if (!xs.length) throw new RtError('pick of an empty collection', line);
+      return xs[Math.floor(env.rng.next() * xs.length)];
+    }
+    case 'sqrt': case 'ln': case 'exp': case 'floor': case 'ceil': case 'round': {
+      const x = needType(a, isNum, 'a number', line);
+      if (name === 'sqrt') { if (x < 0) throw new RtError('sqrt of a negative number', line); return Math.sqrt(x); }
+      if (name === 'ln') { if (x <= 0) throw new RtError('ln of a number ≤ 0', line); return Math.log(x); }
+      return Math[name](x);
+    }
+    case 'pow': return Math.pow(needType(a, isNum, 'a number', line), needType(args[1], isNum, 'a number', line));
+  }
+  throw new RtError('Unknown function ' + name, line);
+}
+
+function matchPat(p, v, env, binds) {
+  switch (p.k) {
+    case 'wild': return true;
+    case 'lit': return eq(p.value, v);
+    case 'timer': return v === p.name;
+    case 'id': {
+      if (binds.has(p.name)) {
+        if (env.locals.has(p.name)) return eq(env.locals.get(p.name), v);
+        env.locals.set(p.name, v); return true;
+      }
+      return eq(lookup(p.name, env, p.tok.line), v);
+    }
+    case 'tup':
+      if (!(v instanceof Tup) || v.items.length !== p.items.length) return false;
+      for (let i = 0; i < p.items.length; i++) if (!matchPat(p.items[i], v.items[i], env, binds)) return false;
+      return true;
+  }
+  return false;
+}
+
+function assignIdx(base, idx, val, line) {
+  if (!idx.length) return val;
+  const [i, ...rest] = idx;
+  if (base instanceof VMap) {
+    const cur = base.m.get(key(i));
+    const nv = assignIdx(cur ? cur[1] : null, rest, val, line);
+    const m = new Map(base.m); m.set(key(i), [i, nv]); return new VMap(m);
+  }
+  if (base instanceof Tup) {
+    needType(i, isNum, 'a numeric index', line);
+    if (i < 0 || i >= base.items.length) throw new RtError('Index ' + i + ' is out of range for the tuple', line);
+    const items = base.items.slice(); items[i] = assignIdx(items[i], rest, val, line);
+    return new Tup(items);
+  }
+  if (base === null && rest.length === 0) {
+    const m = new Map(); m.set(key(i), [i, val]); return new VMap(m);
+  }
+  throw new RtError('Indexed assignment on a ' + typeName(base), line);
+}
+
+const LOOP_CAP = 100000;
+function execBlock(stmts, env) {
+  for (const s of stmts) {
+    env.sim.stepBudget--;
+    if (env.sim.stepBudget < 0) throw new RtError('Too many statements in a single step (infinite loop?)', s.line);
+    switch (s.s) {
+      case 'assign': {
+        const v = evalExpr(s.expr, env);
+        const inst = env.inst;
+        if (s.name in inst.state) {
+          inst.state[s.name] = s.idx.length ? assignIdx(inst.state[s.name], s.idx.map(x => evalExpr(x, env)), v, s.line) : v;
+          inst.dirty = true;
+        } else {
+          const cur = env.locals.has(s.name) ? env.locals.get(s.name) : null;
+          env.locals.set(s.name, s.idx.length ? assignIdx(cur, s.idx.map(x => evalExpr(x, env)), v, s.line) : v);
+        }
+        break;
+      }
+      case 'trigger':
+        env.sim.emit(env, s.inst, s.ev, s.args.map(x => evalExpr(x, env)), s.line);
+        break;
+      case 'if': {
+        let done = false;
+        for (const b of s.branches) {
+          if (needType(evalExpr(b.cond, env), isBool, 'a boolean in the condition', s.line)) { execBlock(b.body, env); done = true; break; }
+        }
+        if (!done && s.els) execBlock(s.els, env);
+        break;
+      }
+      case 'forall': {
+        const xs = elems(evalExpr(s.set, env), s.line);
+        const had = env.locals.has(s.var), old = env.locals.get(s.var);
+        for (const x of xs) {
+          env.locals.set(s.var, x);
+          if (s.where && !needType(evalExpr(s.where, env), isBool, 'a boolean', s.line)) continue;
+          execBlock(s.body, env);
+        }
+        if (had) env.locals.set(s.var, old); else env.locals.delete(s.var);
+        break;
+      }
+      case 'while': {
+        let k = 0;
+        while (needType(evalExpr(s.cond, env), isBool, 'a boolean', s.line)) {
+          if (++k > LOOP_CAP) throw new RtError('while loop exceeded ' + LOOP_CAP + ' iterations', s.line);
+          execBlock(s.body, env);
+        }
+        break;
+      }
+      case 'starttimer': {
+        const d = needType(evalExpr(s.dur, env), isNum, 'a duration', s.line);
+        if (d < 0) throw new RtError('Negative timer duration', s.line);
+        env.sim.startTimer(env, s.id, d);
+        break;
+      }
+      case 'canceltimer': env.sim.cancelTimer(env, s.id); break;
+      case 'assert': {
+        const ok = needType(evalExpr(s.expr, env), isBool, 'a boolean', s.line);
+        if (!ok) {
+          const msg = s.msg ? evalExpr(s.msg, env) : 'assertion failed';
+          env.sim.assertFail(env, typeof msg === 'string' ? msg : fmt(msg), s.line);
+        }
+        break;
+      }
+      case 'log':
+        env.sim.userLog(env, s.args.map(x => { const v = evalExpr(x, env); return typeof v === 'string' ? v : fmt(v); }).join(' '), s.line);
+        break;
+      case 'skip': break;
+      case 'return': throw new ReturnSignal(s.expr ? evalExpr(s.expr, env) : null);
+      case 'call': callUser(env.inst.algo.funcs.get(s.name), s.args.map(x => evalExpr(x, env)), env, s.line); break;
+    }
+  }
+}
+
+// ============================================================
+// Priority queue
+// ============================================================
+class Heap {
+  constructor(cmp) { this.a = []; this.cmp = cmp; }
+  get size() { return this.a.length; }
+  push(x) {
+    const a = this.a; a.push(x);
+    let i = a.length - 1;
+    while (i > 0) { const p = (i - 1) >> 1; if (this.cmp(a[i], a[p]) >= 0) break; [a[i], a[p]] = [a[p], a[i]]; i = p; }
+  }
+  pop() {
+    const a = this.a; const top = a[0]; const last = a.pop();
+    if (a.length) {
+      a[0] = last; let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < a.length && this.cmp(a[l], a[m]) < 0) m = l;
+        if (r < a.length && this.cmp(a[r], a[m]) < 0) m = r;
+        if (m === i) break;
+        [a[i], a[m]] = [a[m], a[i]]; i = m;
+      }
+    }
+    return top;
+  }
+}
+
+// ============================================================
+// Simulation engine
+// ============================================================
+const CLS = { crash: 0, input: 1, roundStart: 2, deliver: 3, timer: 3, roundEnd: 4 };
+const MAX_EVENTS = 150000;
+
+function runSimulation(scn) {
+  const out = {
+    ok: false, error: null, errorLine: 0, compile: null, msgs: [], log: [], outputs: [],
+    snaps: {}, endT: 0, violations: 0, stopReason: '', nodeInfo: {},
+    rounds: null, specs: [], warnings: [], handlerCount: 0, activity: [], localEvents: [], localTruncated: false, downs: {}, pauses: {}, netFaults: { links: [], partitions: [] },
+    properties: []
+  };
+  // ---- configuration ----
+  let cfg;
+  try { cfg = normalizeScenario(scn); }
+  catch (e) { out.error = e.message; return out; }
+
+  // ---- compilation ----
+  let prog;
+  try { prog = parseProgram(scn.code); }
+  catch (e) {
+    if (e instanceof DslError) { out.compile = { errors: [{ msg: e.message, line: e.line, col: e.col }], warnings: [] }; out.error = 'Syntax error'; out.errorLine = e.line; return out; }
+    throw e;
+  }
+  const chk = check(prog, { timing: cfg.timing, roundMode: cfg.roundMode, known: cfg.known });
+  out.compile = { errors: chk.errors, warnings: chk.warnings, algorithms: prog.algorithms.map(a => a.name) };
+  if (chk.errors.length) { out.error = 'The code contains errors'; out.errorLine = chk.errors[0].line; return out; }
+  if (!prog.algorithms.length) { out.error = 'No algorithm is defined'; return out; }
+  const topName = scn.top && prog.algorithms.some(a => a.name === scn.top) ? scn.top : prog.algorithms[0].name;
+  out.top = topName;
+  let stack;
+  try { stack = resolveStack(prog, topName); }
+  catch (e) { out.error = e.message; return out; }
+  out.warnings.push(...stack.warnings);
+  out.specs = stack.specs.map(s => ({
+    id: s.id, path: s.path, algo: s.algo.name, iface: s.algo.implType, alias: s.algo.implAlias,
+    parent: s.parent, aliasInParent: s.aliasInParent, depth: s.path.split('/').length - 1,
+    builtins: Object.keys(s.bind).filter(k => s.bind[k].builtin).map(k => s.bind[k].builtin)
+  }));
+  const topSpec = stack.specs[0];
+  const topIface = chk.ifaces.get(topSpec.algo.implType);
+
+  const streams = new Streams(cfg.seed);
+  const nodes = cfg.nodes.map((n, idx) => ({
+    id: n.id, idx, crashed: false, busyUntil: 0, round: 0, insts: [], out: new Set(),
+    neighborSet: null, offset: 0, rho: 0
+  }));
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const linkMap = new Map(); // "a>b" -> link cfg
+  for (const l of cfg.links) {
+    if (!byId.has(l.a) || !byId.has(l.b)) continue;
+    const info = { enabled: l.enabled, loss: l.loss, delay: l.delay, key: l.a + '>' + l.b };
+    linkMap.set(l.a + '>' + l.b, info);
+    if (!l.directed) linkMap.set(l.b + '>' + l.a, Object.assign({}, info, { key: l.b + '>' + l.a }));
+  }
+  for (const n of nodes) {
+    const out2 = [];
+    for (const m of nodes) if (m !== n && linkMap.has(n.id + '>' + m.id)) out2.push(m.id);
+    n.neighborSet = VSet.of(out2);
+    const cr = streams.get('clock:' + n.id);
+    n.offset = Math.round(sampleDist(cfg.offset, cr));
+    n.rho = sampleDist(cfg.rho, cr);
+    if (n.rho <= -0.5) n.rho = -0.5;
+    out.nodeInfo[n.id] = { offset: n.offset, rho: n.rho };
+    out.snaps[n.id] = [];
+  }
+
+  const sim = {
+    nodes, procSet: VSet.of(nodes.map(n => n.id)), known: cfg.known, stepBudget: 0,
+    localClock(node, t) { return Math.round(node.offset + (1 + node.rho) * t); }
+  };
+
+  let seq = 0;
+  const tieRng = streams.get('tiebreak');
+  const heap = new Heap((x, y) =>
+    (x.t - y.t) || (x.cls - y.cls) || (x.tb - y.tb) || (x.node - y.node) || (x.seq - y.seq));
+  const push = (ev) => {
+    ev.seq = ev.seq !== undefined ? ev.seq : seq++;
+    ev.tb = cfg.tieBreak === 'shuffle' ? (ev.tb !== undefined ? ev.tb : tieRng.u32()) : 0;
+    heap.push(ev);
+  };
+  const logE = (t, node, kind, text, line) => out.log.push({ t, node, kind, text, line: line || 0 });
+
+  let halted = null;
+  let msgSeq = 0;
+  const lockstep = cfg.timing === 'synchronous-rounds' && cfg.roundMode === 'lockstep';
+  const emulated = cfg.timing === 'synchronous-rounds' && cfg.roundMode === 'emulated';
+  const R = cfg.timing === 'synchronous-rounds'
+    ? (lockstep ? cfg.roundLen : (cfg.known.DELTA || 0) + (cfg.known.PHI || 0))
+    : 0;
+  if (emulated && !(R > 0)) { out.error = 'Emulated rounds need known DELTA and PHI in the assumed model (round length = DELTA + PHI)'; return out; }
+  if (cfg.timing === 'synchronous-rounds') out.rounds = { R, lockstep, starts: {} };
+
+  const l2g = (node, L) => Math.max(0, Math.round((L - node.offset) / (1 + node.rho)));
+  const roundStartG = (node, r) => lockstep ? (r - 1) * R : l2g(node, r * R);
+  const roundEndG = (node, r) => lockstep ? (r - 1) * R + Math.round(R * 0.9) : l2g(node, (r + 1) * R) - 1;
+
+  // ---- instances ----
+  const unhandledSeen = new Set();
+  function makeInst(node, spec) {
+    const inst = { spec, algo: spec.algo, params: {}, state: {}, timers: {}, dirty: true, rr: 0 };
+    const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: 0 };
+    for (const p of spec.algo.params) {
+      const ov = cfg.paramOverrides[spec.algo.name + '.' + p.name];
+      inst.params[p.name] = ov !== undefined ? ov : evalExpr(p.expr, env);
+    }
+    for (const s of spec.algo.state) inst.state[s.name] = evalExpr(s.expr, env);
+    return inst;
+  }
+
+  // local queue for events internal to a node
+  let localQ = [];
+  let curTime = 0;
+  let curEnd = 0;
+
+  const LOCAL_MAX = 200000;
+  const trace = (node, from, to, ev, args) => {
+    if (out.localEvents.length >= LOCAL_MAX) { out.localTruncated = true; return; }
+    let a = args.map(fmt).join(', ');
+    if (a.length > 80) a = a.slice(0, 79) + '…';
+    out.localEvents.push({ t: curEnd, node: node.id, from, to, ev, args: a });
+  };
+  sim.emit = function (env, alias, ev, args, line) {
+    const inst = env.inst, node = env.node, spec = inst.spec;
+    if (alias === spec.algo.implAlias) {
+      // indication going up
+      trace(node, spec.id, spec.parent === null ? 'app' : spec.parent, ev, args);
+      if (spec.parent === null) {
+        const text = ev + (args.length ? ' | ' + args.map(fmt).join(', ') : '');
+        out.outputs.push({ t: curEnd, node: node.id, ev, args: args.map(fmt), text });
+        logE(curEnd, node.id, 'output', text, line);
+      } else {
+        localQ.push({ inst: spec.parent, alias: spec.aliasInParent, ev, args, from: spec.id });
+      }
+      return;
+    }
+    const b = spec.bind[alias];
+    if (b.inst !== undefined) {
+      trace(node, spec.id, b.inst, ev, args);
+      localQ.push({ inst: b.inst, alias: stack.specs[b.inst].algo.implAlias, ev, args, origin: env.origin !== undefined ? env.origin : spec.id });
+      return;
+    }
+    trace(node, spec.id, 'net', ev, args);
+    // built-in module: network send
+    const q = args[0];
+    netSend(node, q, args[1], spec.id, alias, line, env.origin !== undefined ? env.origin : spec.id);
+  };
+  let timerSeq = 0;
+  sim.startTimer = function (env, id, d) {
+    const inst = env.inst, node = env.node;
+    const gen = ++timerSeq;
+    inst.timers[id] = gen;
+    const g = Math.max(1, Math.round(d / (1 + node.rho)));
+    push({ t: curEnd + g, cls: CLS.timer, node: node.idx, type: 'timer', inst: inst.spec.id, id, gen });
+  };
+  sim.cancelTimer = function (env, id) { env.inst.timers[id] = ++timerSeq; };
+  sim.assertFail = function (env, msg, line) {
+    logE(curEnd, env.node.id, 'assert', msg, line);
+    if (cfg.haltOnAssert) throw new HaltSignal('Assertion failed on p' + env.node.id + ': ' + msg);
+  };
+  sim.userLog = function (env, text, line) { logE(curEnd, env.node.id, 'log', text, line); };
+
+  function violation(t, nodeId, text) {
+    out.violations++;
+    logE(t, nodeId, 'violation', text);
+  }
+
+  function netSend(node, q, payload, specId, alias, line, origin) {
+    const ts = curEnd;
+    const id = msgSeq++;
+    const rec = { id, from: node.id, to: q, payload: fmt(payload), sendT: ts, recvT: null, status: 'pending', violation: false, dup: false, round: null, spec: specId, origin };
+    out.msgs.push(rec);
+    if (!byId.has(q)) {
+      rec.status = 'dropped-link'; rec.recvT = ts;
+      logE(ts, node.id, 'drop', 'recipient ' + fmt(q) + ' does not exist', line);
+      return;
+    }
+    const self = q === node.id;
+    const lk = self ? null : linkMap.get(node.id + '>' + q);
+    if (!self && (!lk || !lk.enabled)) {
+      rec.status = 'dropped-link'; rec.recvT = ts;
+      logE(ts, node.id, 'drop', 'no link to p' + q + (lk ? ' (link disabled)' : ''), line);
+      return;
+    }
+    const rng = streams.get('link:' + node.id + '>' + q);
+    const loss = lk && lk.loss !== null ? lk.loss : cfg.loss;
+    const lost = !self && rng.next() < loss;
+    const sampleDelay = () => {
+      if (self) return 0;
+      let dist = lk && lk.delay ? lk.delay : cfg.delay;
+      if (cfg.gst !== null && ts < cfg.gst && cfg.preGstDelay) dist = cfg.preGstDelay;
+      let d = sampleDist(dist, rng);
+      if (cfg.spikeProb > 0 && rng.next() < cfg.spikeProb) d += cfg.spikeExtra;
+      if (cfg.bound !== null && !(cfg.gst !== null && ts < cfg.gst)) d = Math.min(d, cfg.bound);
+      // DLS model: messages sent before GST arrive by GST + bound
+      if (cfg.bound !== null && cfg.gst !== null && ts < cfg.gst) d = Math.min(d, cfg.gst + cfg.bound - ts);
+      return Math.max(0, Math.round(d));
+    };
+
+    if (cfg.timing === 'synchronous-rounds') {
+      const r = node.round;
+      rec.round = r;
+      if (lockstep) {
+        const Ts = (r - 1) * R;
+        let rr = r;
+        if (ts >= Ts + Math.round(R * 0.2)) rr = r + 1; // sent after the delivery window opened
+        const off = self ? Math.round(R * 0.25) : Math.round(R * (0.25 + 0.5 * rng.next()));
+        const arr = (rr - 1) * R + off;
+        if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr; logE(ts, node.id, 'drop', 'message to p' + q + ' lost (omission)', line); return; }
+        if (cutDrop(rec, node.id, q, ts, arr, line)) return;
+        scheduleDeliver(rec, node, q, payload, arr, alias);
+        return;
+      }
+      // emulated
+      const qn = byId.get(q);
+      let arr = ts + sampleDelay();
+      if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr; logE(ts, node.id, 'drop', 'message to p' + q + ' lost', line); return; }
+      if (cutDrop(rec, node.id, q, ts, arr, line)) return;
+      const qs = roundStartG(qn, r), qe = roundEndG(qn, r);
+      if (arr < qs) arr = qs; // the recipient has not opened the round yet: the message waits
+      if (arr > qe) {
+        rec.violation = true;
+        violation(arr, q, 'round ' + r + ' message from p' + node.id + ' arrived after the round ended on p' + q +
+          ' (delay ' + fmtDuration(arr - ts) + ')');
+        if (cfg.policy === 'drop') { rec.status = 'dropped-late'; rec.recvT = arr; return; }
+        if (cfg.policy === 'halt') { rec.status = 'dropped-late'; rec.recvT = arr; halted = 'Timing violation (policy: halt)'; return; }
+      }
+      scheduleDeliver(rec, node, q, payload, arr, alias);
+      return;
+    }
+
+    const d = sampleDelay();
+    // drawn for every message, so that the random stream of the channel does not depend on the fate of the message
+    const dupDraw = (!self && cfg.dup > 0) ? rng.next() : 1;
+    const arr0 = ts + d;
+    if (lost) { rec.status = 'dropped-loss'; rec.recvT = arr0; logE(ts, node.id, 'drop', 'message to p' + q + ' lost', line); return; }
+    // The order below keeps everything that happens before a fault independent of that fault:
+    // a cut at send time only concerns messages sent after the fault starts; FIFO state is updated by every
+    // message that enters the channel, including those a fault will drop on arrival.
+    if (cutAtSend(rec, node.id, q, ts, line)) return;
+    if (omissions.length && !self && omits(node.id, 'send', ts)) {
+      rec.status = 'dropped-omission'; rec.recvT = ts;
+      logE(ts, node.id, 'drop', 'message to p' + q + ' not sent (omission)', line);
+      return;
+    }
+    const assumeBound = cfg.known.DELTA !== null &&
+      (cfg.timing === 'synchronous-timed' || (cfg.timing === 'partial' && cfg.gst !== null && ts >= cfg.gst) ||
+       (cfg.timing === 'partial' && cfg.gst === null));
+    if (assumeBound && d > cfg.known.DELTA) {
+      rec.violation = true;
+      violation(arr0, q, 'delay ' + fmtDuration(d) + ' exceeds DELTA = ' + fmtDuration(cfg.known.DELTA) + ' (p' + node.id + ' → p' + q + ')');
+      if (cfg.policy === 'drop') { rec.status = 'dropped-late'; rec.recvT = arr0; return; }
+      if (cfg.policy === 'halt') { rec.status = 'dropped-late'; rec.recvT = arr0; halted = 'Timing violation (policy: halt)'; return; }
+    }
+    let arr = arr0;
+    const fifoKey = node.id + '>' + q;
+    if (cfg.fifo) { arr = Math.max(arr, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr); }
+    if (!cutAtArrival(rec, node.id, q, arr)) scheduleDeliver(rec, node, q, payload, arr, alias);
+    if (dupDraw < cfg.dup) {
+      const d2 = sampleDelay();
+      let arr2 = ts + d2;
+      if (cfg.fifo) { arr2 = Math.max(arr2, fifoLast.get(fifoKey) || 0); fifoLast.set(fifoKey, arr2); }
+      const rec2 = Object.assign({}, rec, { id: msgSeq++, dup: true, violation: false, status: 'pending', recvT: null });
+      out.msgs.push(rec2);
+      if (!cutAtArrival(rec2, node.id, q, arr2)) scheduleDeliver(rec2, node, q, payload, arr2, alias);
+    }
+  }
+  const fifoLast = new Map();
+
+  const linkCuts = cfg.faults.filter(f => f.type === 'link');
+  const pauses = cfg.faults.filter(f => f.type === 'pause');
+  const omissions = cfg.faults.filter(f => f.type === 'omission');
+  for (const p of pauses) {
+    (out.pauses[p.node] = out.pauses[p.node] || []).push({ from: p.from, to: p.to });
+    // logged from the schedule, so that a pause is visible even when no event runs into it
+    logE(p.from, p.node, 'fault', 'p' + p.node + ' pauses: it handles nothing until ' + fmtDuration(p.to));
+    logE(p.to, p.node, 'fault', 'p' + p.node + ' resumes');
+  }
+  // a paused process is not down: it processes nothing until the pause ends, and loses nothing
+  function pauseEnd(id, t) {
+    let end = 0;
+    for (const p of pauses) if (p.node === id && t >= p.from && t < p.to) end = Math.max(end, p.to);
+    return end;
+  }
+  // an omitting process drops some of the messages it sends or receives, without crashing
+  function omits(id, dir, t) {
+    for (const f of omissions) {
+      if (f.node !== id || t < f.from || (f.to !== null && t >= f.to)) continue;
+      if (f.direction !== 'both' && f.direction !== dir) continue;
+      if (f.prob >= 1 || streams.get('omit:' + id).next() < f.prob) return true;
+    }
+    return false;
+  }
+  const partitions = cfg.faults.filter(f => f.type === 'partition').map(p => {
+    const groupOf = new Map();
+    p.groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
+    return Object.assign({}, p, { groupOf });
+  });
+  out.netFaults = {
+    links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to, oneWay: !!l.oneWay })),
+    partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to }))
+  };
+  // is the channel between a and b interrupted at time t? (processes not listed in a partition form one more group)
+  function cutAt(a, b, t) {
+    for (const l of linkCuts) {
+      const match = l.oneWay ? (l.a === a && l.b === b) : ((l.a === a && l.b === b) || (l.a === b && l.b === a));
+      if (match && t >= l.from && (l.to === null || t < l.to)) return 'link down';
+    }
+    for (const p of partitions) {
+      if (t < p.from || (p.to !== null && t >= p.to)) continue;
+      const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1;
+      const gb = p.groupOf.has(b) ? p.groupOf.get(b) : -1;
+      if (ga !== gb) return 'network partition';
+    }
+    return null;
+  }
+  // drops a message sent into an interrupted channel
+  function cutAtSend(rec, from, q, ts, line) {
+    if (from === q || (!linkCuts.length && !partitions.length)) return false;
+    const why = cutAt(from, q, ts);
+    if (!why) return false;
+    rec.status = 'dropped-cut'; rec.recvT = ts;
+    logE(ts, from, 'drop', 'message to p' + q + ' dropped: ' + why, line);
+    return true;
+  }
+  // drops a message whose channel is interrupted when it arrives
+  function cutAtArrival(rec, from, q, arr) {
+    if (from === q || (!linkCuts.length && !partitions.length)) return false;
+    const why = cutAt(from, q, arr);
+    if (!why) return false;
+    rec.status = 'dropped-cut'; rec.recvT = arr;
+    logE(arr, q, 'drop', 'message from p' + from + ' dropped in transit: ' + why);
+    return true;
+  }
+  function cutDrop(rec, from, q, ts, arr, line) {
+    return cutAtSend(rec, from, q, ts, line) || cutAtArrival(rec, from, q, arr);
+  }
+
+  function scheduleDeliver(rec, node, q, payload, arr, alias) {
+    rec.recvT = arr;
+    push({ t: arr, cls: CLS.deliver, node: byId.get(q).idx, type: 'deliver', rec, from: node.id, payload, alias });
+  }
+
+  // dispatch an event to an instance
+  // origin: the module that started the chain of requests this event belongs to. A module handling a
+  // request from above keeps the origin; one reacting to an indication, a timer or an input starts its own.
+  function dispatch(node, specId, alias, ev, args, origin) {
+    const inst = node.insts[specId];
+    const algo = inst.algo;
+    const fromAbove = alias === algo.implAlias && ev !== 'Init' && ev !== 'Recovery' && origin !== undefined;
+    const org = fromAbove ? origin : specId;
+    let handled = false;
+    for (const h of algo.handlers) {
+      if (h.kind !== 'event' || h.inst !== alias || h.ev !== ev) continue;
+      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: curTime, origin: org };
+      let ok = true;
+      for (let i = 0; i < h.pats.length && ok; i++) ok = matchPat(h.pats[i], args[i], env, h.binds);
+      if (!ok) continue;
+      if (h.where) {
+        try {
+          const w = evalExpr(h.where, env);
+          if (w !== true) { if (w !== false) throw new RtError('The "where" clause must be boolean', h.line); continue; }
+        } catch (e) { throw e; }
+      }
+      out.handlerCount++;
+      execBlock(h.body, env);
+      handled = true;
+      break;
+    }
+    if (!handled && ev !== 'Init' && ev !== 'Recovery' && ev !== 'RoundStart' && ev !== 'RoundEnd') {
+      const k = node.id + ':' + specId + ':' + alias + '.' + ev;
+      if (!unhandledSeen.has(k)) {
+        unhandledSeen.add(k);
+        logE(curTime, node.id, 'warn', 'event ⟨' + alias + ', ' + ev + (args.length ? ' | ' + args.map(fmt).join(', ') : '') +
+          '⟩ has no handler in ' + algo.name + ' (shown once)');
+      }
+    }
+  }
+
+  function drain(node) {
+    let guard = 0;
+    for (;;) {
+      while (localQ.length) {
+        if (++guard > 20000) throw new RtError('Too many internal events in a single step', 0);
+        const e = localQ.shift();
+        dispatch(node, e.inst, e.alias, e.ev, e.args, e.origin);
+      }
+      // guards
+      let fired = false;
+      for (const inst of node.insts) {
+        const hs = inst.algo.handlers;
+        const gs = hs.filter(h => h.kind !== 'event');
+        if (!gs.length) continue;
+        for (let k = 0; k < gs.length; k++) {
+          const h = gs[(inst.rr + k) % gs.length];
+          const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: curTime };
+          let en = false;
+          if (h.kind === 'cond') {
+            en = needType(evalExpr(h.expr, env), isBool, 'a boolean in the guard', h.line);
+          } else {
+            for (const x of elems(evalExpr(h.set, env), h.line)) {
+              env.locals.set(h.var, x);
+              if (needType(evalExpr(h.where, env), isBool, 'a boolean', h.line)) { en = true; break; }
+            }
+          }
+          if (en) {
+            inst.rr = (inst.rr + k + 1) % gs.length;
+            if (++guard > 20000) throw new RtError('A guard stays true forever: its handler must make it false', h.line);
+            execBlock(h.body, env);
+            fired = true;
+            break;
+          }
+        }
+        if (fired) break;
+      }
+      if (!fired && !localQ.length) break;
+    }
+  }
+
+  // ---- global properties ----
+  // Each property is one boolean expression over the state of every process: a state variable name reads as a
+  // map from process to its value on that process, in the main algorithm. "always" is checked after every step
+  // and reports the first moment it turns false; "eventually" latches the first moment it turns true.
+  const props = (prog.properties || []).map(pr => ({
+    name: pr.name, kind: pr.kind, expr: pr.expr, line: pr.line,
+    ok: pr.kind === 'always', at: null, node: null, error: null
+  }));
+  const propStateNames = (() => {
+    const set = new Set();
+    for (const a of prog.algorithms) for (const st of a.state) set.add(st.name);
+    return [...set];
+  })();
+  function propEnv(t) {
+    const locals = new Map();
+    for (const name of propStateNames) {
+      const m = new Map();
+      for (const node of nodes) {
+        const st = node.insts[0].state;
+        if (name in st) m.set(key(node.id), [node.id, st[name]]);
+      }
+      locals.set(name, new VMap(m));
+    }
+    const crashedSet = new Set(nodes.filter(n => n.crashed).map(n => n.id));
+    const everCrashed = new Set(nodes.filter(n => (out.downs[n.id] || []).length).map(n => n.id));
+    const setOf = ids => new VSet(new Map(ids.map(id => [key(id), id])));
+    locals.set('Procs', sim.procSet);
+    locals.set('N', nodes.length);
+    locals.set('crashed', setOf([...crashedSet]));
+    locals.set('up', setOf(nodes.filter(n => !n.crashed).map(n => n.id)));
+    locals.set('correct', setOf(nodes.filter(n => !everCrashed.has(n.id)).map(n => n.id)));
+    locals.set('t', t);
+    // a placeholder instance: a property has no algorithm of its own, and only built-in functions are allowed
+    const inst = { state: {}, params: {}, algo: { funcs: new Map() } };
+    return { node: null, inst, locals, sim, rng: streams.get('input'), time: t, property: true };
+  }
+  function checkProperties(t, nodeId) {
+    if (!props.length) return;
+    let env = null;
+    for (const p of props) {
+      if (p.error) continue;
+      if (p.kind === 'always' && !p.ok) continue;      // the first violation is the one that matters
+      if (p.kind === 'eventually' && p.ok) continue;   // already satisfied
+      if (!env) env = propEnv(t);
+      let v;
+      try { v = evalExpr(p.expr, env); }
+      catch (e) {
+        p.error = e instanceof RtError ? e.message : String(e && e.message || e);
+        logE(t, nodeId, 'property', p.name + ' could not be evaluated: ' + p.error, p.line);
+        continue;
+      }
+      if (typeof v !== 'boolean') {
+        p.error = 'the expression is not a boolean, found ' + typeName(v);
+        logE(t, nodeId, 'property', p.name + ' could not be evaluated: ' + p.error, p.line);
+        continue;
+      }
+      if (p.kind === 'always' && !v) {
+        // kept apart from timing violations: a broken property is a broken algorithm, not a broken assumption
+        p.ok = false; p.at = t; p.node = nodeId;
+        logE(t, nodeId, 'property', p.name + ' is violated', p.line);
+        if (cfg.haltOnProperty) throw new HaltSignal('Property violated: ' + p.name);
+      } else if (p.kind === 'eventually' && v) {
+        p.ok = true; p.at = t;
+        logE(t, nodeId, 'property', p.name + ' holds from here', p.line);
+      }
+    }
+  }
+
+  function snapshot(node, t) {
+    const states = {};
+    let changed = false;
+    for (const inst of node.insts) { if (inst.dirty) changed = true; inst.dirty = false; states[inst.spec.path] = Object.assign({}, inst.state); }
+    const arr = out.snaps[node.id];
+    if (changed || !arr.length || arr[arr.length - 1].round !== node.round) arr.push({ t, states, round: node.round });
+  }
+
+  // ---- initialization ----
+  try {
+    for (const n of nodes) {
+      n.insts = stack.specs.map(s => makeInst(n, s));
+      if (cfg.known.RHO !== null && Math.abs(n.rho) > cfg.known.RHO)
+        violation(0, n.id, 'clock drift ' + n.rho.toExponential(2) + ' exceeds RHO = ' + cfg.known.RHO);
+    }
+  } catch (e) {
+    if (e instanceof RtError) { out.error = 'Initialization error: ' + e.message; out.errorLine = e.line; return out; }
+    throw e;
+  }
+  for (const n of nodes) {
+    // Init from the bottom up
+    push({ t: 0, cls: CLS.input - 0.5, node: n.idx, type: 'init' });
+  }
+  const groupsText = g => g.map(x => '{' + x.map(id => 'p' + id).join(', ') + '}').join(' | ');
+  for (const f of cfg.faults) {
+    if (f.type === 'crash' || f.type === 'recover') {
+      const n = byId.get(f.node);
+      if (!n) { out.warnings.push('Fault on missing process p' + f.node); continue; }
+      push({ t: f.at, cls: CLS.crash, node: n.idx, type: f.type });
+    } else if (f.type === 'link') {
+      if (!byId.has(f.a) || !byId.has(f.b)) { out.warnings.push('Link fault on missing process p' + f.a + ' or p' + f.b); continue; }
+      push({ t: f.from, cls: CLS.crash, node: 0, type: 'netlog', text: 'link p' + f.a + '–p' + f.b + ' goes down' });
+      if (f.to !== null) push({ t: f.to, cls: CLS.crash, node: 0, type: 'netlog', text: 'link p' + f.a + '–p' + f.b + ' is back up' });
+    } else if (f.type === 'partition') {
+      const missing = f.groups.flat().filter(id => !byId.has(id));
+      if (missing.length) out.warnings.push('Partition lists missing processes: ' + missing.map(id => 'p' + id).join(', '));
+      const listed = new Set(f.groups.flat());
+      const rest = nodes.filter(n => !listed.has(n.id)).map(n => n.id);
+      const shown = rest.length ? f.groups.concat([rest]) : f.groups;
+      push({ t: f.from, cls: CLS.crash, node: 0, type: 'netlog', text: 'network partition: ' + groupsText(shown) });
+      if (f.to !== null) push({ t: f.to, cls: CLS.crash, node: 0, type: 'netlog', text: 'partition healed: ' + groupsText(shown) });
+    }
+  }
+  for (const inp of cfg.inputs) {
+    const targets = inp.node === '*' ? nodes : [byId.get(inp.node)].filter(Boolean);
+    if (!targets.length) { out.warnings.push('Input on line ' + inp.line + ': process p' + inp.node + ' does not exist'); continue; }
+    if (!topIface.requests.has(inp.ev)) {
+      out.error = 'Input on line ' + inp.line + ': "' + inp.ev + '" is not a request of ' + topIface.name +
+        ' (available: ' + ([...topIface.requests.keys()].join(', ') || 'none') + ')';
+      return out;
+    }
+    if (topIface.requests.get(inp.ev) !== inp.args.length) {
+      out.error = 'Input on line ' + inp.line + ': "' + inp.ev + '" takes ' + topIface.requests.get(inp.ev) + ' argument(s)';
+      return out;
+    }
+    for (const n of targets) push({ t: inp.at, cls: CLS.input, node: n.idx, type: 'input', inp });
+  }
+  if (cfg.timing === 'synchronous-rounds') {
+    const maxR = Math.max(1, Math.floor(cfg.stopAt / R) + 1);
+    for (const n of nodes) {
+      out.rounds.starts[n.id] = [];
+      for (let r = 1; r <= maxR; r++) {
+        const s = roundStartG(n, r);
+        if (s > cfg.stopAt) break;
+        out.rounds.starts[n.id].push(s);
+        push({ t: s, cls: CLS.roundStart, node: n.idx, type: 'roundStart', r });
+        push({ t: roundEndG(n, r), cls: CLS.roundEnd, node: n.idx, type: 'roundEnd', r });
+      }
+    }
+  }
+
+  // restart a crashed process: volatile state and timers are reset, stable variables are kept,
+  // and each instance receives Recovery if it handles it, Init otherwise (bottom-up)
+  function recoverNode(node, t) {
+    node.crashed = false;
+    const d = out.downs[node.id];
+    d[d.length - 1].to = t;
+    node.busyUntil = t;
+    curTime = t; curEnd = t; localQ = []; sim.stepBudget = 200000;
+    for (const inst of node.insts) {
+      const env = { node, inst, locals: new Map(), sim, rng: streams.get('node:' + node.id), time: t };
+      for (const st of inst.algo.state) if (!st.stable) inst.state[st.name] = evalExpr(st.expr, env);
+      inst.timers = {};
+      inst.dirty = true;
+    }
+    logE(t, node.id, 'fault', 'p' + node.id + ' recovers (volatile state reset)');
+    for (let i = stack.specs.length - 1; i >= 0; i--) {
+      const a = stack.specs[i].algo;
+      const hasRecovery = a.handlers.some(h => h.kind === 'event' && h.inst === a.implAlias && h.ev === 'Recovery');
+      dispatch(node, i, a.implAlias, hasRecovery ? 'Recovery' : 'Init', []);
+    }
+    drain(node);
+    snapshot(node, t);
+    checkProperties(t, node.id);
+    out.activity.push({ t, end: t, node: node.id, type: 'recover', msg: null });
+  }
+
+  // ---- main loop ----
+  let count = 0;
+  let curNode = nodes[0];
+  const inputRng = streams.get('input');
+  try {
+    while (heap.size && !halted) {
+      const ev = heap.pop();
+      if (ev.t > cfg.stopAt) { out.stopReason = 'Time limit reached'; break; }
+      if (++count > MAX_EVENTS) { out.stopReason = 'Limit of ' + MAX_EVENTS + ' events reached'; break; }
+      const node = nodes[ev.node];
+      curNode = node;
+      out.endT = Math.max(out.endT, ev.t);
+      if (ev.type === 'netlog') { logE(ev.t, null, 'fault', ev.text); continue; }
+      if (ev.type === 'crash') {
+        if (!node.crashed) {
+          node.crashed = true;
+          (out.downs[node.id] = out.downs[node.id] || []).push({ from: ev.t, to: null });
+          logE(ev.t, node.id, 'fault', 'p' + node.id + ' crashes');
+        }
+        continue;
+      }
+      if (ev.type === 'recover') {
+        if (!node.crashed) { logE(ev.t, node.id, 'warn', 'p' + node.id + ' is running: recovery ignored'); continue; }
+        recoverNode(node, ev.t);
+        continue;
+      }
+      // input arguments are evaluated once, when the input first comes up, whatever the state of the target,
+      // so that the shared input stream gives every process the same values with or without faults
+      if (ev.type === 'input' && ev.args === undefined) {
+        const ienv = { node, inst: node.insts[0], locals: new Map(), sim, rng: inputRng, time: ev.t };
+        ev.args = ev.inp.args.map(a => evalExpr(a, ienv));
+      }
+      if (node.crashed) {
+        if (ev.type === 'deliver') { ev.rec.status = 'lost-crash'; }
+        if (ev.type === 'input') logE(ev.t, node.id, 'warn', 'input ' + ev.inp.ev + ' ignored: p' + node.id + ' is down');
+        continue;
+      }
+      if (ev.t < node.busyUntil) { ev.t = node.busyUntil; push(ev); continue; }
+      const held = pauseEnd(node.id, ev.t);
+      if (held) { ev.t = held; push(ev); continue; }
+      if (ev.type === 'timer') {
+        const inst = node.insts[ev.inst];
+        if (inst.timers[ev.id] !== ev.gen) continue; // cancelled or restarted
+      }
+      const step = lockstep ? 0 : Math.max(0, Math.round(sampleDist(cfg.step, streams.get('step:' + node.id))));
+      curTime = ev.t;
+      curEnd = ev.t + step;
+      if (cfg.known.PHI !== null && !lockstep && step > cfg.known.PHI)
+        violation(ev.t, node.id, 'processing step of ' + fmtDuration(step) + ' exceeds PHI = ' + fmtDuration(cfg.known.PHI));
+      sim.stepBudget = 200000;
+      localQ = [];
+      switch (ev.type) {
+        case 'init':
+          for (let i = stack.specs.length - 1; i >= 0; i--) dispatch(node, i, stack.specs[i].algo.implAlias, 'Init', []);
+          break;
+        case 'input': {
+          const args = ev.args;
+          logE(ev.t, node.id, 'input', ev.inp.ev + (args.length ? ' | ' + args.map(fmt).join(', ') : ''));
+          trace(node, 'app', 0, ev.inp.ev, args);
+          dispatch(node, 0, topSpec.algo.implAlias, ev.inp.ev, args);
+          break;
+        }
+        case 'deliver': {
+          ev.rec.status = 'delivered';
+          // the sending instance receives under the same alias on the destination node
+          if (omissions.length && ev.from !== node.id && omits(node.id, 'receive', ev.t)) {
+            ev.rec.status = 'dropped-omission';
+            logE(ev.t, node.id, 'drop', 'message from p' + ev.from + ' not received (omission)');
+            continue;
+          }
+          trace(node, 'net', ev.rec.spec, 'Deliver', [ev.from, ev.payload]);
+          dispatch(node, ev.rec.spec, ev.alias, 'Deliver', [ev.from, ev.payload]);
+          break;
+        }
+        case 'timer':
+          trace(node, 'timer', ev.inst, 'Timeout', [ev.id]);
+          dispatch(node, ev.inst, 'timer', 'Timeout', [ev.id]);
+          break;
+        case 'roundStart':
+          node.round = ev.r;
+          for (const s of stack.specs) for (const a in s.bind) if (s.bind[a].builtin === 'Rounds') dispatch(node, s.id, a, 'RoundStart', [ev.r]);
+          break;
+        case 'roundEnd':
+          for (const s of stack.specs) for (const a in s.bind) if (s.bind[a].builtin === 'Rounds') dispatch(node, s.id, a, 'RoundEnd', [ev.r]);
+          break;
+      }
+      drain(node);
+      node.busyUntil = curEnd;
+      // processing activity, used by the UI to animate nodes
+      if (ev.type !== 'init') out.activity.push({ t: ev.t, end: curEnd, node: node.id, type: ev.type, msg: ev.type === 'deliver' ? ev.rec.id : null });
+      snapshot(node, ev.t);
+      checkProperties(curEnd, node.id);
+    }
+    out.properties = props.map(p => ({ name: p.name, kind: p.kind, ok: p.error ? false : p.ok, at: p.at, node: p.node, error: p.error, line: p.line }));
+    if (halted) out.stopReason = halted;
+    else if (!out.stopReason) out.stopReason = 'No more events in the queue';
+    out.ok = true;
+  } catch (e) {
+    if (e instanceof RtError) { out.error = 'Runtime error on p' + (curNode ? curNode.id : '?') + ': ' + e.message; out.errorLine = e.line; out.ok = true; out.stopReason = 'Runtime error'; logE(curTime, curNode ? curNode.id : null, 'error', e.message + (e.line ? ' (line ' + e.line + ')' : ''), e.line); }
+    else if (e instanceof HaltSignal) { out.ok = true; out.stopReason = e.message; }
+    else throw e;
+  }
+  for (const m of out.msgs) if (m.recvT !== null && m.recvT <= cfg.stopAt && m.recvT > out.endT) out.endT = m.recvT;
+  if (out.endT < 1) out.endT = 1;
+  out.eventCount = count;
+  out.cfg = { timing: cfg.timing, roundMode: cfg.roundMode, known: cfg.known, gst: cfg.gst, stopAt: cfg.stopAt };
+  return out;
+}
+
+// ============================================================
+// Scenario normalization
+// ============================================================
+function normalizeScenario(s) {
+  const A = s.assumed || {}, X = s.actual || {};
+  const timing = A.timing || 'asynchronous';
+  if (!['synchronous-rounds', 'synchronous-timed', 'partial', 'asynchronous'].includes(timing))
+    throw new Error('Invalid assumed model: ' + timing);
+  const kd = k => (A[k] === undefined || A[k] === null || A[k] === '' || A[k] === 'unknown') ? null : (k === 'RHO' ? parseFloat(A[k]) : parseDuration(A[k]));
+  const known = { DELTA: kd('DELTA'), PHI: kd('PHI'), RHO: kd('RHO') };
+  if (timing === 'asynchronous') { known.DELTA = null; known.PHI = null; known.RHO = null; }
+  const num = (v, d, name) => {
+    if (v === undefined || v === null || v === '') return d;
+    const x = parseFloat(v);
+    if (isNaN(x) || x < 0 || x > 1) throw new Error(name + ' must be a number between 0 and 1');
+    return x;
+  };
+  const inputs = parseInputs(s.inputs || '');
+  return {
+    seed: (parseInt(s.seed, 10) || 0) >>> 0,
+    timing, known,
+    roundMode: X.roundMode === 'emulated' ? 'emulated' : 'lockstep',
+    roundLen: parseDuration(X.roundLen || '1s') || 1000000,
+    nodes: (s.nodes || []).map(n => ({ id: n.id })),
+    links: (s.links || []).map(l => ({
+      a: l.a, b: l.b, directed: !!l.directed, enabled: l.enabled !== false,
+      loss: l.loss === null || l.loss === undefined || l.loss === '' ? null : num(l.loss, 0, 'Link loss'),
+      delay: l.delay ? parseDist(l.delay) : null
+    })),
+    delay: parseDist(X.delay || 'uniform(5ms, 50ms)'),
+    bound: X.bound ? parseDuration(X.bound) : null,
+    loss: num(X.loss, 0, 'Loss'),
+    dup: num(X.dup, 0, 'Duplication'),
+    fifo: X.fifo !== false,
+    spikeProb: num(X.spikeProb, 0, 'Spike probability'),
+    spikeExtra: parseDuration(X.spikeExtra || '0ms') || 0,
+    step: parseDist(X.step || 'const(0ms)'),
+    offset: parseDist(X.offset || 'const(0ms)'),
+    rho: parseDist(X.rho || '0', true),
+    gst: X.gst ? parseDuration(X.gst) : null,
+    preGstDelay: X.preGstDelay ? parseDist(X.preGstDelay) : null,
+    policy: s.violationPolicy || 'deliver-late',
+    tieBreak: s.tieBreak === 'shuffle' ? 'shuffle' : 'stable',
+    stopAt: parseDuration(s.stopAt || '10s'),
+    faults: (s.faults || []).map((f, i) => normalizeFault(f, i + 1)),
+    inputs,
+    paramOverrides: {},
+    haltOnAssert: !!s.haltOnAssert,
+    haltOnProperty: !!s.haltOnProperty
+  };
+}
+
+function parseGroups(g) {
+  let groups;
+  if (Array.isArray(g)) groups = g.map(x => (Array.isArray(x) ? x : [x]).map(Number));
+  else groups = String(g || '').split('|').map(part => part.split(/[\s,]+/).filter(Boolean).map(x => parseInt(x.replace(/^p/i, ''), 10)));
+  groups = groups.filter(x => x.length);
+  if (!groups.length || groups.some(x => x.some(id => !Number.isInteger(id))))
+    throw new Error('Partition groups must be process numbers separated by "|", e.g. "1 2 | 3 4"');
+  const seen = new Set();
+  for (const id of groups.flat()) { if (seen.has(id)) throw new Error('p' + id + ' appears in more than one partition group'); seen.add(id); }
+  return groups;
+}
+// Faults: crash/recover {node, at}, link {a, b, from, to}, partition {groups, from, to}; "to" empty = forever
+function normalizeFault(f, n) {
+  const where = 'Fault ' + (n || '') + ': ';
+  const dur = (v, label, optional) => {
+    if (v === undefined || v === null || String(v).trim() === '' || String(v).trim() === 'forever') {
+      if (optional) return null;
+      throw new Error(where + label + ' is required');
+    }
+    let d;
+    try { d = parseDuration(v); } catch (e) { throw new Error(where + e.message); }
+    if (d === null || d < 0) throw new Error(where + label + ' must be a duration ≥ 0');
+    return d;
+  };
+  const pid = (v, label) => {
+    const x = parseInt(v, 10);
+    if (!Number.isInteger(x)) throw new Error(where + label + ' must be a process number');
+    return x;
+  };
+  const type = f.type || 'crash';
+  switch (type) {
+    case 'crash': case 'recover':
+      return { type, node: pid(f.node, 'process'), at: dur(f.at, 'time') };
+    case 'link': {
+      const a = pid(f.a, 'first process'), b = pid(f.b, 'second process');
+      if (a === b) throw new Error(where + 'a link needs two different processes');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      // one-way: only the messages from a to b are lost, the other direction keeps working
+      return { type, a, b, from, to, oneWay: !!f.oneWay };
+    }
+    case 'pause': {
+      const node = pid(f.node, 'process');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end');
+      if (to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, node, from, to };
+    }
+    case 'omission': {
+      const node = pid(f.node, 'process');
+      const dir = f.direction || 'both';
+      if (!['send', 'receive', 'both'].includes(dir)) throw new Error(where + 'direction must be send, receive or both');
+      const prob = f.prob === undefined || f.prob === '' ? 1 : Number(f.prob);
+      if (!Number.isFinite(prob) || prob < 0 || prob > 1) throw new Error(where + 'probability must be between 0 and 1');
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, node, direction: dir, prob, from, to };
+    }
+    case 'partition': {
+      let groups;
+      try { groups = parseGroups(f.groups); } catch (e) { throw new Error(where + e.message); }
+      const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
+      if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
+      return { type, groups, from, to };
+    }
+  }
+  throw new Error(where + 'unknown type "' + type + '"');
+}
+
+// Format: TIME NODE Event | arg1, arg2     (NODE = number or *)
+function parseInputs(text) {
+  const res = [];
+  const lines = text.split('\n');
+  lines.forEach((raw, i) => {
+    const line = raw.replace(/\/\/.*$/, '').trim();
+    if (!line) return;
+    const m = /^(\S+)\s+(\*|p?\d+)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\s*(.*))?$/.exec(line);
+    if (!m) throw new Error('Input line ' + (i + 1) + ': expected "TIME NODE Event | arguments", e.g. "0ms 1 Broadcast | \\"hello\\""');
+    let at;
+    try { at = parseDuration(m[1]); } catch (e) { throw new Error('Input line ' + (i + 1) + ': ' + e.message); }
+    const node = m[2] === '*' ? '*' : parseInt(m[2].replace('p', ''), 10);
+    let args = [];
+    if (m[4] !== undefined && m[4].trim() !== '') {
+      try {
+        const p = new Parser(m[4]);
+        args.push(p.expr());
+        while (p.isOp(',')) { p.p++; args.push(p.expr()); }
+        if (!p.is('eof')) p.err('Unexpected text: ' + p.desc(p.tok));
+      } catch (e) { throw new Error('Input line ' + (i + 1) + ': ' + e.message); }
+    }
+    res.push({ at: at || 0, node, ev: m[3], args, line: i + 1 });
+  });
+  return res;
+}
+
+// sampling for the distribution preview
+function previewDist(str, n, seed) {
+  const d = parseDist(str);
+  const rng = new Rng(seed || 1, 'preview:' + str);
+  const xs = [];
+  for (let i = 0; i < (n || 2000); i++) xs.push(Math.max(0, sampleDist(d, rng)));
+  return xs;
+}
+
+// delay samples with spikes and truncation, for the Timing panel preview
+function previewDelay(distStr, spikeProb, spikeExtraStr, boundStr, n) {
+  const d = parseDist(distStr);
+  const sp = parseFloat(spikeProb) || 0;
+  const ex = parseDuration(spikeExtraStr || '0ms') || 0;
+  const bound = boundStr ? parseDuration(boundStr) : null;
+  const rng = new Rng(12345, 'preview:' + distStr);
+  const xs = [];
+  for (let i = 0; i < (n || 4000); i++) {
+    let v = sampleDist(d, rng);
+    if (sp > 0 && rng.next() < sp) v += ex;
+    if (bound !== null) v = Math.min(v, bound);
+    xs.push(Math.max(0, v));
+  }
+  return xs;
+}
+
+function isAtomNamePublic(n) { return isAtomName(n); }
+
+// Causal cone of the event of process `node` at time `t` (Lamport's happened-before relation).
+// past[q]: every event of q at or before past[q] may have influenced the origin (-Infinity: none).
+// future[q]: every event of q at or after future[q] may be influenced by the origin (Infinity: none).
+function causalCone(res, node, t) {
+  const ids = Object.keys(res.nodeInfo).map(Number);
+  const past = {}, future = {};
+  for (const q of ids) { past[q] = -Infinity; future[q] = Infinity; }
+  past[node] = t; future[node] = t;
+  const msgs = res.msgs.filter(m => m.status === 'delivered' && m.from !== m.to);
+  const byRecv = msgs.slice().sort((a, b) => b.recvT - a.recvT);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of byRecv) {
+      if (m.recvT <= past[m.to] && m.sendT > past[m.from]) { past[m.from] = m.sendT; changed = true; }
+    }
+  }
+  const bySend = msgs.slice().sort((a, b) => a.sendT - b.sendT);
+  changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of bySend) {
+      if (m.sendT >= future[m.from] && m.recvT < future[m.to]) { future[m.to] = m.recvT; changed = true; }
+    }
+  }
+  const counts = { past: 0, future: 0, concurrent: 0 };
+  for (const a of res.activity) {
+    if (a.node === node && a.t === t) continue;
+    if (a.t <= past[a.node]) counts.past++;
+    else if (a.t >= future[a.node]) counts.future++;
+    else counts.concurrent++;
+  }
+  return { node, t, past, future, counts };
+}
+
+const SimCore = {
+  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay,
+  isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups, causalCone,
+  DslError, fmt, KEYWORDS
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = SimCore;
+else root.SimCore = SimCore;
+})(typeof self !== 'undefined' ? self : this);
+
+/* Distributed Systems Playground — library of communication abstractions written in Upon */
+(function (root) {
+'use strict';
+
+const IFACES = {
+  StubbornLinks: `interface StubbornLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end`,
+  PerfectLinks: `interface PerfectLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end`,
+  FifoPerfectLinks: `interface FifoPerfectLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end`,
+  BestEffortBroadcast: `interface BestEffortBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  ReliableBroadcast: `interface ReliableBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  UniformReliableBroadcast: `interface UniformReliableBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  FifoReliableBroadcast: `interface FifoReliableBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  CausalOrderBroadcast: `interface CausalOrderBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`,
+  ProbabilisticBroadcast: `interface ProbabilisticBroadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end`
+};
+
+const MODULES = [
+  {
+    key: 'stubborn-links', name: 'RetransmitLinks', implements: 'StubbornLinks', group: 'Links', uses: [],
+    summary: 'Stubborn links: every message is sent again periodically, a bounded number of times.',
+    properties: 'Stubborn delivery (within the retransmission budget), no creation.',
+    source: `// Stubborn links over the lossy network, after "Retransmit Forever"
+// (Cachin, Guerraoui, Rodrigues). The book retransmits forever; here each message is resent RETRIES times,
+// so that runs stay short.
+algorithm RetransmitLinks
+  implements StubbornLinks as sl
+  uses Net as net
+  params
+    PERIOD := 100ms
+    RETRIES := 5
+  state
+    sent := map()            // [q, m] -> retransmissions left
+
+  upon event ⟨sl, Init⟩ do
+    starttimer(retransmit, PERIOD)
+  end
+
+  upon event ⟨sl, Send | q, m⟩ do
+    trigger ⟨net, Send | q, m⟩
+    sent[[q, m]] := RETRIES
+  end
+
+  upon event ⟨timer, Timeout | retransmit⟩ do
+    forall e in keys(sent) do
+      trigger ⟨net, Send | e[0], e[1]⟩
+      if sent[e] <= 1 then
+        sent := remove(sent, e)
+      else
+        sent[e] := sent[e] - 1
+      end
+    end
+    starttimer(retransmit, PERIOD)
+  end
+
+  upon event ⟨net, Deliver | p, m⟩ do
+    trigger ⟨sl, Deliver | p, m⟩
+  end
+end`
+  },
+  {
+    key: 'eliminate-duplicates', name: 'EliminateDuplicates', implements: 'PerfectLinks', group: 'Links', uses: ['StubbornLinks'],
+    summary: 'Perfect links built on stubborn links by discarding duplicates.',
+    properties: 'Reliable delivery, no duplication, no creation (messages are assumed unique).',
+    source: `// Perfect links on top of stubborn links, after "Eliminate Duplicates"
+// (Cachin, Guerraoui, Rodrigues).
+// Like the book, it assumes that every message is unique.
+algorithm EliminateDuplicates
+  implements PerfectLinks as pl
+  uses StubbornLinks as sl
+  state
+    delivered := ∅
+
+  upon event ⟨pl, Send | q, m⟩ do
+    trigger ⟨sl, Send | q, m⟩
+  end
+
+  upon event ⟨sl, Deliver | p, m⟩ where [p, m] ∉ delivered do
+    delivered := delivered ∪ {[p, m]}
+    trigger ⟨pl, Deliver | p, m⟩
+  end
+
+  upon event ⟨sl, Deliver | p, m⟩ where [p, m] ∈ delivered do
+    skip    // duplicate
+  end
+end`
+  },
+  {
+    key: 'ack-links', name: 'AckLinks', implements: 'PerfectLinks', group: 'Links', uses: [],
+    summary: 'Perfect links with sequence numbers, acknowledgements and retransmission until acknowledged.',
+    properties: 'Reliable delivery to correct processes, no duplication, no creation.',
+    source: `// Perfect links with acknowledgements: each message carries a sequence number
+// and is retransmitted until the recipient acknowledges it. Duplicates are
+// recognized by (sender, sequence number), so equal payloads are fine.
+algorithm AckLinks
+  implements PerfectLinks as pl
+  uses Net as net
+  params
+    TIMEOUT := 150ms
+  state
+    seq := 0
+    pending := map()         // [q, n] -> message not yet acknowledged
+    delivered := ∅           // [p, n] already delivered
+
+  upon event ⟨pl, Init⟩ do
+    starttimer(resend, TIMEOUT)
+  end
+
+  upon event ⟨pl, Send | q, m⟩ do
+    seq := seq + 1
+    pending[[q, seq]] := m
+    trigger ⟨net, Send | q, [DATA, seq, m]⟩
+  end
+
+  upon event ⟨net, Deliver | p, [DATA, n, m]⟩ do
+    trigger ⟨net, Send | p, [ACK, n]⟩
+    if [p, n] ∉ delivered then
+      delivered := delivered ∪ {[p, n]}
+      trigger ⟨pl, Deliver | p, m⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | q, [ACK, n]⟩ do
+    pending := remove(pending, [q, n])
+  end
+
+  upon event ⟨timer, Timeout | resend⟩ do
+    forall k in keys(pending) do
+      trigger ⟨net, Send | k[0], [DATA, k[1], pending[k]]⟩
+    end
+    starttimer(resend, TIMEOUT)
+  end
+end`
+  },
+  {
+    key: 'fifo-links', name: 'SequencedFifoLinks', implements: 'FifoPerfectLinks', group: 'Links', uses: ['PerfectLinks'],
+    summary: 'FIFO perfect links: per-sender sequence numbers and a reorder buffer.',
+    properties: 'Perfect link properties, plus FIFO delivery per pair of processes.',
+    source: `// FIFO perfect links on top of perfect links: messages from each sender are
+// numbered, buffered on arrival and delivered in order.
+algorithm SequencedFifoLinks
+  implements FifoPerfectLinks as fpl
+  uses PerfectLinks as pl
+  state
+    next := map()            // q -> sequence number of the next message to q
+    expected := map()        // p -> sequence number expected from p
+    buffer := ∅              // [p, n, m] received but not delivered
+
+  function expectedFrom(p)
+    return get(expected, p, 0)
+  end
+
+  upon event ⟨fpl, Send | q, m⟩ do
+    n := get(next, q, 0)
+    next[q] := n + 1
+    trigger ⟨pl, Send | q, [FIFO, n, m]⟩
+  end
+
+  upon event ⟨pl, Deliver | p, [FIFO, n, m]⟩ do
+    buffer := buffer ∪ {[p, n, m]}
+  end
+
+  upon exists e in buffer where e[1] = expectedFrom(e[0]) do
+    buffer := buffer \\ {e}
+    expected[e[0]] := e[1] + 1
+    trigger ⟨fpl, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'beb', name: 'BasicBroadcast', implements: 'BestEffortBroadcast', group: 'Broadcast', uses: ['PerfectLinks'],
+    summary: 'Best-effort broadcast: send the message to every process over perfect links.',
+    properties: 'Validity, no duplication, no creation. If the sender crashes, some processes may miss the message.',
+    source: `// Best-effort broadcast, after "Basic Broadcast" (Cachin, Guerraoui, Rodrigues).
+algorithm BasicBroadcast
+  implements BestEffortBroadcast as beb
+  uses PerfectLinks as pl
+
+  upon event ⟨beb, Broadcast | m⟩ do
+    forall q in Π do
+      trigger ⟨pl, Send | q, m⟩
+    end
+  end
+
+  upon event ⟨pl, Deliver | p, m⟩ do
+    trigger ⟨beb, Deliver | p, m⟩
+  end
+end`
+  },
+  {
+    key: 'erb', name: 'EagerReliableBroadcast', implements: 'ReliableBroadcast', group: 'Broadcast', uses: ['BestEffortBroadcast'],
+    summary: 'Reliable broadcast without failure detection: every process relays each message once.',
+    properties: 'Validity, no duplication, no creation, agreement among correct processes.',
+    source: `// Reliable broadcast, after "Eager Reliable Broadcast" (Cachin, Guerraoui, Rodrigues).
+// Messages are identified by (original sender, sequence number).
+algorithm EagerReliableBroadcast
+  implements ReliableBroadcast as rb
+  uses BestEffortBroadcast as beb
+  state
+    seq := 0
+    delivered := ∅
+
+  upon event ⟨rb, Broadcast | m⟩ do
+    seq := seq + 1
+    trigger ⟨beb, Broadcast | [RB, self, seq, m]⟩
+  end
+
+  upon event ⟨beb, Deliver | p, [RB, s, n, m]⟩ where [s, n] ∉ delivered do
+    delivered := delivered ∪ {[s, n]}
+    trigger ⟨rb, Deliver | s, m⟩
+    trigger ⟨beb, Broadcast | [RB, s, n, m]⟩
+  end
+
+  upon event ⟨beb, Deliver | p, [RB, s, n, m]⟩ where [s, n] ∈ delivered do
+    skip    // already relayed
+  end
+end`
+  },
+  {
+    key: 'urb', name: 'MajorityAckURB', implements: 'UniformReliableBroadcast', group: 'Broadcast', uses: ['BestEffortBroadcast'],
+    summary: 'Uniform reliable broadcast: deliver only after a majority has relayed the message.',
+    properties: 'Uniform agreement: if any process delivers, every correct process delivers. Needs a correct majority.',
+    source: `// Uniform reliable broadcast, after "Majority-Ack Uniform Reliable Broadcast"
+// (Cachin, Guerraoui, Rodrigues).
+// A message is delivered once more than half of the processes relayed it,
+// so it survives the crash of the processes that delivered it first.
+algorithm MajorityAckURB
+  implements UniformReliableBroadcast as urb
+  uses BestEffortBroadcast as beb
+  state
+    seq := 0
+    pending := ∅             // [s, n, m] seen and relayed
+    ack := map()             // [s, n] -> processes that relayed it
+    delivered := ∅           // [s, n]
+
+  function acks(s, n)
+    return #get(ack, [s, n], ∅)
+  end
+
+  upon event ⟨urb, Broadcast | m⟩ do
+    seq := seq + 1
+    pending := pending ∪ {[self, seq, m]}
+    trigger ⟨beb, Broadcast | [URB, self, seq, m]⟩
+  end
+
+  upon event ⟨beb, Deliver | p, [URB, s, n, m]⟩ do
+    ack[[s, n]] := get(ack, [s, n], ∅) ∪ {p}
+    if [s, n, m] ∉ pending then
+      pending := pending ∪ {[s, n, m]}
+      trigger ⟨beb, Broadcast | [URB, s, n, m]⟩
+    end
+  end
+
+  upon exists e in pending where [e[0], e[1]] ∉ delivered and acks(e[0], e[1]) > N / 2 do
+    delivered := delivered ∪ {[e[0], e[1]]}
+    trigger ⟨urb, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'fifo-rb', name: 'BroadcastWithSequenceNumber', implements: 'FifoReliableBroadcast', group: 'Broadcast', uses: ['ReliableBroadcast'],
+    summary: 'FIFO reliable broadcast: messages of each sender are delivered in the order they were sent.',
+    properties: 'Reliable broadcast properties, plus FIFO delivery per sender.',
+    source: `// FIFO reliable broadcast, after "Broadcast with Sequence Number"
+// (Cachin, Guerraoui, Rodrigues).
+algorithm BroadcastWithSequenceNumber
+  implements FifoReliableBroadcast as frb
+  uses ReliableBroadcast as rb
+  state
+    lsn := 0                 // messages broadcast by this process
+    next := map()            // s -> sequence number expected from s
+    pending := ∅             // [s, n, m]
+
+  function nextFrom(s)
+    return get(next, s, 1)
+  end
+
+  upon event ⟨frb, Broadcast | m⟩ do
+    lsn := lsn + 1
+    trigger ⟨rb, Broadcast | [FIFO, lsn, m]⟩
+  end
+
+  upon event ⟨rb, Deliver | s, [FIFO, n, m]⟩ do
+    pending := pending ∪ {[s, n, m]}
+  end
+
+  upon exists e in pending where e[1] = nextFrom(e[0]) do
+    pending := pending \\ {e}
+    next[e[0]] := e[1] + 1
+    trigger ⟨frb, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'causal', name: 'WaitingCausalBroadcast', implements: 'CausalOrderBroadcast', group: 'Broadcast', uses: ['ReliableBroadcast'],
+    summary: 'Causal order broadcast with vector clocks: a message waits until everything it depends on is delivered.',
+    properties: 'Reliable broadcast properties, plus causal delivery order.',
+    source: `// Causal-order broadcast with vector clocks, after "Waiting Causal Broadcast"
+// (Cachin, Guerraoui, Rodrigues).
+algorithm WaitingCausalBroadcast
+  implements CausalOrderBroadcast as crb
+  uses ReliableBroadcast as rb
+  state
+    V := map()               // q -> messages of q delivered here
+    lsn := 0                 // messages broadcast by this process
+    pending := ∅             // [s, W, m]
+
+  function entry(W, q)
+    return get(W, q, 0)
+  end
+
+  // true when W ≤ V in every component
+  function satisfied(W)
+    forall q in keys(W) do
+      if entry(W, q) > entry(V, q) then
+        return false
+      end
+    end
+    return true
+  end
+
+  upon event ⟨crb, Broadcast | m⟩ do
+    W := V
+    W[self] := lsn
+    lsn := lsn + 1
+    trigger ⟨rb, Broadcast | [CRB, W, m]⟩
+  end
+
+  upon event ⟨rb, Deliver | s, [CRB, W, m]⟩ do
+    pending := pending ∪ {[s, W, m]}
+  end
+
+  upon exists e in pending where satisfied(e[1]) do
+    pending := pending \\ {e}
+    V[e[0]] := entry(V, e[0]) + 1
+    trigger ⟨crb, Deliver | e[0], e[2]⟩
+  end
+end`
+  },
+  {
+    key: 'gossip', name: 'EagerGossip', implements: 'ProbabilisticBroadcast', group: 'Broadcast', uses: [],
+    summary: 'Probabilistic broadcast: each process forwards a new message to a few random neighbors for a few rounds.',
+    properties: 'Probabilistic validity: most processes deliver with high probability; no duplication.',
+    source: `// Gossip, after "Eager Probabilistic Broadcast" (Cachin, Guerraoui, Rodrigues).
+// Each hop forwards to FANOUT random neighbors, for at most ROUNDS hops.
+algorithm EagerGossip
+  implements ProbabilisticBroadcast as pb
+  uses Net as net
+  params
+    FANOUT := 2
+    ROUNDS := 4
+  state
+    seq := 0
+    delivered := ∅           // [s, n]
+
+  function targets(k)
+    chosen := ∅
+    left := neighbors
+    while #chosen < k and #left > 0 do
+      q := pick(left)
+      chosen := chosen ∪ {q}
+      left := left \\ {q}
+    end
+    return chosen
+  end
+
+  function gossip(msg)
+    forall q in targets(FANOUT) do
+      trigger ⟨net, Send | q, msg⟩
+    end
+  end
+
+  upon event ⟨pb, Broadcast | m⟩ do
+    seq := seq + 1
+    delivered := delivered ∪ {[self, seq]}
+    trigger ⟨pb, Deliver | self, m⟩
+    call gossip([GOSSIP, self, seq, m, ROUNDS])
+  end
+
+  upon event ⟨net, Deliver | p, [GOSSIP, s, n, m, r]⟩ do
+    if [s, n] ∉ delivered then
+      delivered := delivered ∪ {[s, n]}
+      trigger ⟨pb, Deliver | s, m⟩
+      if r > 1 then
+        call gossip([GOSSIP, s, n, m, r - 1])
+      end
+    end
+  end
+end`
+  }
+];
+
+const byKey = new Map(MODULES.map(m => [m.key, m]));
+const byName = new Map(MODULES.map(m => [m.name, m]));
+// default implementation for an interface when a module needs it
+const DEFAULT_FOR = {
+  StubbornLinks: 'stubborn-links', PerfectLinks: 'ack-links', FifoPerfectLinks: 'fifo-links',
+  BestEffortBroadcast: 'beb', ReliableBroadcast: 'erb', UniformReliableBroadcast: 'urb',
+  FifoReliableBroadcast: 'fifo-rb', CausalOrderBroadcast: 'causal', ProbabilisticBroadcast: 'gossip'
+};
+
+// Modules to add, dependencies first, so that `key` works in a program that already
+// declares `interfaces` and implements `implemented`.
+function plan(key, implemented, interfaces) {
+  const order = [], seen = new Set();
+  const impl = new Set(implemented || []);
+  const visit = k => {
+    const m = byKey.get(k);
+    if (!m || seen.has(k)) return;
+    seen.add(k);
+    for (const iface of m.uses) if (!impl.has(iface)) visit(DEFAULT_FOR[iface]);
+    impl.add(m.implements);
+    order.push(m);
+  };
+  visit(key);
+  const have = new Set(interfaces || []);
+  const ifaces = [];
+  for (const m of order) {
+    for (const i of [m.implements].concat(m.uses)) {
+      if (IFACES[i] && !have.has(i)) { have.add(i); ifaces.push(i); }
+    }
+  }
+  return { modules: order, interfaces: ifaces };
+}
+
+// Full source for a stack whose top is `key` (used by the examples)
+function source(key) {
+  const p = plan(key, [], []);
+  return p.interfaces.map(i => IFACES[i]).concat(p.modules.map(m => m.source)).join('\n\n') + '\n';
+}
+
+const Library = { IFACES, MODULES, byKey, byName, DEFAULT_FOR, plan, source };
+if (typeof module !== 'undefined' && module.exports) module.exports = Library;
+else root.SimLibrary = Library;
+})(typeof self !== 'undefined' ? self : this);
+
+(function (root) {
+'use strict';
+
+function ringLayout(ids, cx, cy, r) {
+  return ids.map((id, i) => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / ids.length;
+    return { id, x: Math.round(cx + r * Math.cos(a)), y: Math.round(cy + r * Math.sin(a)) };
+  });
+}
+function complete(ids) {
+  const l = [];
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) l.push({ a: ids[i], b: ids[j], directed: false, enabled: true });
+  return l;
+}
+
+const FLOODING = `// Flooding broadcast on an arbitrary topology.
+// Every process forwards a new message to all neighbors
+// except the one it came from.
+
+interface Broadcast
+  request Broadcast(m)
+  indication Deliver(p, m)
+end
+
+algorithm Flooding
+  implements Broadcast as fb
+  uses Net as net
+  state
+    seen := ∅
+
+  upon event ⟨fb, Broadcast | m⟩ do
+    seen := seen ∪ {m}
+    trigger ⟨fb, Deliver | self, m⟩
+    forall q in neighbors do
+      trigger ⟨net, Send | q, [FLOOD, self, m]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [FLOOD, o, m]⟩ where m ∉ seen do
+    seen := seen ∪ {m}
+    trigger ⟨fb, Deliver | o, m⟩
+    forall q in neighbors where q ≠ p do
+      trigger ⟨net, Send | q, [FLOOD, o, m]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [FLOOD, o, m]⟩ where m ∈ seen do
+    skip  // already seen: do not forward
+  end
+end
+`;
+
+const CHANG_ROBERTS = `// Leader election on a directed ring (Chang-Roberts).
+// The process with the highest identifier wins.
+
+interface LeaderElection
+  request Start()
+  indication Elected(l)
+end
+
+algorithm ChangRoberts
+  implements LeaderElection as le
+  uses Net as net
+  state
+    participant := false
+    leader := nil
+
+  upon event ⟨le, Start⟩ do
+    if not participant then
+      participant := true
+      trigger ⟨net, Send | choose(neighbors), [ELECTION, self]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [ELECTION, id]⟩ do
+    if id > self then
+      participant := true
+      trigger ⟨net, Send | choose(neighbors), [ELECTION, id]⟩
+    elif id < self and not participant then
+      participant := true
+      trigger ⟨net, Send | choose(neighbors), [ELECTION, self]⟩
+    elif id = self then
+      trigger ⟨net, Send | choose(neighbors), [ELECTED, self]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [ELECTED, l]⟩ do
+    leader := l
+    trigger ⟨le, Elected | l⟩
+    if l ≠ self then
+      trigger ⟨net, Send | choose(neighbors), [ELECTED, l]⟩
+    end
+  end
+end
+`;
+
+const FLOODSET = `// FloodSet consensus in the synchronous rounds model (complete graph).
+// Tolerates f crashes with f + 1 rounds.
+// Try the "Realistic synchronous" preset: late messages become
+// omissions the algorithm does not expect.
+
+interface Consensus
+  request Propose(v)
+  indication Decide(v)
+end
+
+algorithm FloodSet
+  implements Consensus as c
+  uses Rounds as net
+  params
+    f := 1
+  state
+    W := ∅
+    decision := nil
+
+  upon event ⟨c, Propose | v⟩ do
+    W := W ∪ {v}
+  end
+
+  upon event ⟨net, RoundStart | r⟩ where r ≤ f + 1 do
+    forall q in neighbors do
+      trigger ⟨net, Send | q, [VALUES, W]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [VALUES, V]⟩ do
+    W := W ∪ V
+  end
+
+  upon event ⟨net, RoundEnd | r⟩ where r = f + 1 and decision = nil do
+    decision := min(W)
+    trigger ⟨c, Decide | decision⟩
+  end
+end
+
+// Properties are checked after every step, on the state of every process at once.
+// A state variable reads as a map from process to its value there.
+property Agreement always
+  #toset(values(defined(decision))) ≤ 1
+end
+
+property Validity always
+  #{p in keys(defined(decision)) where decision[p] ∉ W[p]} = 0
+end
+
+property Termination eventually
+  keys(defined(decision)) = correct
+end
+`;
+
+const EPFD = `// Eventually perfect failure detector (◇P) with increasing timeout.
+// It does not use DELTA, so it works even when the bound is unknown.
+// Before GST it suspects wrongly; afterwards the timeout adapts.
+
+interface PerfectLinks
+  request Send(q, m)
+  indication Deliver(p, m)
+end
+
+interface EventuallyPerfectFailureDetector
+  indication Suspect(p)
+  indication Restore(p)
+end
+
+// Direct link over the network: it is "perfect" only if the network
+// does not lose messages (loss = 0).
+algorithm DirectLinks
+  implements PerfectLinks as pl
+  uses Net as net
+
+  upon event ⟨pl, Send | q, m⟩ do
+    trigger ⟨net, Send | q, m⟩
+  end
+
+  upon event ⟨net, Deliver | p, m⟩ do
+    trigger ⟨pl, Deliver | p, m⟩
+  end
+end
+
+algorithm IncreasingTimeout
+  implements EventuallyPerfectFailureDetector as epfd
+  uses PerfectLinks as pl
+  params
+    DELTA0 := 100ms
+  state
+    alive := Π
+    suspected := ∅
+    delay := DELTA0
+
+  upon event ⟨epfd, Init⟩ do
+    starttimer(t, delay)
+  end
+
+  upon event ⟨timer, Timeout | t⟩ do
+    if alive ∩ suspected ≠ ∅ then
+      delay := delay + DELTA0
+    end
+    forall p in Π do
+      if p ∉ alive and p ∉ suspected then
+        suspected := suspected ∪ {p}
+        trigger ⟨epfd, Suspect | p⟩
+      elif p ∈ alive and p ∈ suspected then
+        suspected := suspected \\ {p}
+        trigger ⟨epfd, Restore | p⟩
+      end
+      trigger ⟨pl, Send | p, [HEARTBEAT_REQUEST]⟩
+    end
+    alive := ∅
+    starttimer(t, delay)
+  end
+
+  upon event ⟨pl, Deliver | q, [HEARTBEAT_REQUEST]⟩ do
+    trigger ⟨pl, Send | q, [HEARTBEAT_REPLY]⟩
+  end
+
+  upon event ⟨pl, Deliver | p, [HEARTBEAT_REPLY]⟩ do
+    alive := alive ∪ {p}
+  end
+end
+`;
+
+function gridScenario() {
+  const nodes = [], links = [];
+  let id = 1;
+  const W = 4, H = 3;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) nodes.push({ id: id++, x: 110 + x * 150, y: 90 + y * 130 });
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x + 1;
+    if (x < W - 1) links.push({ a: i, b: i + 1, directed: false, enabled: true });
+    if (y < H - 1) links.push({ a: i, b: i + W, directed: false, enabled: true });
+  }
+  return { nodes, links };
+}
+
+const EXAMPLES = [
+  {
+    key: 'flooding',
+    title: 'Flooding broadcast (asynchronous)',
+    scenario: Object.assign(gridScenario(), {
+      version: 1, seed: 7, code: FLOODING, top: 'Flooding',
+      inputs: '0ms 1 Broadcast | "hello"\n40ms 12 Broadcast | "ok"',
+      faults: [], preset: 'async',
+      assumed: { timing: 'asynchronous', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+      actual: { delay: 'lognormal(3, 0.6)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0.05, spikeExtra: '150ms',
+        step: 'uniform(100us, 1ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' },
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    })
+  },
+  {
+    key: 'chang-roberts',
+    title: 'Ring leader election, Chang-Roberts (asynchronous)',
+    scenario: (function () {
+      const ids = [3, 7, 1, 5, 2, 8, 4, 6];
+      const nodes = ringLayout(ids, 330, 230, 170);
+      const links = ids.map((id, i) => ({ a: id, b: ids[(i + 1) % ids.length], directed: true, enabled: true }));
+      return {
+        version: 1, seed: 11, nodes, links, code: CHANG_ROBERTS, top: 'ChangRoberts',
+        inputs: '0ms * Start', faults: [], preset: 'async',
+        assumed: { timing: 'asynchronous', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+        actual: { delay: 'exp(20ms)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+          step: 'uniform(100us, 1ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' },
+        violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '3s'
+      };
+    })()
+  },
+  {
+    key: 'floodset',
+    title: 'FloodSet consensus (synchronous rounds)',
+    scenario: (function () {
+      const ids = [1, 2, 3, 4];
+      return {
+        version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+        code: FLOODSET, top: 'FloodSet',
+        inputs: '0ms * Propose | random(1, 9)', faults: [], preset: 'sync-ideal',
+        assumed: { timing: 'synchronous-rounds', DELTA: '40ms', PHI: '10ms', RHO: '0.0001' },
+        actual: { delay: 'uniform(5ms, 30ms)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+          step: 'const(0ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' },
+        violationPolicy: 'drop', tieBreak: 'stable', stopAt: '3s'
+      };
+    })()
+  },
+  {
+    key: 'epfd',
+    title: 'Failure detector ◇P (partially synchronous)',
+    scenario: (function () {
+      const ids = [1, 2, 3, 4];
+      return {
+        version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 150), links: complete(ids),
+        code: EPFD, top: 'IncreasingTimeout',
+        inputs: '', faults: [{ type: 'crash', node: 3, at: '6s' }], preset: 'partial',
+        assumed: { timing: 'partial', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+        actual: { delay: 'uniform(5ms, 40ms)', bound: '50ms', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+          step: 'uniform(100us, 1ms)', offset: 'uniform(0ms, 20ms)', rho: 'uniform(-0.0001, 0.0001)',
+          gst: '3s', preGstDelay: 'pareto(20ms, 1.1)', roundMode: 'lockstep', roundLen: '1s' },
+        violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '12s'
+      };
+    })()
+  }
+];
+
+EXAMPLES.push({
+  key: 'epfd-partition',
+  title: 'Failure detector across a partition and a recovery',
+  scenario: (function () {
+    const ids = [1, 2, 3, 4, 5];
+    return {
+      version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+      code: EPFD.replace(
+        '// Eventually perfect failure detector (◇P) with increasing timeout.',
+        '// Eventually perfect failure detector (◇P) with increasing timeout.\n' +
+        '// In this scenario the network splits into {p1, p2} and {p3, p4, p5}\n' +
+        '// from 4s to 7s, then p5 crashes at 9s and recovers at 11s.'),
+      top: 'IncreasingTimeout',
+      inputs: '',
+      faults: [
+        { type: 'partition', groups: '1 2 | 3 4 5', from: '4s', to: '7s' },
+        { type: 'crash', node: 5, at: '9s' },
+        { type: 'recover', node: 5, at: '11s' }
+      ],
+      preset: 'custom',
+      assumed: { timing: 'partial', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+      actual: { delay: 'uniform(5ms, 40ms)', bound: '50ms', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+        step: 'uniform(100us, 1ms)', offset: 'uniform(0ms, 20ms)', rho: 'uniform(-0.0001, 0.0001)',
+        gst: '1s', preGstDelay: 'pareto(20ms, 1.1)', roundMode: 'lockstep', roundLen: '1s' },
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '14s'
+    };
+  })()
+});
+
+// ---- examples built from the library of communication abstractions
+const Lib = (typeof module !== 'undefined' && module.exports) ? require('./library.js') : root.SimLibrary;
+
+const RB_APP = `// Application on top of the broadcast stack.
+// Swap "ReliableBroadcast" for "BestEffortBroadcast" in the uses line
+// and run again with the same seed: when the sender crashes before its
+// retransmissions, only some processes get the news.
+interface News
+  request Publish(m)
+  indication Read(from, m)
+end
+
+algorithm Newsroom
+  implements News as app
+  uses ReliableBroadcast as rb
+
+  upon event ⟨app, Publish | m⟩ do
+    trigger ⟨rb, Broadcast | m⟩
+  end
+
+  upon event ⟨rb, Deliver | p, m⟩ do
+    trigger ⟨app, Read | p, m⟩
+  end
+end
+`;
+
+const CAUSAL_APP = `// p1 asks a question, p2 answers as soon as it reads it.
+// With causal order every process reads the question before the answer.
+// Swap "CausalOrderBroadcast" for "ReliableBroadcast" and run again with
+// the same seed: p4 and p5 read the answer first.
+interface Forum
+  request Post(m)
+  indication Read(from, m)
+end
+
+algorithm Discussion
+  implements Forum as app
+  uses CausalOrderBroadcast as cb
+
+  upon event ⟨app, Post | m⟩ do
+    trigger ⟨cb, Broadcast | m⟩
+  end
+
+  upon event ⟨cb, Deliver | p, m⟩ do
+    trigger ⟨app, Read | p, m⟩
+    if m = "question" and self = 2 then
+      trigger ⟨cb, Broadcast | "answer"⟩
+    end
+  end
+end
+`;
+
+const GOSSIP_APP = `// A rumor spreads by gossip: each process forwards it to FANOUT random
+// neighbors, for at most ROUNDS hops. Change FANOUT and ROUNDS in EagerGossip
+// and compare how many processes hear it and how many messages it costs.
+interface Rumors
+  request Spread(m)
+  indication Heard(from, m)
+end
+
+algorithm Village
+  implements Rumors as app
+  uses ProbabilisticBroadcast as pb
+
+  upon event ⟨app, Spread | m⟩ do
+    trigger ⟨pb, Broadcast | m⟩
+  end
+
+  upon event ⟨pb, Deliver | p, m⟩ do
+    trigger ⟨app, Heard | p, m⟩
+  end
+end
+`;
+
+function libStack(keys) {
+  const seen = new Set(), ifaces = [], mods = [];
+  for (const k of keys) {
+    const p = Lib.plan(k, mods.map(m => m.implements), ifaces);
+    for (const i of p.interfaces) if (!seen.has('i' + i)) { seen.add('i' + i); ifaces.push(i); }
+    for (const m of p.modules) if (!seen.has('m' + m.key)) { seen.add('m' + m.key); mods.push(m); }
+  }
+  return '// Library modules (Code tab → Add module)\n\n' +
+    ifaces.map(i => Lib.IFACES[i]).concat(mods.map(m => m.source)).join('\n\n') + '\n\n';
+}
+function asyncActual(extra) {
+  return Object.assign({ delay: 'uniform(5ms, 30ms)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+    step: 'uniform(100us, 1ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' }, extra);
+}
+const ASYNC = { timing: 'asynchronous', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' };
+
+EXAMPLES.push({
+  key: 'reliable-broadcast',
+  title: 'Reliable broadcast when the sender crashes',
+  scenario: (function () {
+    const ids = [1, 2, 3, 4, 5];
+    return {
+      version: 1, seed: 4, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+      code: RB_APP + '\n' + libStack(['beb', 'erb']), top: 'Newsroom',
+      inputs: '0ms 1 Publish | "news"',
+      faults: [{ type: 'crash', node: 1, at: '40ms' }],
+      preset: 'async', assumed: Object.assign({}, ASYNC), actual: asyncActual({ loss: 0.4 }),
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    };
+  })()
+});
+EXAMPLES.push({
+  key: 'causal-broadcast',
+  title: 'Causal order broadcast: questions before answers',
+  scenario: (function () {
+    const ids = [1, 2, 3, 4, 5];
+    return {
+      version: 1, seed: 5, nodes: ringLayout(ids, 330, 230, 160), links: complete(ids),
+      code: CAUSAL_APP + '\n' + libStack(['causal']), top: 'Discussion',
+      inputs: '0ms 1 Post | "question"',
+      faults: [],
+      preset: 'custom', assumed: Object.assign({}, ASYNC), actual: asyncActual({ fifo: false, delay: 'uniform(5ms, 120ms)' }),
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    };
+  })()
+});
+EXAMPLES.push({
+  key: 'gossip',
+  title: 'Gossip: spreading a rumor',
+  scenario: (function () {
+    const ids = Array.from({ length: 16 }, (_, i) => i + 1);
+    const links = [];
+    const L = (a, b) => links.push({ a, b, directed: false, enabled: true });
+    // a ring with chords: every process has four neighbors
+    ids.forEach((id, i) => { L(id, ids[(i + 1) % 16]); if (i < 8) L(id, ids[(i + 8) % 16]); if (i % 2 === 0) L(id, ids[(i + 5) % 16]); });
+    return {
+      version: 1, seed: 7, nodes: ringLayout(ids, 360, 260, 220), links,
+      code: GOSSIP_APP + '\n' + libStack(['gossip']), top: 'Village',
+      inputs: '0ms 1 Spread | "rumor"',
+      faults: [],
+      preset: 'async', assumed: Object.assign({}, ASYNC), actual: asyncActual({ delay: 'uniform(10ms, 60ms)' }),
+      violationPolicy: 'deliver-late', tieBreak: 'stable', stopAt: '2s'
+    };
+  })()
+});
+
+// Gallery metadata
+const META = {
+  'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
+  'chang-roberts': { category: 'Leader election', summary: 'Identifiers travel around a directed ring until the largest one comes back.' },
+  'floodset': { category: 'Consensus', summary: 'Consensus in f + 1 rounds, and what happens when the rounds are only an assumption.' },
+  'epfd': { category: 'Failure detection', summary: 'Heartbeats and a growing timeout: wrong suspicions before GST, a crash detected after.' },
+  'epfd-partition': { category: 'Failure detection', summary: 'The same detector through a network partition, a crash and a recovery.' },
+  'reliable-broadcast': { category: 'Broadcast', summary: 'The sender crashes on a lossy network; relays make sure every correct process gets the news.' },
+  'causal-broadcast': { category: 'Broadcast', summary: 'Vector clocks keep answers after their questions, even when the network reorders them.' },
+  'gossip': { category: 'Broadcast', summary: 'A rumor spreads to random neighbors; reach and cost depend on fanout and rounds.' }
+};
+for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
+
+// Timing model presets: they only change assumed/actual/policy
+const PRESETS = {
+  'sync-ideal': {
+    label: 'Ideal synchronous',
+    note: 'Lockstep rounds: no violation can happen. This is the textbook model.',
+    assumed: { timing: 'synchronous-rounds', DELTA: '40ms', PHI: '10ms', RHO: '0.0001' },
+    actual: { delay: 'uniform(5ms, 30ms)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+      step: 'const(0ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' },
+    violationPolicy: 'drop'
+  },
+  'sync-real': {
+    label: 'Realistic synchronous',
+    note: 'The algorithm believes in rounds; the network has long tails and clocks drift. Late messages become omissions.',
+    assumed: { timing: 'synchronous-rounds', DELTA: '40ms', PHI: '10ms', RHO: '0.0001' },
+    actual: { delay: 'lognormal(3.2, 0.8)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0.03, spikeExtra: '60ms',
+      step: 'uniform(100us, 2ms)', offset: 'uniform(0ms, 8ms)', rho: 'uniform(-0.0005, 0.0005)', gst: '', preGstDelay: '',
+      roundMode: 'emulated', roundLen: '1s' },
+    violationPolicy: 'drop'
+  },
+  'sync-timed': {
+    label: 'Timed synchronous',
+    note: 'DELTA is known and respected by the network; clocks do not drift.',
+    assumed: { timing: 'synchronous-timed', DELTA: '50ms', PHI: '5ms', RHO: 'unknown' },
+    actual: { delay: 'uniform(5ms, 45ms)', bound: '50ms', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+      step: 'uniform(100us, 1ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' },
+    violationPolicy: 'deliver-late'
+  },
+  'partial': {
+    label: 'Partially synchronous',
+    note: 'Before GST delays are heavy-tailed; after GST a bound exists, unknown to the algorithm.',
+    assumed: { timing: 'partial', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+    actual: { delay: 'uniform(5ms, 40ms)', bound: '50ms', loss: 0, dup: 0, fifo: true, spikeProb: 0, spikeExtra: '0ms',
+      step: 'uniform(100us, 1ms)', offset: 'uniform(0ms, 20ms)', rho: 'uniform(-0.0001, 0.0001)', gst: '3s',
+      preGstDelay: 'pareto(20ms, 1.1)', roundMode: 'lockstep', roundLen: '1s' },
+    violationPolicy: 'deliver-late'
+  },
+  'async': {
+    label: 'Asynchronous',
+    note: 'No bounds on delays, steps or clocks. DELTA, PHI and RHO do not exist for the algorithm.',
+    assumed: { timing: 'asynchronous', DELTA: 'unknown', PHI: 'unknown', RHO: 'unknown' },
+    actual: { delay: 'lognormal(3, 0.6)', bound: '', loss: 0, dup: 0, fifo: true, spikeProb: 0.05, spikeExtra: '150ms',
+      step: 'uniform(100us, 1ms)', offset: 'const(0ms)', rho: '0', gst: '', preGstDelay: '', roundMode: 'lockstep', roundLen: '1s' },
+    violationPolicy: 'deliver-late'
+  }
+};
+
+const Examples = { EXAMPLES, PRESETS, ringLayout, complete };
+if (typeof module !== 'undefined' && module.exports) module.exports = Examples;
+else root.SimExamples = Examples;
+})(typeof self !== 'undefined' ? self : this);
+
+/* Distributed Systems Playground — batch runner.
+   Runs a scenario many times without touching the page: several seeds, several variants, compact summaries.
+   Used by the command line tool, by the test suite, and (later) by the worker pool of the interface. */
+(function (root) {
+'use strict';
+
+const C = (typeof module !== 'undefined' && module.exports) ? require('./core.js') : root.SimCore;
+const EX = (typeof module !== 'undefined' && module.exports) ? require('./examples.js') : root.SimExamples;
+
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function clone(o) { return JSON.parse(JSON.stringify(o), (k, v) => (UNSAFE_KEYS.has(k) ? undefined : v)); }
+
+// "actual.loss=0.3" style overrides, applied to a copy of the scenario
+function applyOverride(scn, path, value) {
+  const ks = String(path).split('.');
+  if (ks.some(k => !k || UNSAFE_KEYS.has(k))) throw new Error('Invalid property path: ' + path);
+  let a = scn;
+  for (let i = 0; i < ks.length - 1; i++) {
+    if (a[ks[i]] === null || typeof a[ks[i]] !== 'object') a[ks[i]] = {};
+    a = a[ks[i]];
+  }
+  const last = ks[ks.length - 1];
+  const n = Number(value);
+  a[last] = (value === 'true' || value === 'false') ? value === 'true'
+    : (value !== '' && Number.isFinite(n) && String(n) === String(value).trim()) ? n
+      : value;
+  return scn;
+}
+
+// seeds: [1, 2, 3] or "1..50" or { from, to }
+function seedList(seeds) {
+  if (Array.isArray(seeds)) return seeds.map(Number);
+  if (typeof seeds === 'string') {
+    const m = /^(\d+)\s*\.\.\s*(\d+)$/.exec(seeds.trim());
+    if (m) return seedList({ from: +m[1], to: +m[2] });
+    if (/^\d+(\s*,\s*\d+)*$/.test(seeds.trim())) return seeds.split(',').map(s => +s.trim());
+    throw new Error('Invalid seed list: ' + seeds);
+  }
+  if (seeds && typeof seeds === 'object') {
+    const from = +seeds.from, to = +seeds.to;
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) throw new Error('Invalid seed range');
+    if (to - from > 10000) throw new Error('Too many seeds: ' + (to - from + 1));
+    const out = [];
+    for (let s = from; s <= to; s++) out.push(s);
+    return out;
+  }
+  return [1];
+}
+
+// A compact view of one run: enough to compare runs, small enough to keep thousands of them.
+function summarize(res, seed) {
+  const msgs = res.msgs || [];
+  const byStatus = {};
+  for (const m of msgs) byStatus[m.status] = (byStatus[m.status] || 0) + 1;
+  const outputs = (res.outputs || []).map(o => ({ t: o.t, node: o.node, ev: o.ev, args: o.args.slice(), text: o.text }));
+  return {
+    seed,
+    ok: !res.error && (!res.compile || !res.compile.errors.length),
+    error: res.error || null,
+    errorLine: res.errorLine || null,
+    compileErrors: res.compile ? res.compile.errors.map(e => ({ line: e.line, msg: e.msg })) : [],
+    warnings: (res.warnings || []).slice(),
+    stopReason: res.stopReason || null,
+    endT: res.endT || 0,
+    eventCount: res.eventCount || 0,
+    messages: msgs.length,
+    byStatus,
+    delivered: byStatus.delivered || 0,
+    lost: msgs.length - (byStatus.delivered || 0) - (byStatus.pending || 0),
+    violations: res.violations || 0,
+    assertions: (res.log || []).filter(e => e.kind === 'assert').length,
+    properties: (res.properties || []).map(p => ({ name: p.name, kind: p.kind, ok: p.ok, at: p.at, node: p.node, error: p.error })),
+    propertyFailures: (res.properties || []).filter(p => !p.ok).length,
+    outputs,
+    outputCount: outputs.length,
+    nodesWithOutput: new Set(outputs.map(o => o.node)).size
+  };
+}
+
+// Runs the same scenario over several seeds. `onRun` is called with each summary as soon as it is ready,
+// which lets a caller stream progress; returning false from it stops the batch.
+function runBatch(scenario, opts) {
+  opts = opts || {};
+  const base = clone(scenario);
+  for (const [path, value] of Object.entries(opts.set || {})) applyOverride(base, path, value);
+  if (opts.preset) {
+    const preset = EX.PRESETS[opts.preset];
+    if (!preset) throw new Error('Unknown preset: ' + opts.preset + ' (available: ' + Object.keys(EX.PRESETS).join(', ') + ')');
+    Object.assign(base, { assumed: clone(preset.assumed), actual: clone(preset.actual), violationPolicy: preset.violationPolicy, preset: opts.preset });
+  }
+  const seeds = seedList(opts.seeds !== undefined ? opts.seeds : base.seed || 1);
+  const runs = [];
+  const started = Date.now();
+  for (const seed of seeds) {
+    const scn = clone(base);
+    scn.seed = seed;
+    const summary = summarize(C.runSimulation(scn), seed);
+    runs.push(summary);
+    if (opts.onRun && opts.onRun(summary, runs.length, seeds.length) === false) break;
+    if (opts.stopOnFailure && (!summary.ok || summary.propertyFailures)) break;
+  }
+  return { scenario: base, runs, summary: aggregate(runs), ms: Date.now() - started };
+}
+
+function aggregate(runs) {
+  const n = runs.length || 1;
+  const sum = k => runs.reduce((a, r) => a + r[k], 0);
+  const failed = runs.filter(r => !r.ok);
+  const withViolations = runs.filter(r => r.violations > 0);
+  const withAssertions = runs.filter(r => r.assertions > 0);
+  const withPropertyFailures = runs.filter(r => r.propertyFailures > 0);
+  const byProperty = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = byProperty[p.name] = byProperty[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  return {
+    runs: runs.length,
+    failed: failed.length,
+    firstFailure: failed.length ? failed[0].seed : null,
+    withViolations: withViolations.length,
+    firstViolation: withViolations.length ? withViolations[0].seed : null,
+    withAssertions: withAssertions.length,
+    firstAssertion: withAssertions.length ? withAssertions[0].seed : null,
+    withPropertyFailures: withPropertyFailures.length,
+    firstPropertyFailure: withPropertyFailures.length ? withPropertyFailures[0].seed : null,
+    properties: Object.values(byProperty),
+    avgMessages: +(sum('messages') / n).toFixed(1),
+    avgDelivered: +(sum('delivered') / n).toFixed(1),
+    avgLost: +(sum('lost') / n).toFixed(1),
+    avgViolations: +(sum('violations') / n).toFixed(2),
+    avgOutputs: +(sum('outputCount') / n).toFixed(1),
+    avgEvents: Math.round(sum('eventCount') / n)
+  };
+}
+
+// Groups the runs by the values the processes produced, which is the usual question asked of a batch:
+// "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
+function outcomes(runs, pick) {
+  const key = pick || (o => o.text);
+  const groups = new Map();
+  for (const r of runs) {
+    const values = r.outputs.map(key).sort();
+    const k = JSON.stringify(values);
+    if (!groups.has(k)) groups.set(k, { values, seeds: [], count: 0 });
+    const g = groups.get(k);
+    g.count++;
+    if (g.seeds.length < 10) g.seeds.push(r.seed);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+// Compile-only check, for a quick "does this program make sense in this model?"
+function checkScenario(scenario) {
+  const scn = clone(scenario);
+  let prog;
+  try { prog = C.parseProgram(scn.code || ''); }
+  catch (e) { return { ok: false, errors: [{ line: e.line || null, msg: e.message }], warnings: [] }; }
+  const assumed = scn.assumed || {};
+  const known = {
+    DELTA: assumed.DELTA && assumed.DELTA !== 'unknown' ? C.parseDuration(assumed.DELTA) : null,
+    PHI: assumed.PHI && assumed.PHI !== 'unknown' ? C.parseDuration(assumed.PHI) : null,
+    RHO: assumed.RHO && assumed.RHO !== 'unknown' ? Number(assumed.RHO) : null
+  };
+  const res = C.check(prog, { timing: assumed.timing || 'asynchronous', roundMode: (scn.actual && scn.actual.roundMode) || 'lockstep', known });
+  return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
+}
+
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario };
+if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
+else root.SimRunner = Runner;
+})(typeof self !== 'undefined' ? self : this);
+
+self.onmessage = function (e) {
+  const { scenario, seed } = e.data;
+  try {
+    const res = SimRunner.runBatch(scenario, { seeds: [seed] });
+    self.postMessage(res.runs[0]);
+  } catch (err) {
+    self.postMessage({
+      seed, ok: false, error: String(err && err.message || err), errorLine: null, compileErrors: [], warnings: [],
+      stopReason: null, endT: 0, eventCount: 0, messages: 0, byStatus: {}, delivered: 0, lost: 0, violations: 0,
+      assertions: 0, properties: [], propertyFailures: 0, outputs: [], outputCount: 0, nodesWithOutput: 0
+    });
+  }
+};
 
 </script>
 <script>
@@ -7774,6 +11592,139 @@ function bindGallery() {
   $('#btn-img-graph-svg').addEventListener('click', () => exportImage('graph-svg'));
 }
 
+// 12b-batch.js — running a scenario over many seeds without blocking the page
+
+// The worker runs core.js, examples.js and runner.js, which never touch the page. Its source is inlined in
+// the bundle as a plain text script, turned into a blob URL here. Where blob workers are not allowed (some
+// browsers refuse them on file://), the batch falls back to the main thread, in slices, so the page still
+// answers between seeds.
+let workerUrl = null;
+function batchWorkerUrl() {
+  if (workerUrl !== null) return workerUrl;
+  const el = document.getElementById('worker-src');
+  workerUrl = el ? URL.createObjectURL(new Blob([el.textContent], { type: 'text/javascript' })) : '';
+  return workerUrl;
+}
+function makeWorkers(n) {
+  const url = batchWorkerUrl();
+  if (!url) return [];
+  const out = [];
+  try { for (let i = 0; i < n; i++) out.push(new Worker(url)); }
+  catch (e) { out.forEach(w => w.terminate()); return []; }
+  return out;
+}
+
+// runs `seeds` of `scenario`, calling onRun(summary) as results arrive; returns a handle with cancel()
+function runBatch(scenario, seeds, onRun, onDone) {
+  const pending = seeds.slice();
+  const results = [];
+  let cancelled = false;
+  const finish = () => { if (!cancelled) onDone(results.sort((a, b) => a.seed - b.seed)); };
+  const take = () => (pending.length ? pending.shift() : null);
+  const collect = summary => {
+    if (cancelled) return;
+    results.push(summary);
+    onRun(summary, results.length, seeds.length);
+  };
+  const workers = makeWorkers(Math.min(seeds.length, Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1))));
+  if (workers.length) {
+    let active = workers.length;
+    for (const w of workers) {
+      const next = () => {
+        const seed = take();
+        if (seed === null) { w.terminate(); if (--active === 0) finish(); return; }
+        w.postMessage({ scenario, seed });
+      };
+      w.onmessage = e => { collect(e.data); next(); };
+      w.onerror = () => { w.terminate(); if (--active === 0) finish(); };
+      next();
+    }
+    return { cancel() { cancelled = true; workers.forEach(w => w.terminate()); } };
+  }
+  // fallback: one seed per animation frame, so the page keeps answering
+  const step = () => {
+    if (cancelled) return;
+    const seed = take();
+    if (seed === null) { finish(); return; }
+    collect(window.SimRunner.runBatch(scenario, { seeds: [seed] }).runs[0]);
+    setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
+  return { cancel() { cancelled = true; } };
+}
+
+let batchHandle = null;
+function parseSeedSpec(text) {
+  try { return window.SimRunner.seedList(text.trim() || '1'); }
+  catch (e) { return null; }
+}
+function renderBatchResults(runs, seeds) {
+  const box = $('#batch-results');
+  box.textContent = '';
+  if (!runs.length) return;
+  const props = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = props[p.name] = props[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, first: null };
+    if (p.ok) e.held++; else { e.failed++; if (e.first === null) e.first = r.seed; }
+  }
+  const failed = runs.filter(r => !r.ok || r.propertyFailures || r.assertions);
+  box.append(el('p', { class: 'batch-summary' },
+    runs.length + ' of ' + seeds.length + ' run(s), ',
+    el('b', { class: failed.length ? 'bad' : 'good' }, failed.length ? failed.length + ' with a problem' : 'all clean')));
+  for (const p of Object.values(props)) {
+    box.append(el('p', { class: 'batch-prop' + (p.failed ? ' bad' : '') },
+      el('b', {}, p.name), ' (' + p.kind + ') held in ' + p.held + '/' + (p.held + p.failed) + ' run(s)',
+      p.first !== null ? ', first broken at seed ' + p.first : ''));
+  }
+  const list = el('ul', { class: 'batch-list' });
+  const shown = failed.length ? failed : runs;
+  for (const r of shown.slice(0, 60)) {
+    const broken = r.properties.filter(p => !p.ok).map(p => p.name);
+    const what = !r.ok ? (r.error || 'does not compile')
+      : broken.length ? broken.join(', ') + ' broken'
+        : r.assertions ? r.assertions + ' failed assertion(s)'
+          : r.violations ? r.violations + ' violation(s)' : 'ok';
+    list.append(el('li', {},
+      el('button', {
+        type: 'button', class: 'link', title: 'Open this run',
+        onclick: () => { $('#seed').value = r.seed; S.scn.seed = r.seed; run(false); setTab('scen'); }
+      }, 'seed ' + r.seed),
+      el('span', { class: r.ok && !broken.length && !r.assertions ? '' : 'bad' }, ' ' + what),
+      el('span', { class: 'hint' }, '  ' + r.messages + ' messages, ' + r.outputCount + ' outputs')));
+  }
+  box.append(list);
+  if (shown.length > 60) box.append(el('p', { class: 'hint' }, 'showing the first 60 of ' + shown.length + '.'));
+}
+function startBatch() {
+  const btn = $('#btn-batch');
+  if (batchHandle) { batchHandle.cancel(); batchHandle = null; btn.textContent = 'Run over seeds'; $('#batch-progress').textContent = 'stopped'; return; }
+  const seeds = parseSeedSpec($('#batch-seeds').value);
+  if (!seeds) { toast('Seeds look like 1..50, or 3, or 1,4,9.'); return; }
+  if (seeds.length > 500) { toast('That is a lot of seeds: try at most 500.'); return; }
+  const scenario = clone(S.scn);
+  $('#batch-results').textContent = '';
+  $('#batch-progress').textContent = '0 / ' + seeds.length;
+  btn.textContent = 'Stop';
+  const started = Date.now();
+  const runs = [];
+  batchHandle = runBatch(scenario, seeds,
+    (summary, done, total) => {
+      runs.push(summary);
+      $('#batch-progress').textContent = done + ' / ' + total;
+      if (done === total || done % 10 === 0) renderBatchResults(runs.slice().sort((a, b) => a.seed - b.seed), seeds);
+    },
+    all => {
+      batchHandle = null;
+      btn.textContent = 'Run over seeds';
+      $('#batch-progress').textContent = all.length + ' run(s) in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s';
+      renderBatchResults(all, seeds);
+    });
+}
+function bindBatch() {
+  $('#btn-batch').addEventListener('click', startBatch);
+  $('#batch-seeds').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); startBatch(); } });
+}
+
 // 13-init.js — startup
 
 async function init() {
@@ -7784,7 +11735,7 @@ async function init() {
   $('#toast').setAttribute('role', 'status');
   applySettings();
   bindHeader(); bindForms(); bindEditor(); bindTopo(); bindDiagram(); bindTransport(); bindDialogs(); bindKeys();
-  bindSettings(); bindTour(); bindGallery();
+  bindSettings(); bindTour(); bindGallery(); bindBatch();
   window.addEventListener('resize', () => { if (S.tab === 'time') drawPreview(); });
   window.addEventListener('hashchange', async () => {
     try { const shared = await fromHash(); if (shared) loadScenario(shared, 'Opened the shared scenario.'); }

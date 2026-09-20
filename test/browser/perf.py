@@ -1,6 +1,6 @@
 import asyncio, json, sys
 from playwright.async_api import async_playwright
-from common import URL
+from common import URL, launcher
 MEASURE = """async (ms) => {
   const deltas = []; let last = performance.now(); let long = 0;
   const po = new PerformanceObserver(l => { for (const e of l.getEntries()) long += e.duration; });
@@ -21,7 +21,7 @@ async def scenario(pg, label, setup):
     print(label, json.dumps(r))
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        b = await launcher(p).launch()
         pg = await (await b.new_context(viewport={'width': 1440, 'height': 900})).new_page()
         await pg.goto(URL); await pg.wait_for_timeout(900)
         await pg.click('#btn-play')

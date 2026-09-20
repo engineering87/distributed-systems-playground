@@ -132,6 +132,8 @@ A workflow step that keeps an exercise honest:
 
 With `assert` statements in the algorithm and *Stop at the first failed assertion* in the scenario, a violated property makes the step fail and names the seed that produced it.
 
+The same batch runs are available in the page: *Run over many seeds* in the *Scenario* tab, described in [The interface](interface.md#batch-runs).
+
 ## The batch runner API
 
 `src/runner.js` is the module behind the tool. It has no dependency on the page and can be required from Node or loaded in a browser page.

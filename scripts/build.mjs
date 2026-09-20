@@ -24,9 +24,15 @@ for (const [marker, file] of [
   ['/*__LIBRARY__*/', 'library.js'],
   ['/*__I18N__*/', 'i18n.js'],
   ['/*__EXAMPLES__*/', 'examples.js'],
+  ['/*__RUNNER__*/', 'runner.js'],
+  ['/*__WORKER__*/', 'worker.js'],
   ['/*__UI__*/', 'ui/']
 ]) {
-  const src = file === 'ui/' ? readUi() : read(file);
+  let src = file === 'ui/' ? readUi() : read(file);
+  // the worker carries its own copy of the engine: it has no access to the page's scripts
+  if (file === 'worker.js') {
+    src = src.replace('/*__WORKER_LIBS__*/', () => ['core.js', 'library.js', 'examples.js', 'runner.js'].map(read).join('\n'));
+  }
   if (src.toLowerCase().includes('</script')) throw new Error(`${file} contains "</script", which would break the page`);
   if (!html.includes(marker)) throw new Error(`Placeholder ${marker} is missing from the template`);
   html = html.replace(marker, () => src);

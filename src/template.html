@@ -261,6 +261,15 @@ uses PerfectLinks as pl via AckLinks</pre>
       <div class="row">
         <label class="field"><span>Simulated duration</span><input data-bind="stopAt" data-kind="dur" class="narrow"></label>
         <label class="check"><input type="checkbox" data-bind="haltOnAssert"> Stop at the first failed assertion</label>
+
+    <h3>Run over many seeds</h3>
+    <p class="hint">The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.</p>
+    <div class="row">
+      <label class="field inline"><span>Seeds</span><input id="batch-seeds" value="1..50" class="narrow" aria-label="Seeds to run"></label>
+      <button type="button" id="btn-batch" class="ghost">Run over seeds</button>
+      <span id="batch-progress" class="hint"></span>
+    </div>
+    <div id="batch-results"></div>
       </div>
     </div>
 
@@ -462,6 +471,12 @@ uses PerfectLinks as pl via AckLinks</pre>
 </script>
 <script>
 /*__EXAMPLES__*/
+</script>
+<script>
+/*__RUNNER__*/
+</script>
+<script id="worker-src" type="text/plain">
+/*__WORKER__*/
 </script>
 <script>
 /*__UI__*/

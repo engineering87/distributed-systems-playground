@@ -309,9 +309,9 @@ Implementation note: inside a `trigger`, the ASCII `>` closes the event, so comp
 
 Every higher abstraction (stubborn link, perfect link, broadcast, failure detector, consensus) is **written in the DSL**. Its source code is part of the teaching material.
 
-### 5.7 Batch runner and command line
+### 5.7 Batch runner, workers and command line
 
-`src/runner.js` runs a scenario several times without the page: it clones the scenario, applies optional field overrides and a timing preset, runs one simulation per seed and returns a compact summary of each (counts of messages by status, violations, failed assertions, outputs with their times, stop reason, error) plus an aggregate and, on request, the runs grouped by the outputs they produced. `bin/dsp.mjs` is a dependency-free command line front end for it, with exit codes suitable for continuous integration. Both are described in [Running scenarios outside the browser](cli.md).
+`src/runner.js` runs a scenario several times without the page: it clones the scenario, applies optional field overrides and a timing preset, runs one simulation per seed and returns a compact summary of each (counts of messages by status, violations, failed assertions, outputs with their times, stop reason, error) plus an aggregate and, on request, the runs grouped by the outputs they produced. `bin/dsp.mjs` is a dependency-free command line front end for it, with exit codes suitable for continuous integration. The page uses the same module inside Web Workers, whose source (engine, library, examples and runner) is inlined in the bundle as a plain text script and turned into a blob URL at run time; where workers are refused, batches run on the page one seed at a time. Both are described in [Running scenarios outside the browser](cli.md).
 
 ### 5.8 Module library
 
@@ -430,7 +430,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.7** | batch runner and command line tool |
 | **v0.8** | global invariants checked across processes, reported in the interface and by the batch runner |
 | **v0.9** | one-way link failures, process pauses and omission faults |
-| **v1.0** | test suites over generated fault schedules, engine in worker threads, counterexample minimization |
+| **v0.10** | batch runs over many seeds in workers, browser suites in the repository, interface split by area |
+| **v1.0** | test suites over generated fault schedules, counterexample minimization |
 | **v1.1** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
 | **v1.2** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |

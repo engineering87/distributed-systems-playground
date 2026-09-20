@@ -8,7 +8,7 @@ async function init() {
   $('#toast').setAttribute('role', 'status');
   applySettings();
   bindHeader(); bindForms(); bindEditor(); bindTopo(); bindDiagram(); bindTransport(); bindDialogs(); bindKeys();
-  bindSettings(); bindTour(); bindGallery();
+  bindSettings(); bindTour(); bindGallery(); bindBatch();
   window.addEventListener('resize', () => { if (S.tab === 'time') drawPreview(); });
   window.addEventListener('hashchange', async () => {
     try { const shared = await fromHash(); if (shared) loadScenario(shared, 'Opened the shared scenario.'); }

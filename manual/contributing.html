@@ -198,6 +198,7 @@ npm test</code></pre>
 <p>The suites that need a page are separate, because they need a browser:</p>
 <pre class="code lang-sh"><code>pip install playwright &amp;&amp; playwright install chromium
 npm run build &amp;&amp; npm run test:browser</code></pre>
+<p><code>DSP_BROWSER=firefox</code> or <code>DSP_BROWSER=webkit</code> runs the same suites on another engine.</p>
 <p>Both run in CI on every push. <code>npm test</code> covers the engine, the runner, the language, the documentation and the translations; <code>npm run test:browser</code> covers the interface. Details in <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/test/browser/README.md" target="_blank" rel="noopener">test/browser/README.md</a>.</p>
 <p>Open <code>index.html</code> in a browser to use the application.</p>
 <h2 id="how-the-code-is-organized">How the code is organized<a class="anchor" href="#how-the-code-is-organized" aria-label="Link to this section">#</a></h2>

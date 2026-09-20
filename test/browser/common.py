@@ -7,3 +7,13 @@ INDEX = os.environ.get('DSP_INDEX', str(ROOT / 'index.html'))
 URL = INDEX if INDEX.startswith('http') else 'file://' + INDEX
 OUT = pathlib.Path(os.environ.get('DSP_OUT', ROOT / 'test' / 'browser' / 'out'))
 OUT.mkdir(parents=True, exist_ok=True)
+
+# chromium, firefox or webkit; the suites use launcher(playwright) instead of naming one
+BROWSER = os.environ.get('DSP_BROWSER', 'chromium')
+
+
+def launcher(pw):
+    """The browser type chosen by DSP_BROWSER, for `await launcher(p).launch()`."""
+    if BROWSER not in ('chromium', 'firefox', 'webkit'):
+        raise SystemExit('DSP_BROWSER must be chromium, firefox or webkit, not ' + BROWSER)
+    return getattr(pw, BROWSER)

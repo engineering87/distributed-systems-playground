@@ -106,8 +106,25 @@ Everything is explained in [The timing model](timing-model.md).
 
 - **External inputs**, one per line: `TIME NODE Event | arguments`. `NODE` is a number or `*` for every process. Arguments are Upon expressions evaluated on the target process. Lines added with **Inject event** appear here.
 - **Faults**: the list of scheduled faults, each with **Remove**, and a form to add crashes, recoveries, link failures and partitions. See [Faults](faults.md).
+- **Run over many seeds**: the same scenario, one run per seed, in the background. See [Batch runs](#batch-runs).
 - **Simulated duration**: when the run stops at the latest.
 - **Stop at the first failed assertion**: turns `assert` into a hard stop.
+
+### Batch runs
+
+*Run over many seeds* in the *Scenario* tab answers the question a single run cannot: does this hold in general?
+
+Write the seeds as `1..50`, `7`, or `1,4,9`, press **Run over seeds**, and the runs happen in the background: the page stays usable while they go. The panel reports, as results arrive:
+
+- how many runs finished and how many had a problem;
+- for each declared [property](language.md#properties), in how many runs it held and the first seed that broke it;
+- a list of the runs with a problem, or of all of them when there is none.
+
+Click a seed to load that run in the page, with everything in place to watch what happened. **Stop** ends a batch early.
+
+The runs use Web Workers, as many as a few cores allow, each with its own copy of the engine. Where a browser does not allow them, for example when the page is opened from disk in some configurations, the batch falls back to running one seed at a time on the page, still without freezing it.
+
+The same thing from a terminal, with exit codes for continuous integration, is in [Running scenarios outside the browser](cli.md).
 
 ## State tab
 

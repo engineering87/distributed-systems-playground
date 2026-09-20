@@ -13,6 +13,10 @@ python test/browser/run_all.py              # every suite
 python test/browser/run_all.py commands     # one of them
 ```
 
+They run on Chromium by default. `DSP_BROWSER=firefox` or `DSP_BROWSER=webkit` runs the same suites on the
+other engines, once the browser is installed (`playwright install firefox webkit`). CI runs Chromium on every
+push and the other two on the main branch.
+
 They run against `index.html` in the repository, so build first if you changed anything in `src/`:
 
 ```sh
@@ -31,6 +35,7 @@ downloaded files go (`test/browser/out` by default, which is not committed).
 | `extras` | settings, themes, the palette for color vision deficiency, the Italian interface, presentation mode, the welcome tour, the gallery and image export |
 | `props` | global properties: counters, the log filter, the diagnostics and the translation |
 | `faults` | one-way link failures, process pauses and omissions: form, log, drawing and injection at the cursor |
+| `batch` | running a scenario over many seeds: workers, progress, results, opening a seed, stopping |
 | `security` | markup typed in the editor, prototype pollution from imports, links and storage, what a saved file contains, and what an exported image may carry |
 | `touch` | a phone: taps, dragging a process, scrolling over the graph, target sizes and dialogs |
 | `layout` | eleven screen sizes, from 320×640 to 2560×1440: overflow, clipping and touch target sizes |

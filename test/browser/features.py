@@ -1,11 +1,11 @@
 import asyncio
 from playwright.async_api import async_playwright
-from common import URL
+from common import URL, launcher
 res=[]
 def check(c,m): res.append(('OK  ' if c else 'FAIL')+' '+m)
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        b = await launcher(p).launch()
         ctx = await b.new_context(viewport={'width':1440,'height':900}, color_scheme='dark')
         pg = await ctx.new_page(); errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))

@@ -536,3 +536,13 @@ body.present .pk text { font-size: 12px; }
 @media (min-width: 960px) {
   body.present .app { grid-template-rows: minmax(0, 1fr) clamp(220px, 36vh, 560px); }
 }
+
+/* ---------- batch runs ---------- */
+#batch-results { margin-top: 8px; }
+.batch-summary, .batch-prop { margin: 2px 0; font-size: 13.5px; }
+.batch-prop.bad b, .batch-summary .bad { color: var(--red); }
+.batch-summary .good { color: var(--green); }
+.batch-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 220px; overflow: auto; font-size: 13px; }
+.batch-list li { padding: 2px 0; border-bottom: 1px solid var(--grid); display: flex; gap: 8px; align-items: baseline; }
+.batch-list .bad { color: var(--red); }
+.batch-list .hint { margin-left: auto; white-space: nowrap; }

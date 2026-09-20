@@ -288,6 +288,25 @@ const LIBTXT = {
 P(/^(\w+): (.+?) Guarantees: (.+)$/, m => LIBTXT[m[2]] ? m[1] + ': ' + LIBTXT[m[2]] + ' Garanzie: ' + (LIBTXT[m[3]] || m[3]) : null);
 M('Links', 'Collegamenti');
 M('or', 'o');
+M('Run over many seeds', 'Esecuzione su molti semi');
+M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
+  'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
+M('Seeds', 'Semi'); M('Run over seeds', 'Esegui sui semi'); M('Seeds to run', 'Semi da eseguire'); M('Stop', 'Ferma');
+M('Open this run', 'Apri questa esecuzione'); M('stopped', 'fermato'); M('all clean', 'tutto a posto');
+M('Seeds look like 1..50, or 3, or 1,4,9.', 'I semi si scrivono come 1..50, oppure 3, oppure 1,4,9.');
+M('That is a lot of seeds: try at most 500.', 'Sono molti semi: al massimo 500.');
+P(/^(\d+) \/ (\d+)$/, m => null);
+P(/^(\d+) of (\d+) run\(s\), $/, m => m[1] + ' di ' + m[2] + ' esecuzioni, ');
+P(/^(\d+) with a problem$/, m => m[1] + ' con un problema');
+P(/^(\d+) run\(s\) in ([\d.]+) s$/, m => m[1] + ' esecuzioni in ' + m[2] + ' s');
+P(/^ \((always|eventually)\) held in (\d+)\/(\d+) run\(s\)(, first broken at seed (\d+))?$/, m =>
+  ' (' + (m[1] === 'always' ? 'sempre' : 'prima o poi') + ') vale in ' + m[2] + '/' + m[3] + ' esecuzioni' + (m[5] ? ', prima rottura al seme ' + m[5] : ''));
+P(/^seed (\d+)$/, m => 'seme ' + m[1]);
+P(/^ (\w+(?:, \w+)*) broken$/, m => ' ' + m[1] + ' violata');
+P(/^ (\d+) violation\(s\)$/, m => ' ' + m[1] + ' violazioni');
+P(/^ (\d+) failed assertion\(s\)$/, m => ' ' + m[1] + ' asserzioni violate');
+P(/^  (\d+) messages, (\d+) outputs$/, m => '  ' + m[1] + ' messaggi, ' + m[2] + ' output');
+P(/^showing the first 60 of (\d+)\.$/, m => 'mostrate le prime 60 di ' + m[1] + '.');
 M('Process pause', 'Pausa di processo'); M('Omission', 'Omissione'); M('One way', 'Unidirezionale');
 M('Only the messages from the first process to the second are lost', 'Si perdono solo i messaggi dal primo processo al secondo');
 M('Omits', 'Omette'); M('sends and receives', 'invii e ricezioni'); M('sends', 'invii'); M('receives', 'ricezioni');

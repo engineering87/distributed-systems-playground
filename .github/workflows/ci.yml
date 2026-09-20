@@ -22,11 +22,18 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # every push is checked on Chromium; the other engines run on the main branch
+        browser: ${{ github.ref == 'refs/heads/main' && fromJSON('["chromium","firefox","webkit"]') || fromJSON('["chromium"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install playwright
-      - run: playwright install --with-deps chromium
+      - run: playwright install --with-deps ${{ matrix.browser }}
       - run: python test/browser/run_all.py
+        env:
+          DSP_BROWSER: ${{ matrix.browser }}

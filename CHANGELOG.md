@@ -6,6 +6,13 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.10.0]
+
+### Added
+- **Run over many seeds** in the *Scenario* tab: the same scenario runs in background workers, one run per seed, reporting per-property results and the first seed that broke each one; clicking a seed opens that run. Falls back to running on the page, one seed at a time, where workers are not allowed.
+- The browser suites can run on Firefox and WebKit with `DSP_BROWSER`, and CI runs all three engines on the main branch.
+- A browser suite for batch runs.
+
 ## [0.9.2]
 
 ### Changed

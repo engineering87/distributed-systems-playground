@@ -164,6 +164,7 @@ This project exists to make that gap visible.
 - A command line tool that runs the same engine: many seeds in one command, outcomes grouped, exit codes for continuous integration. See [Running scenarios outside the browser](docs/cli.md).
 
 **Checking**
+- Batch runs over many seeds, in background workers, with per-property results and one click to open the seed that broke an invariant.
 - Global properties written next to the algorithm: `property Agreement always … end`, checked after every step over the state of every process, with the instant and the process of the first violation.
 
 **Analysis**

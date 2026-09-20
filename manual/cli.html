@@ -244,6 +244,7 @@ node bin/dsp.mjs run scenario.json --preset async --set actual.delay=&quot;logno
 <pre class="code lang-yaml"><code>- run: node bin/dsp.mjs check solution.json
 - run: node bin/dsp.mjs run solution.json --seeds 1..100 --quiet</code></pre>
 <p>With <code>assert</code> statements in the algorithm and <em>Stop at the first failed assertion</em> in the scenario, a violated property makes the step fail and names the seed that produced it.</p>
+<p>The same batch runs are available in the page: <em>Run over many seeds</em> in the <em>Scenario</em> tab, described in <a href="interface.html#batch-runs">The interface</a>.</p>
 <h2 id="the-batch-runner-api">The batch runner API<a class="anchor" href="#the-batch-runner-api" aria-label="Link to this section">#</a></h2>
 <p><code>src/runner.js</code> is the module behind the tool. It has no dependency on the page and can be required from Node or loaded in a browser page.</p>
 <pre class="code lang-js"><code>const R = require('./src/runner.js');

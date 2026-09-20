@@ -4,9 +4,10 @@
     python test/browser/run_all.py                 # all suites
     python test/browser/run_all.py commands touch  # only these
     DSP_INDEX=/path/to/index.html python test/browser/run_all.py
+    DSP_BROWSER=firefox python test/browser/run_all.py
 
-Exit code 0 when every check passed. Needs Playwright with Chromium:
-    pip install playwright && playwright install chromium
+Exit code 0 when every check passed. Needs Playwright and the browser it will use:
+    pip install playwright && playwright install chromium firefox webkit
 """
 import os
 import pathlib
@@ -15,7 +16,7 @@ import sys
 import time
 
 HERE = pathlib.Path(__file__).resolve().parent
-SUITES = ['commands', 'features', 'extras', 'props', 'faults', 'security', 'touch', 'layout', 'perf']
+SUITES = ['commands', 'features', 'extras', 'props', 'faults', 'batch', 'security', 'touch', 'layout', 'perf']
 # perf and layout report measurements rather than pass or fail
 MEASURE_ONLY = {'perf', 'layout'}
 
@@ -29,6 +30,7 @@ def main(argv):
     out = pathlib.Path(os.environ.get('DSP_OUT', HERE / 'out'))
     out.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, PYTHONPATH=str(HERE) + os.pathsep + os.environ.get('PYTHONPATH', ''))
+    print('browser: ' + os.environ.get('DSP_BROWSER', 'chromium'))
     failed, total_ok, total_fail = [], 0, 0
     for name in names:
         started = time.time()
