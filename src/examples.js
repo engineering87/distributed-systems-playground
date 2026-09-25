@@ -767,7 +767,7 @@ function catalogScenario(opts) {
   return {
     version: 1, seed: opts.seed, nodes: ringLayout(ids, 330, 230, 165), links: complete(ids),
     code: opts.code, top: opts.top, inputs: opts.inputs || '', faults: opts.faults || [],
-    preset: opts.preset, assumed: copy(preset.assumed), actual: copy(preset.actual),
+    preset: opts.preset, assumed: copy(preset.assumed), actual: Object.assign(copy(preset.actual), opts.actual || {}),
     violationPolicy: preset.violationPolicy, tieBreak: 'stable', stopAt: opts.stopAt
   };
 }
@@ -806,6 +806,161 @@ EXAMPLES.push({
 });
 
 
+const CLOCKS_CODE = `// Logical clocks: Lamport's counter and a vector clock, side by side.
+// Every message carries both. On receipt the Lamport clock jumps past the
+// timestamp it received, and the vector takes the entrywise maximum.
+interface Clocks
+  request Tick(q)
+  indication Event(kind, lc)
+end
+
+algorithm LogicalClocks
+  implements Clocks as app
+  uses Net as net
+  state
+    lc := 0
+    vc := map()
+
+  upon event ⟨app, Init⟩ do
+    forall q in Π do
+      vc[q] := 0
+    end
+  end
+
+  upon event ⟨app, Tick | q⟩ do
+    lc := lc + 1
+    vc[self] := vc[self] + 1
+    trigger ⟨net, Send | q, [MSG, lc, vc]⟩
+    trigger ⟨app, Event | SEND, lc⟩
+  end
+
+  upon event ⟨net, Deliver | p, [MSG, ts, v]⟩ do
+    lc := max({lc, ts}) + 1
+    assert lc > ts
+    vc[self] := vc[self] + 1
+    forall q in Π do
+      vc[q] := max({vc[q], v[q]})
+    end
+    trigger ⟨app, Event | RECEIVE, lc⟩
+  end
+end
+
+// Nobody knows more about me than I do: my own entry is never behind
+// the entry somebody else keeps for me.
+// Processes that have not started yet have an empty vector, and are left out.
+property OwnEntryIsHighest always
+  #{p in Π where #vc[p] > 0 and #{q in Π where #vc[q] > 0 and vc[q][p] > vc[p][p]} > 0} = 0
+end
+
+// Every process eventually takes part.
+property EverybodyTicks eventually
+  #{p in Π where lc[p] > 0} = N
+end
+`;
+const SNAPSHOT_CODE = `// Chandy-Lamport global snapshot, on FIFO channels.
+// Processes move coins around. Whoever is asked first records its own balance,
+// sends a marker on every channel and records what arrives on a channel until
+// its marker comes: local state plus messages in flight make a consistent cut.
+interface Snapshot
+  request Transfer(q, amount)
+  request Snap()
+  indication Recorded(total)
+end
+
+algorithm ChandyLamport
+  implements Snapshot as app
+  uses Net as net
+  params
+    START := 100
+  state
+    balance := 0
+    snapped := false
+    snap := 0
+    recording := ∅
+    inFlight := 0
+    recorded := nil
+
+  upon event ⟨app, Init⟩ do
+    balance := START
+  end
+
+  upon event ⟨app, Transfer | q, amount⟩ where balance ≥ amount do
+    balance := balance - amount
+    trigger ⟨net, Send | q, [COIN, amount]⟩
+  end
+
+  upon event ⟨app, Transfer | q, amount⟩ where balance < amount do
+    skip
+  end
+
+  upon event ⟨app, Snap⟩ where not snapped do
+    call takeSnapshot()
+  end
+
+  upon event ⟨app, Snap⟩ where snapped do
+    skip
+  end
+
+  upon event ⟨net, Deliver | p, [COIN, amount]⟩ do
+    balance := balance + amount
+    if snapped and p ∈ recording then
+      inFlight := inFlight + amount
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [MARKER]⟩ do
+    if not snapped then
+      call takeSnapshot()
+    end
+    recording := recording \\ {p}
+    if #recording = 0 and recorded = nil then
+      recorded := snap + inFlight
+      trigger ⟨app, Recorded | recorded⟩
+    end
+  end
+
+  function takeSnapshot()
+    snapped := true
+    snap := balance
+    inFlight := 0
+    recording := Π \\ {self}
+    forall q in Π \\ {self} do
+      trigger ⟨net, Send | q, [MARKER]⟩
+    end
+  end
+end
+
+// The recorded cut holds every coin: local balances plus what was in flight.
+// The recorded cut holds every coin: local balances plus what was in flight.
+// sum() over the map keeps repeated amounts, which values() would merge into a set.
+property Conservation eventually
+  #{p in Π where recorded[p] = nil} = 0 and sum(defined(recorded)) = N * 100
+end
+
+// A process records its own state once, and never after it has finished.
+property SnapshotOnce always
+  #{p in Π where recorded[p] ≠ nil and not snapped[p]} = 0
+end
+`;
+
+EXAMPLES.push({
+  key: 'logical-clocks',
+  title: 'Logical clocks: Lamport and vector',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: CLOCKS_CODE, top: 'LogicalClocks',
+    inputs: '0ms 1 Tick | 2\n5ms 2 Tick | 3\n8ms 3 Tick | 4\n12ms 4 Tick | 1\n20ms 2 Tick | 1', stopAt: '500ms'
+  })
+});
+EXAMPLES.push({
+  key: 'snapshot',
+  title: 'Chandy-Lamport snapshot on FIFO channels',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: SNAPSHOT_CODE, top: 'ChandyLamport', actual: { fifo: true },
+    inputs: '0ms 1 Transfer | 2, 30\n2ms 2 Transfer | 3, 20\n4ms 3 Transfer | 4, 10\n6ms 1 Snap\n8ms 4 Transfer | 1, 25',
+    stopAt: '1s'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -819,7 +974,9 @@ const META = {
   'perfect-detector': { category: 'Failure detection', summary: 'With known bounds, a missed heartbeat means a crash: nobody correct is ever suspected.' },
   'omega-leader': { category: 'Leader election', summary: 'Heartbeats with a growing timeout: after GST everybody trusts the same correct leader.' },
   'mutual-exclusion': { category: 'Coordination', summary: 'Timestamped requests and deferred replies keep two processes out of the critical section.' },
-  'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' }
+  'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' },
+  'logical-clocks': { category: 'Logical time', summary: 'A Lamport counter and a vector clock side by side: what each one can and cannot tell you.' },
+  'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 

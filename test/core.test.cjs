@@ -741,3 +741,40 @@ test('a partition can be one way', () => {
   assert.ok(cut(oneWay).every(x => x.startsWith('1>')), 'only what leaves p1: ' + cut(oneWay).join(', '));
   assert.equal(oneWay.netFaults.partitions[0].oneWay, true);
 });
+
+test('logical clocks keep their invariants, and the Lamport counter passes what it receives', () => {
+  const r = C.runSimulation(byKey('logical-clocks'));
+  assert.equal(r.error, null);
+  assert.ok(r.properties.every(p => p.ok), JSON.stringify(r.properties.map(p => [p.name, p.ok])));
+  assert.equal(r.log.filter(e => e.kind === 'assert').length, 0, 'no assertion failed');
+  const receives = r.outputs.filter(o => o.args[0] === 'RECEIVE');
+  assert.ok(receives.length >= 4, 'messages are received');
+  // a receive always reports a counter above the one of the send it answers
+  const sends = r.outputs.filter(o => o.args[0] === 'SEND');
+  assert.ok(Math.max(...receives.map(o => +o.args[1])) > Math.max(...sends.map(o => +o.args[1])) - 1);
+
+  // without the max the counter no longer passes the timestamp, and the assert says so
+  const broken = clone(byKey('logical-clocks'));
+  broken.code = broken.code.replace('lc := max({lc, ts}) + 1', 'lc := lc + 1');
+  const bad = C.runSimulation(broken);
+  assert.ok(bad.log.some(e => e.kind === 'assert'), 'the assertion catches it');
+});
+
+test('a snapshot records a consistent cut, and loses coins without FIFO channels', () => {
+  const r = C.runSimulation(byKey('snapshot'));
+  assert.equal(r.error, null);
+  assert.ok(r.properties.every(p => p.ok), JSON.stringify(r.properties.map(p => [p.name, p.ok])));
+  const totals = r.outputs.map(o => +o.args[0]);
+  assert.equal(totals.length, 4, 'every process finishes its snapshot');
+  assert.equal(totals.reduce((a, b) => a + b, 0), 400, 'the cut holds every coin');
+
+  // FIFO is the hypothesis of the algorithm, not a detail: some seeds lose coins without it
+  const lost = [11, 13].map(seed => {
+    const s = clone(byKey('snapshot'));
+    s.seed = seed;
+    s.actual = Object.assign({}, s.actual, { fifo: false });
+    const run = C.runSimulation(s);
+    return { seed, total: run.outputs.reduce((a, o) => a + +o.args[0], 0), ok: run.properties[0].ok };
+  });
+  assert.ok(lost.some(x => x.total < 400 && !x.ok), 'a non-FIFO run records less than everything: ' + JSON.stringify(lost));
+});

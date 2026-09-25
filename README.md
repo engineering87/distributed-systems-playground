@@ -239,6 +239,8 @@ Every algorithm below ships as a scenario: the code in Upon, a topology, a timin
 | **Gossip** | asynchronous | a rumor over random neighbors: reach against cost | — |
 | **Ricart-Agrawala mutual exclusion** | asynchronous | timestamps and deferred replies, with no coordinator | mutual exclusion |
 | **Two-phase commit** | asynchronous | everybody commits together, and the participants block when the coordinator crashes in between | agreement, termination |
+| **Logical clocks** | asynchronous | a Lamport counter and a vector clock side by side: what each one orders and what it refuses to order | own entry is highest, everybody ticks |
+| **Chandy-Lamport snapshot** | asynchronous, FIFO | a consistent cut of a running system, and the coins that go missing as soon as channels stop being FIFO | conservation, snapshot once |
 
 Ten more algorithms come as **library modules** you can build on, written in the same language: stubborn, perfect and FIFO links, best-effort, reliable, uniform reliable, FIFO, causal and probabilistic broadcast. See [the module library](docs/library.md).
 
@@ -655,6 +657,8 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Eventual leader election Ω | partially synchronous | complete graph of 5 | Crash the second leader too and follow the handover. |
 | Mutual exclusion, Ricart-Agrawala | asynchronous | complete graph of 4 | Make everybody ask at the same instant and see how the tie is broken. |
 | Two-phase commit | asynchronous | complete graph of 4 | Crash the coordinator at `25ms` and watch the participants block. |
+| Logical clocks | asynchronous | complete graph of 4 | Remove the `max` and watch the assertion fail. |
+| Chandy-Lamport snapshot | asynchronous, FIFO | complete graph of 4 | Turn FIFO off and run seeds 11 and 13: the cut loses coins. |
 
 The *Example* menu also offers an empty scenario to start from.
 

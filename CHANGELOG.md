@@ -6,6 +6,13 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.19.0]
+
+### Added
+- Two algorithms from the catalog: logical clocks (Lamport and vector, with the invariant that nobody knows more about a process than the process itself) and the Chandy-Lamport snapshot on FIFO channels (with conservation of the recorded cut).
+- New gallery categories: *Logical time* and *Global state*.
+- Example scenarios can override fields of their timing preset, which the snapshot uses to require FIFO channels.
+
 ## [0.18.0]
 
 ### Added

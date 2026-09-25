@@ -18,6 +18,8 @@ For every example this page gives the setup, what to watch, a few experiments, a
 - [Eventual leader election Ω](#eventual-leader-election-ω)
 - [Mutual exclusion, Ricart-Agrawala](#mutual-exclusion-ricart-agrawala)
 - [Two-phase commit and the blocked participants](#two-phase-commit-and-the-blocked-participants)
+- [Logical clocks: Lamport and vector](#logical-clocks-lamport-and-vector)
+- [Chandy-Lamport snapshot on FIFO channels](#chandy-lamport-snapshot-on-fifo-channels)
 - [Empty scenario](#empty-scenario)
 
 ## Flooding broadcast
@@ -231,6 +233,38 @@ p1 is the coordinator: it asks everybody to prepare, collects the votes, decides
 - Crash the coordinator at `25ms`, after the votes arrive and before the announcement. Nobody decides: *Agreement* still holds, *Termination* is reported broken. The participants know their own vote and nothing else, and no timeout can help them, because a missing coordinator could have decided either way. This is the blocking problem that three-phase commit and consensus-based commit exist to solve.
 - Crash it at `60ms` instead, after the announcement has left: the others decide normally.
 - Make one participant vote `NO` by editing the `PREPARE` handler, and watch the outcome change to `ABORT`.
+
+## Logical clocks: Lamport and vector
+
+**Topic:** what a clock without time can tell you · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
+
+Every message carries both clocks. On receipt the Lamport counter jumps past the timestamp it received and adds one; the vector takes the entrywise maximum and then counts the local event.
+
+**What to watch.** The *State* tab shows both clocks of the selected process. Follow a chain of messages on the diagram and read the Lamport numbers along it: they only ever grow. Now find two events on different processes with no path between them: their Lamport numbers say nothing, while their vectors are incomparable, and that is exactly the difference between the two clocks.
+
+The declared property *OwnEntryIsHighest* says what a vector clock guarantees: nobody knows more about me than I do, so my own entry is never behind the one somebody else keeps for me. *EverybodyTicks* checks that every process takes part.
+
+**Try this.**
+
+- Add `0ms * Tick | 1` to make everybody send at once, and compare the vectors afterwards.
+- Turn off FIFO channels: the clocks still hold, because they do not depend on order.
+- Delete the `max` in the Lamport handler and watch *assert* fail: the counter no longer passes the timestamp it received.
+
+**Keep in mind.** A Lamport clock orders what is causally related and invents an order for the rest; a vector clock refuses to order what is concurrent. Neither measures time.
+
+## Chandy-Lamport snapshot on FIFO channels
+
+**Topic:** recording a global state without stopping the system · **Model:** asynchronous, FIFO channels · **Topology:** complete graph of 4 · **Seed:** 3
+
+Four processes start with 100 coins each and move them around. At 6 ms p1 is asked for a snapshot: it records its own balance, sends a marker on every channel, and records what arrives on a channel until that channel's marker comes. Everybody else does the same on the first marker it receives.
+
+**What to watch.** The four processes report 95, 110, 110 and 85: not the balances at any single instant, since there is no such instant, but a consistent cut whose total is 400, the number of coins in the system. The property *Conservation* checks exactly that, and *SnapshotOnce* that nobody finishes without having recorded its own state.
+
+**Try this.**
+
+- **Turn off FIFO channels** in the *Timing* tab and run seeds 11 and 13. The recorded total becomes 370: coins vanish, because a marker can overtake a coin that should have been counted in flight. FIFO is not a detail of the algorithm, it is its hypothesis.
+- Move the `Snap` request later, after every transfer has arrived: the cut becomes the obvious one, with no messages in flight.
+- Ask two processes to snapshot at the same moment: the markers meet, and the cut is still consistent.
 
 ## Empty scenario
 

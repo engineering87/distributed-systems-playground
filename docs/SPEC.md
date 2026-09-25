@@ -434,6 +434,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.11** | generated fault schedules for batch runs |
 | **v0.12** | counterexample minimization |
 | **v0.13** | catalog algorithms with their properties: P, Ω, mutual exclusion, two-phase commit |
+| **v0.18** | writing help: contextual completion and quick fixes |
+| **v0.19** | catalog: logical clocks and the Chandy-Lamport snapshot |
 | **v1.0** | a test suite saved with the scenario |
 | **v1.1** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
 | **v1.2** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
