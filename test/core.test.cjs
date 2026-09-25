@@ -841,3 +841,37 @@ test('total order broadcast delivers the same sequence everywhere', () => {
   const bad = C.runSimulation(broken);
   assert.equal(bad.properties.find(p => p.name === 'TotalOrder').ok, false, 'the property has teeth');
 });
+
+test('Paxos decides one value, and keeps agreement whoever crashes', () => {
+  const base = byKey('paxos');
+  const run = faults => C.runSimulation(Object.assign(clone(base), { faults }));
+
+  const clean = run([]);
+  assert.equal(clean.error, null);
+  assert.ok(clean.properties.every(p => p.ok), JSON.stringify(clean.properties.map(p => [p.name, p.ok])));
+  const values = [...new Set(clean.outputs.map(o => o.args[0]))];
+  assert.equal(values.length, 1, 'one value only: ' + values.join(','));
+  assert.equal(clean.outputs.length, 5, 'everybody learns it');
+
+  // the proposer of the winning ballot can crash: the others still decide
+  const crashed = run([{ type: 'crash', node: 1, at: '8ms' }]);
+  assert.ok(crashed.properties.every(p => p.ok), 'a crashed proposer changes nothing');
+
+  // a majority cannot crash: nobody decides, and nobody decides wrongly
+  const majority = run([{ type: 'crash', node: 3, at: '8ms' }, { type: 'crash', node: 4, at: '10ms' }, { type: 'crash', node: 5, at: '12ms' }]);
+  assert.equal(majority.outputs.length, 0);
+  assert.equal(majority.properties.find(p => p.name === 'Agreement').ok, true);
+  assert.equal(majority.properties.find(p => p.name === 'Termination').ok, false);
+});
+
+test('Paxos never loses safety in a behaviour profile', () => {
+  const R = require('../src/runner.js');
+  const prof = R.profile(byKey('paxos'), { seeds: '1..10', faultWindow: '0..60ms' });
+  for (const row of prof.rows) {
+    for (const name of ['Agreement', 'Validity']) {
+      assert.equal(row.properties.find(p => p.name === name).failed, 0, name + ' holds under ' + row.name);
+    }
+  }
+  const lost = prof.rows.filter(r => (r.properties.find(p => p.name === 'Termination') || {}).failed);
+  assert.ok(lost.length >= 2, 'termination is what the faults take away: ' + lost.map(r => r.name).join(', '));
+});

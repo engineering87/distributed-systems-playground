@@ -22,6 +22,7 @@ For every example this page gives the setup, what to watch, a few experiments, a
 - [Chandy-Lamport snapshot on FIFO channels](#chandy-lamport-snapshot-on-fifo-channels)
 - [Majority-quorum register](#majority-quorum-register)
 - [Total order broadcast with a sequencer](#total-order-broadcast-with-a-sequencer)
+- [Paxos: consensus on one value](#paxos-consensus-on-one-value)
 - [Empty scenario](#empty-scenario)
 
 ## Flooding broadcast
@@ -302,6 +303,34 @@ Everybody sends its message to all; p1, the sequencer, is the only process that 
 - **Crash the sequencer** at `3ms`: deliveries stop altogether. *TotalOrder* still holds — nobody has seen anything wrong — while *EverybodyDelivers* is broken. One process deciding the order is cheap and fragile at the same time; making it fault-tolerant is what consensus is for.
 - **Deliver without waiting for the order**, by replacing the `skip` in the second `DATA` handler with an immediate delivery: *TotalOrder* breaks at once, which is what a property is for.
 - Turn off FIFO channels: the algorithm still holds, because the sequence numbers, not the channels, carry the order.
+
+## Paxos: consensus on one value
+
+**Topic:** the algorithm the previous example was missing · **Model:** asynchronous · **Topology:** complete graph of 5 · **Seed:** 3
+
+The [total order example](#total-order-broadcast-with-a-sequencer) ends with the sequencer crashing and everything stopping. Paxos is the answer to that sentence: nobody is indispensable.
+
+Every process is acceptor and learner; p1 proposes "A" and p2 proposes "B" five milliseconds later. A proposer picks a ballot number nobody else can use, asks a majority to promise not to accept anything older, **adopts the most recent value it hears about** instead of its own, and then asks that majority to accept it. Two majorities always meet, and that is the whole argument.
+
+**What to watch.** Everybody decides "B", including p1, which proposed "A": the second ballot was higher, and the first proposal had not been accepted by a majority yet. The properties are *Agreement* (`always`, nobody decides differently), *Validity* (`always`, a decided value is one somebody proposed) and *Termination* (`eventually`, every correct process decides).
+
+**The profile is the lesson.** Over ten seeds and ten fault conditions, *Agreement* and *Validity* hold **everywhere**, while *Termination* falls under crashes, partitions and a zone going down:
+
+| Condition | Result |
+|---|---|
+| no faults, pauses, link failures, omissions | everything holds |
+| one crash, two crashes, a partition, a zone | agreement and validity hold, termination breaks in some seeds |
+| **a majority crashes** | nobody decides, and nobody decides wrongly |
+
+Safety costs nothing; liveness costs a majority. This is the shape of every quorum-based algorithm, and it is the same shape as the [register](#majority-quorum-register).
+
+**Try this.**
+
+- Crash p1 at `8ms`, in the middle of its ballot: the others decide anyway.
+- Make both proposals start at `0ms`: the ballots interleave, one proposer restarts, and the decision takes longer. With unlucky timing they could keep interrupting each other forever, which is exactly what FLP says and what Ω exists to avoid.
+- Add `link:0.5/s` faults: the decision survives, because a majority is still reachable.
+
+**Keep in mind.** This is one value, one round, no reconfiguration and no leader: a proposer that keeps being outbid never gives up. Real systems add a leader (Ω), a log of values and a way to change the membership.
 
 ## Empty scenario
 

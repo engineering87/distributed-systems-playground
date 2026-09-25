@@ -1161,6 +1161,146 @@ EXAMPLES.push({
   })
 });
 
+const PAXOS_CODE = `// Single-value Paxos. Every process is acceptor and learner; the ones that
+// receive a Propose act as proposers too.
+// A proposer picks a ballot number nobody else can use, asks a majority to
+// promise not to accept anything older, adopts the most recent value it hears
+// about (or its own, if nobody accepted anything yet), and then asks the same
+// majority to accept it. Two majorities always meet, which is why two ballots
+// can never fix two different values.
+interface Consensus
+  request Propose(v)
+  indication Decide(v)
+end
+
+algorithm Paxos
+  implements Consensus as cons
+  uses Net as net
+  state
+    promised := 0
+    accTs := 0
+    accVal := nil
+    ballot := self
+    proposed := nil
+    myVal := nil
+    promises := map()
+    accepts := 0
+    phase := nil
+    decided := nil
+
+  // ---- proposer
+  upon event ⟨cons, Propose | v⟩ where phase = nil do
+    proposed := v
+    myVal := v
+    ballot := ballot + N
+    phase := PREPARING
+    promises := map()
+    accepts := 0
+    forall q in Π do
+      trigger ⟨net, Send | q, [PREPARE, ballot]⟩
+    end
+  end
+
+  upon event ⟨cons, Propose | v⟩ where phase ≠ nil do
+    skip
+  end
+
+  // ---- acceptor
+  upon event ⟨net, Deliver | p, [PREPARE, b]⟩ do
+    if b > promised then
+      promised := b
+      trigger ⟨net, Send | p, [PROMISE, b, accTs, accVal]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [ACCEPT, b, v]⟩ do
+    if b ≥ promised then
+      promised := b
+      accTs := b
+      accVal := v
+      trigger ⟨net, Send | p, [ACCEPTED, b]⟩
+    end
+  end
+
+  // ---- proposer, phase one: a majority promised
+  upon event ⟨net, Deliver | p, [PROMISE, b, t, v]⟩ do
+    if b = ballot and phase = PREPARING then
+      promises[p] := [t, v]
+      if 2 * #keys(promises) > N then
+        call chooseAndAccept()
+      end
+    end
+  end
+
+  // ---- proposer, phase two: a majority accepted
+  upon event ⟨net, Deliver | p, [ACCEPTED, b]⟩ do
+    if b = ballot and phase = ACCEPTING then
+      accepts := accepts + 1
+      if 2 * accepts > N and decided = nil then
+        phase := nil
+        decided := myVal
+        trigger ⟨cons, Decide | decided⟩
+        forall q in Π do
+          trigger ⟨net, Send | q, [DECIDED, decided]⟩
+        end
+      end
+    end
+  end
+
+  // ---- learner
+  upon event ⟨net, Deliver | p, [DECIDED, v]⟩ do
+    if decided = nil then
+      decided := v
+      trigger ⟨cons, Decide | v⟩
+    end
+  end
+
+  // The value carried forward is the one accepted at the highest ballot,
+  // which is what keeps two majorities from fixing two different values.
+  function chooseAndAccept()
+    best := 0
+    chosen := nil
+    forall q in keys(promises) do
+      if promises[q][0] > best then
+        best := promises[q][0]
+        chosen := promises[q][1]
+      end
+    end
+    if chosen ≠ nil then
+      myVal := chosen
+    end
+    phase := ACCEPTING
+    accepts := 0
+    forall q in Π do
+      trigger ⟨net, Send | q, [ACCEPT, ballot, myVal]⟩
+    end
+  end
+end
+
+// Nobody decides differently, and a decided value is one that somebody proposed.
+property Agreement always
+  #toset(values(defined(decided))) ≤ 1
+end
+
+property Validity always
+  #{p in Π where decided[p] ≠ nil and decided[p] ∉ toset(values(defined(proposed)))} = 0
+end
+
+// Every correct process decides — which asynchrony does not promise, only this run does.
+property Termination eventually
+  #{p in correct where decided[p] = nil} = 0
+end
+`;
+
+EXAMPLES.push({
+  key: 'paxos',
+  title: 'Paxos: consensus on one value',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'async', code: PAXOS_CODE, top: 'Paxos',
+    inputs: '0ms 1 Propose | "A"\n5ms 2 Propose | "B"', stopAt: '2s'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -1178,7 +1318,8 @@ const META = {
   'logical-clocks': { category: 'Logical time', summary: 'A Lamport counter and a vector clock side by side: what each one can and cannot tell you.' },
   'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
   'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' },
-  'total-order': { category: 'Broadcast', summary: 'One process decides the order and everybody follows it — until that process is the one that crashes.' }
+  'total-order': { category: 'Broadcast', summary: 'One process decides the order and everybody follows it — until that process is the one that crashes.' },
+  'paxos': { category: 'Consensus', summary: 'Two proposers compete, majorities meet, and one value wins: safety never depends on who crashes.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 

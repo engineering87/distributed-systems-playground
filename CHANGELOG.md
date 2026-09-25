@@ -6,6 +6,12 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.22.0]
+
+### Added
+- Single-value Paxos with two competing proposers, with agreement, validity and termination as properties. Its behaviour profile keeps agreement and validity under every fault condition and loses termination with the majority.
+- New gallery category: *Consensus* now also covers Paxos.
+
 ## [0.21.0]
 
 ### Added
