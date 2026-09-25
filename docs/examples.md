@@ -69,7 +69,7 @@ The program also declares three properties, checked after every step: *Agreement
 - Try other seeds with the dice button. Disagreement is rare: the minimum has many paths to every process, and all of them must fail. It shows up in roughly 1 seed out of 50.
 - Back in *Ideal synchronous*, crash p4 at `0ms`. Its value never spreads, and the others agree on 7.
 
-**Keep in mind.** In lockstep rounds a process cannot crash in the middle of its sends, so the classic scenario where a crashing process reaches only some of the others is not reproduced by a crash alone. See [Faults](faults.md#crash).
+**Keep in mind.** FloodSet is written for crash-stop: a process that crashes and recovers comes back with an empty set of values, and deciding on it fails with a runtime error. Run a behaviour profile to see it: the *crash and recovery* row reports a failed run, not a broken property. In lockstep rounds a process cannot crash in the middle of its sends, so the classic scenario where a crashing process reaches only some of the others is not reproduced by a crash alone. See [Faults](faults.md#crash).
 
 ## Failure detector ◇P
 

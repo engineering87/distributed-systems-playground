@@ -301,6 +301,28 @@ M('Run over many seeds', 'Esecuzione su molti semi');
 M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
 M('Seeds', 'Semi');
+M('Behaviour profile', 'Profilo di comportamento');
+M('holds', 'regge');
+P(/^holds, (\d+)% of the processes produce an output$/, m => 'regge, il ' + m[1] + '% dei processi produce un output');
+P(/^(\d+) of (\d+) run\(s\) ended with an error$/, m => m[1] + ' esecuzioni su ' + m[2] + ' terminate con un errore');
+P(/^(\w+) broken in (\d+)\/(\d+)$/, m => m[1] + ' violata in ' + m[2] + '/' + m[3]);
+P(/^(\d+) run\(s\) failed an assertion$/, m => m[1] + ' esecuzioni con un\'asserzione violata');
+P(/^Every condition held: (.+)\.$/, m => 'Ogni condizione ha retto: ' + (tr(m[1]) || m[1]) + '.');
+P(/^Holds under (.+)\. Breaks under (.+)\.$/, m => 'Regge con ' + m[1] + '. Si rompe con ' + m[2] + '.');
+M('Run the algorithm over a grid of fault conditions and summarize how it behaves', 'Esegui l\'algoritmo su una griglia di condizioni di guasto e riassumi come si comporta');
+M('condition', 'condizione'); M('messages', 'messaggi'); M('reach', 'copertura'); M('settles', 'si assesta');
+M('A batch is already running.', 'Un lotto è già in esecuzione.');
+M('A profile runs every condition: try at most 60 seeds.', 'Un profilo esegue ogni condizione: al massimo 60 semi.');
+P(/^condition (\d+) \/ (\d+): (.+)$/, m => 'condizione ' + m[1] + ' / ' + m[2] + ': ' + (tr(m[3]) || m[3]));
+P(/^(\d+) condition\(s\) in ([\d.]+) s$/, m => m[1] + ' condizioni in ' + m[2] + ' s');
+P(/^(\d+) seed\(s\) per condition\. Reach is the share of processes that produced an output; settles is the median time of the last one\.$/,
+  m => m[1] + ' semi per condizione. La copertura è la quota di processi che ha prodotto un output; "si assesta" è il tempo mediano dell\'ultimo.');
+P(/^open seed (\d+)$/, m => 'apri il seme ' + m[1]);
+P(/^(\d+) failed$/, m => m[1] + ' fallite');
+M('no faults', 'nessun guasto'); M('one crash', 'un crash'); M('two crashes', 'due crash');
+M('crash and recovery', 'crash e ripartenza'); M('one pause', 'una pausa'); M('one partition', 'una partizione');
+M('partitions 1.5/s', 'partizioni 1.5/s'); M('link failures 0.5/s', 'guasti di collegamento 0.5/s');
+M('omissions 0.5/s', 'omissioni 0.5/s'); M('a zone crashes', 'una zona cade');
 M('When', 'Quando'); M('Condition', 'Condizione'); M('For', 'Per');
 M('Fire the fault the first moment a condition holds, instead of at a fixed time', 'Fai scattare il guasto appena una condizione è vera, invece che a un istante fisso');
 M('Condition that fires the fault', 'Condizione che fa scattare il guasto');
@@ -310,7 +332,11 @@ M('Only the messages leaving the first group are dropped', 'Si perdono solo i me
 P(/^(.+) when (.+)$/, m => (tr(m[1]) || m[1]) + ' quando ' + m[2]);
 P(/^fault armed by a condition fired: (.+)$/, m => 'guasto armato scattato: ' + (tr(m[1]) || m[1]));
 P(/^fault condition "(.+)" could not be evaluated: (.+)$/, m => 'condizione del guasto "' + m[1] + '" non valutabile: ' + m[2]);
-P(/^fault condition "(.+)" is not a boolean$/, m => 'condizione del guasto "' + m[1] + '" non è booleana'); M('Random faults', 'Guasti casuali'); M('Random faults to draw', 'Guasti casuali da estrarre');
+P(/^fault condition "(.+)" is not a boolean$/, m => 'condizione del guasto "' + m[1] + '" non è booleana'); M('Random faults', 'Guasti casuali');
+M('How many, as in crash:1, or how often, as in crash:0.5/s: kinds are crash, recover, pause, partition, link, omission, zone',
+  'Quanti, come crash:1, oppure con che frequenza, come crash:0.5/s: i tipi sono crash, recover, pause, partition, link, omission, zone');
+M('Faults drawn from the seed of each run: a number, as in crash:1, or a rate, as in crash:0.5/s',
+  'Guasti estratti dal seme di ogni esecuzione: un numero, come crash:1, o un tasso, come crash:0.5/s'); M('Random faults to draw', 'Guasti casuali da estrarre');
 M('When the random faults happen', 'Quando avvengono i guasti casuali');
 M('What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1', 'Cosa estrarre: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
 M('Draw', 'Estrai'); M('Redraw', 'Riestrai');

@@ -216,7 +216,11 @@ took 24 ms</code></pre>
        property Agreement: violated at 1.1 s on p3
 …
 property Agreement       (always)      held in 16/20 run(s), first broken at seed 1</code></pre>
-<div class="table"><table><thead><tr><th>Plan</th><th>What it adds to each run</th></tr></thead><tbody><tr><td><code>crash:1</code></td><td>a process crashes at a random moment in the window</td></tr><tr><td><code>recover:1</code></td><td>one of the crashed processes comes back later</td></tr><tr><td><code>pause:1</code></td><td>a process is paused for part of the window</td></tr><tr><td><code>partition:1</code></td><td>the processes are split in two groups for part of the window</td></tr><tr><td><code>link:1</code></td><td>a link goes down for part of the window, one way half of the time</td></tr><tr><td><code>omission:1</code></td><td>a process omits part of its sends, receives or both</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Plan</th><th>What it adds to each run</th></tr></thead><tbody><tr><td><code>crash:1</code></td><td>a process crashes at a random moment in the window</td></tr><tr><td><code>recover:1</code></td><td>one of the crashed processes comes back later</td></tr><tr><td><code>pause:1</code></td><td>a process is paused for part of the window</td></tr><tr><td><code>partition:1</code></td><td>the processes are split in two groups for part of the window</td></tr><tr><td><code>link:1</code></td><td>a link goes down for part of the window, one way half of the time</td></tr><tr><td><code>omission:1</code></td><td>a process omits part of its sends, receives or both</td></tr><tr><td><code>zone:1</code></td><td>about a third of the processes crash at the same instant, the way a rack does</td></tr></tbody></table></div>
+<p><strong>A number or a rate.</strong> <code>crash:2</code> asks for two crashes somewhere in the window. <code>crash:0.5/s</code> asks for a rate: the faults arrive as a Poisson process over the window, so every run gets a different number of them, and their durations come from an exponential distribution. It is the closer model of a system nobody is watching, and the difference shows:</p>
+<pre class="code lang-text"><code>partition:1        Agreement broken in  1 of 60 runs
+partition:1.5/s    Agreement broken in 18 of 60 runs</code></pre>
+<p>One partition rarely lands where it hurts. A rate of one and a half per second produces overlapping partitions, which is what actually breaks FloodSet. Numbers and rates can be combined: <code>--faults crash:1,link:0.5/s</code>.</p>
 <p>Combine them with commas: <code>--faults crash:1,partition:1</code>. The window accepts <code>0..3s</code> or a single duration, which is read as <code>0..that</code>.</p>
 <p>This is the fastest way to ask a real question about an algorithm. FloodSet keeps agreement under one crash, as it should with f = 1; one random partition breaks it in about a fifth of the seeds, and a single omitting process breaks it now and then.</p>
 <h2 id="shrinking-a-counterexample">Shrinking a counterexample<a class="anchor" href="#shrinking-a-counterexample" aria-label="Link to this section">#</a></h2>
@@ -264,6 +268,32 @@ node bin/dsp.mjs run scenario.json --preset async --set actual.delay=&quot;logno
 - run: node bin/dsp.mjs run solution.json --seeds 1..100 --quiet</code></pre>
 <p>With <code>assert</code> statements in the algorithm and <em>Stop at the first failed assertion</em> in the scenario, a violated property makes the step fail and names the seed that produced it.</p>
 <p>The same batch runs are available in the page: <em>Run over many seeds</em> in the <em>Scenario</em> tab, described in <a href="interface.html#batch-runs">The interface</a>.</p>
+<h2 id="a-behaviour-profile">A behaviour profile<a class="anchor" href="#a-behaviour-profile" aria-label="Link to this section">#</a></h2>
+<p>One command answers &quot;what does this algorithm survive&quot;:</p>
+<pre class="code lang-sh"><code>node bin/dsp.mjs profile --example floodset --seeds 1..15 --fault-window 0..2s</code></pre>
+<pre class="code lang-text"><code>      condition                Agreement     Validity  Termination   msgs  lost  reach  settles
+───────────────────────────────────────────────────────────────────────────────────────────────
+  ok  no faults                    15/15        15/15        15/15     24     0   100%    1.9 s
+ ~    one crash                    15/15        15/15        15/15   22.2   3.3    78%    1.9 s
+ ~    two crashes                  15/15        15/15        15/15   21.2   4.9    53%    1.9 s
+ FAIL crash and recovery           14/15        14/15        14/15   23.2   1.7    85%    1.9 s
+      1 of 15 run(s) ended with an error — open seed 12
+  ok  one pause                    15/15        15/15        15/15     24     0   100%    1.9 s
+  ok  one partition                15/15        15/15        15/15     24   4.2   100%    1.9 s
+ FAIL partitions 1.5/s             10/15        15/15        15/15     24  10.2   100%    1.9 s
+      Agreement broken in 5/15 — open seed 1
+  ok  link failures 0.5/s          15/15        15/15        15/15     24   0.5   100%    1.9 s
+  ok  omissions 0.5/s              15/15        15/15        15/15     24   1.2   100%    1.9 s
+ ~    a zone crashes               15/15        15/15        15/15   21.6   3.5    57%    1.9 s
+
+Holds under no faults, one pause, one partition, link failures 0.5/s, omissions 0.5/s, one
+crash, two crashes, a zone crashes. Breaks under crash and recovery (1 of 15 run(s) ended with
+an error); partitions 1.5/s (Agreement broken in 5/15).</code></pre>
+<p>The mark on the left is the verdict of the condition: <code>ok</code> when every property held and every process produced an output, <code>~</code> when it held with fewer processes reporting, <code>FAIL</code> when a property broke or a run ended in an error. The sentence at the bottom is the same profile in one line.</p>
+<p>Each row is an ordinary batch with a different fault plan, so every number is reproducible and every failing seed can be opened. Read it as a profile of the algorithm, not as a score:</p>
+<ul><li><strong>crashes</strong> cost reach, not agreement: FloodSet tolerates them, as <code>f = 1</code> claims, and fewer processes decide because fewer are alive;</li><li><strong>overlapping partitions</strong> are what break agreement, while a single one almost never does;</li><li><strong>crash and recovery</strong> produces a run that fails outright, because a recovered process finds its state empty and <code>min(W)</code> has nothing to work on: FloodSet is written for crash-stop, and the profile says so in one line.</li></ul>
+<p><code>--seeds</code>, <code>--preset</code>, <code>--set</code> and <code>--fault-window</code> work as they do for <code>run</code>; <code>--json</code> prints the rows. The exit code is 1 when any condition broke a property, failed an assertion or failed a run, which makes the profile usable as a regression test of an algorithm.</p>
+<p>The same grid is in the page: <strong>Behaviour profile</strong> in the <em>Scenario</em> tab, next to the batch controls.</p>
 <h2 id="the-batch-runner-api">The batch runner API<a class="anchor" href="#the-batch-runner-api" aria-label="Link to this section">#</a></h2>
 <p><code>src/runner.js</code> is the module behind the tool. It has no dependency on the page and can be required from Node or loaded in a browser page.</p>
 <pre class="code lang-js"><code>const R = require('./src/runner.js');
@@ -286,7 +316,7 @@ R.checkScenario(scenario); // { ok, errors, warnings }</code></pre>
 <nav class="pager"><a href="troubleshooting.html"><small>Previous</small>Troubleshooting</a><a href="teaching.html" style="text-align:right"><small>Next</small>Teaching</a></nav>
 <footer>Generated from <a href="https://github.com/engineering87/distributed-systems-playground/blob/main/docs/cli.md" target="_blank" rel="noopener">docs/cli.md</a>. Released under the MIT License.</footer>
 </main>
-<aside class="toc"><p>On this page</p><a class="l2" href="#the-command-line-tool">The command line tool</a><a class="l2" href="#running-a-scenario">Running a scenario</a><a class="l2" href="#generated-fault-schedules">Generated fault schedules</a><a class="l2" href="#shrinking-a-counterexample">Shrinking a counterexample</a><a class="l2" href="#properties-across-a-batch">Properties across a batch</a><a class="l2" href="#comparing-outcomes">Comparing outcomes</a><a class="l2" href="#changing-the-model-from-the-command-line">Changing the model from the command line</a><a class="l2" href="#checking-a-program">Checking a program</a><a class="l2" href="#exit-codes-and-continuous-integration">Exit codes and continuous integration</a><a class="l2" href="#the-batch-runner-api">The batch runner API</a><a class="l2" href="#what-it-does-not-do-yet">What it does not do yet</a></aside>
+<aside class="toc"><p>On this page</p><a class="l2" href="#the-command-line-tool">The command line tool</a><a class="l2" href="#running-a-scenario">Running a scenario</a><a class="l2" href="#generated-fault-schedules">Generated fault schedules</a><a class="l2" href="#shrinking-a-counterexample">Shrinking a counterexample</a><a class="l2" href="#properties-across-a-batch">Properties across a batch</a><a class="l2" href="#comparing-outcomes">Comparing outcomes</a><a class="l2" href="#changing-the-model-from-the-command-line">Changing the model from the command line</a><a class="l2" href="#checking-a-program">Checking a program</a><a class="l2" href="#exit-codes-and-continuous-integration">Exit codes and continuous integration</a><a class="l2" href="#a-behaviour-profile">A behaviour profile</a><a class="l2" href="#the-batch-runner-api">The batch runner API</a><a class="l2" href="#what-it-does-not-do-yet">What it does not do yet</a></aside>
 </div>
 </body>
 </html>

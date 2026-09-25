@@ -53,15 +53,46 @@ function seedList(seeds) {
 // schedule travels with the result, ready to be pasted back into the scenario.
 const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission', 'zone'];
 
+// "crash:2" asks for two of them; "crash:0.5/s" asks for a rate, and the faults arrive as a random process
+// over the window, the way they do in a system nobody is watching.
 function parsePlan(spec) {
   const plan = {};
   for (const part of String(spec).split(/[,\s]+/).filter(Boolean)) {
-    const m = /^([a-z]+)(?::(\d+))?$/.exec(part.toLowerCase());
-    if (!m || !PLAN_TYPES.includes(m[1])) throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ')');
-    plan[m[1]] = (plan[m[1]] || 0) + (m[2] === undefined ? 1 : +m[2]);
+    const m = /^([a-z]+)(?::([\d.]+)(\/s)?)?$/.exec(part.toLowerCase());
+    if (!m || !PLAN_TYPES.includes(m[1])) {
+      throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ', or a rate such as crash:0.5/s)');
+    }
+    const value = m[2] === undefined ? 1 : Number(m[2]);
+    if (!Number.isFinite(value) || value < 0) throw new Error('Invalid amount in "' + part + '"');
+    const rate = !!m[3];
+    if (!rate && !Number.isInteger(value)) throw new Error('"' + part + '" must be a whole number, or a rate such as ' + m[1] + ':' + value + '/s');
+    const entry = plan[m[1]] = plan[m[1]] || { count: 0, rate: 0 };
+    if (rate) entry.rate += value; else entry.count += value;
   }
   if (!Object.keys(plan).length) throw new Error('The fault plan is empty');
   return plan;
+}
+// how many of this kind this draw produces: the count asked for, plus the arrivals of a Poisson process
+function amountOf(plan, kind, seconds, rnd) {
+  const entry = plan[kind] || { count: 0, rate: 0 };
+  let n = entry.count || 0;
+  if (entry.rate > 0) {
+    // inter-arrival times of a Poisson process with this rate, over the window
+    for (let t = 0; ; ) {
+      t += -Math.log(1 - rnd()) / entry.rate;
+      if (t > seconds) break;
+      n++;
+      if (n > 200) break;
+    }
+  }
+  return n;
+}
+// a duration drawn around a fraction of the window, never longer than the window itself
+function drawSpan(win, rnd, share) {
+  const span = win.to - win.from;
+  const d = Math.round(-Math.log(1 - rnd()) * span * share);
+  // exponential, but never so short that the fault cannot be noticed, and never longer than the window
+  return Math.max(Math.round(span * 0.15), Math.min(span, d));
 }
 
 // "0..3s" or "3s" (meaning from 0)
@@ -95,57 +126,60 @@ function planFaults(spec, window, scenario, seed) {
   const rnd = planRng(seed, JSON.stringify([plan, win]));
   const time = () => Math.round(win.from + rnd() * (win.to - win.from));
   const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const seconds = (win.to - win.from) / 1000000;
   const out = [];
   const crashed = [];
-  for (let i = 0; i < (plan.crash || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'crash', seconds, rnd); i < n; i++) {
     const node = pick(ids.filter(id => !crashed.includes(id))) || pick(ids);
     crashed.push(node);
     out.push({ type: 'crash', node, at: C.fmtDuration(time()) });
   }
-  for (let i = 0; i < (plan.recover || 0) && i < crashed.length; i++) {
+  for (let i = 0, n = amountOf(plan, 'recover', seconds, rnd); i < n && i < crashed.length; i++) {
     const crash = out.filter(f => f.type === 'crash')[i];
-    const at = C.parseDuration(crash.at) + Math.round((win.to - win.from) * (0.2 + 0.6 * rnd()));
+    // a recovery stays inside the window, like everything else a draw produces
+    const at = Math.min(win.to - 1, C.parseDuration(crash.at) + drawSpan(win, rnd, 0.4));
     out.push({ type: 'recover', node: crash.node, at: C.fmtDuration(at) });
   }
-  for (let i = 0; i < (plan.pause || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'pause', seconds, rnd); i < n; i++) {
     const from = time();
-    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.1 + 0.4 * rnd()))) });
+    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.25)) });
   }
-  for (let i = 0; i < (plan.partition || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'partition', seconds, rnd); i < n; i++) {
     const shuffled = ids.slice();
     for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
     const cut = 1 + Math.floor(rnd() * (ids.length - 1));
     const from = time();
     out.push({
       type: 'partition', groups: shuffled.slice(0, cut).sort((a, b) => a - b).join(' '),
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.3))
     });
   }
-  for (let i = 0; i < (plan.link || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'link', seconds, rnd); i < n; i++) {
     const links = (scenario.links || []).filter(l => l.enabled !== false);
     const l = links.length ? pick(links) : { a: ids[0], b: ids[1] };
     const from = time();
     out.push({
       type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.3))
     });
   }
   // a zone: several processes crash together, the way a rack or an availability zone does
-  for (let i = 0; i < (plan.zone || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'zone', seconds, rnd); i < n; i++) {
     const size = Math.max(2, Math.min(ids.length - 1, Math.round(ids.length / 3)));
     const shuffled = ids.slice();
     for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
     const at = C.fmtDuration(time());
     for (const node of shuffled.slice(0, size).sort((a, b) => a - b)) out.push({ type: 'crash', node, at, zone: true });
   }
-  for (let i = 0; i < (plan.omission || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'omission', seconds, rnd); i < n; i++) {
     const from = time();
     out.push({
       type: 'omission', node: pick(ids), direction: ['send', 'receive', 'both'][Math.floor(rnd() * 3)],
       prob: Math.round((0.3 + 0.7 * rnd()) * 100) / 100,
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.3 + 0.6 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.4))
     });
   }
+  out.sort((a, b) => C.parseDuration(a.at !== undefined ? a.at : a.from) - C.parseDuration(b.at !== undefined ? b.at : b.from));
   return out;
 }
 
@@ -326,6 +360,107 @@ function minimize(scenario, opts) {
   return { ok: true, faults, runs, signature, removed: (opts.faults || []).length - faults.length };
 }
 
+// ---------------------------------------------------------------- behaviour profile
+// The same algorithm, over a grid of fault conditions: one row per condition, so that "what does it survive"
+// has an answer instead of a feeling. Every row is an ordinary batch, so everything is reproducible.
+const PROFILE_GRID = [
+  { name: 'no faults', plan: '' },
+  { name: 'one crash', plan: 'crash:1' },
+  { name: 'two crashes', plan: 'crash:2' },
+  { name: 'crash and recovery', plan: 'crash:1,recover:1' },
+  { name: 'one pause', plan: 'pause:1' },
+  { name: 'one partition', plan: 'partition:1' },
+  { name: 'partitions 1.5/s', plan: 'partition:1.5/s' },
+  { name: 'link failures 0.5/s', plan: 'link:0.5/s' },
+  { name: 'omissions 0.5/s', plan: 'omission:0.5/s' },
+  { name: 'a zone crashes', plan: 'zone:1' }
+];
+
+function median(xs) {
+  if (!xs.length) return null;
+  const a = xs.slice().sort((x, y) => x - y);
+  return a[Math.floor(a.length / 2)];
+}
+
+function profileRow(scenario, row, opts) {
+  const res = runBatch(scenario, {
+    seeds: opts.seeds, preset: opts.preset, set: opts.set,
+    faults: row.plan || undefined, faultWindow: opts.faultWindow
+  });
+  const runs = res.runs;
+  const n = runs.length || 1;
+  const settle = runs.filter(r => r.outputs.length).map(r => r.outputs[r.outputs.length - 1].t);
+  const nodes = (scenario.nodes || []).length || 1;
+  const properties = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = properties[p.name] = properties[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  const out = {
+    name: row.name,
+    plan: row.plan,
+    runs: runs.length,
+    failed: runs.filter(r => !r.ok).length,
+    assertions: runs.filter(r => r.assertions > 0).length,
+    properties: Object.values(properties),
+    avgMessages: +(runs.reduce((a, r) => a + r.messages, 0) / n).toFixed(1),
+    avgLost: +(runs.reduce((a, r) => a + r.lost, 0) / n).toFixed(1),
+    avgOutputs: +(runs.reduce((a, r) => a + r.outputCount, 0) / n).toFixed(1),
+    // how much of the system produced something, and how long the last output took
+    reach: +(runs.reduce((a, r) => a + r.nodesWithOutput / nodes, 0) / n).toFixed(2),
+    settle: median(settle),
+    worstSeed: (runs.find(r => !r.ok || r.propertyFailures || r.assertions) || {}).seed || null
+  };
+  return Object.assign(out, verdictOf(out));
+}
+
+// What this condition did to the algorithm, in one word and one sentence.
+function verdictOf(row) {
+  const broken = row.properties.filter(p => p.failed);
+  if (row.failed) {
+    return { verdict: 'failed', verdictText: row.failed + ' of ' + row.runs + ' run(s) ended with an error' };
+  }
+  if (broken.length) {
+    return {
+      verdict: 'broken',
+      verdictText: broken.map(p => p.name + ' broken in ' + p.failed + '/' + row.runs).join(', ')
+    };
+  }
+  if (row.assertions) return { verdict: 'broken', verdictText: row.assertions + ' run(s) failed an assertion' };
+  if (row.reach < 0.999) return { verdict: 'degraded', verdictText: 'holds, ' + Math.round(row.reach * 100) + '% of the processes produce an output' };
+  return { verdict: 'ok', verdictText: 'holds' };
+}
+
+// The profile in three lists, for a headline: what it survives, where it degrades, what breaks it.
+function profileSummary(rows) {
+  const pick = v => rows.filter(r => r.verdict === v).map(r => r.name);
+  const survives = pick('ok');
+  const degrades = pick('degraded');
+  const broken = rows.filter(r => r.verdict === 'broken' || r.verdict === 'failed')
+    .map(r => ({ name: r.name, verdict: r.verdict, text: r.verdictText, seed: r.worstSeed }));
+  const list = xs => xs.length ? xs.join(', ') : 'nothing';
+  let headline;
+  if (!broken.length) headline = 'Every condition held: ' + list(survives.concat(degrades)) + '.';
+  else {
+    headline = 'Holds under ' + list(survives.concat(degrades)) + '. Breaks under ' +
+      broken.map(b => b.name + ' (' + b.text + ')').join('; ') + '.';
+  }
+  return { survives, degrades, broken, headline };
+}
+
+function profile(scenario, opts) {
+  opts = opts || {};
+  const grid = opts.grid || PROFILE_GRID;
+  const started = Date.now();
+  const rows = [];
+  for (const row of grid) {
+    rows.push(profileRow(scenario, row, opts));
+    if (opts.onRow && opts.onRow(rows[rows.length - 1], rows.length, grid.length) === false) break;
+  }
+  return { rows, seeds: seedList(opts.seeds !== undefined ? opts.seeds : scenario.seed || 1).length, ms: Date.now() - started };
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -358,7 +493,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, verdictOf, PROFILE_GRID };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);

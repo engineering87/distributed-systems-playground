@@ -560,6 +560,28 @@ body.present .pk text { font-size: 12px; }
 .batch-list .bad { color: var(--red); }
 .batch-list .hint { margin-left: auto; white-space: nowrap; }
 
+/* ---------- behaviour profile ---------- */
+table.profile { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 6px; }
+table.profile th, table.profile td { border-bottom: 1px solid var(--grid); padding: 3px 6px; text-align: right; white-space: nowrap; }
+table.profile th:first-child, table.profile td:first-child { text-align: left; }
+table.profile th { color: var(--muted); font-weight: 700; }
+table.profile td.good { color: var(--green); }
+table.profile td.bad { color: var(--red); font-weight: 700; }
+table.profile td.mark { text-align: center; padding-right: 0; }
+table.profile tr.v-ok td.mark { color: var(--green); }
+table.profile tr.v-degraded td.mark { color: var(--amber); }
+table.profile tr.v-broken td.mark, table.profile tr.v-failed td.mark { color: var(--red); }
+table.profile td.reach { white-space: nowrap; }
+table.profile .bar { display: inline-block; width: 42px; height: 7px; border-radius: 4px; background: var(--grid); margin-right: 6px; vertical-align: middle; overflow: hidden; }
+table.profile .bar i { display: block; height: 100%; background: var(--blue); }
+.profile-headline { margin: 6px 0 2px; font-size: 13.5px; line-height: 1.45; }
+.profile-headline.good { color: var(--green); }
+.profile-headline.bad { color: var(--ink); border-left: 3px solid var(--red); padding-left: 8px; }
+#batch-results { max-width: 100%; }
+.profile-wrap { overflow-x: auto; max-width: 100%; }
+.profile-wrap table.profile { width: max-content; min-width: 100%; }
+.profile-headline { overflow-wrap: anywhere; }
+
 </style>
 </head>
 <body data-timing="asynchronous">
@@ -809,7 +831,7 @@ uses PerfectLinks as pl via AckLinks</pre>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
       </div>
       <div class="row">
-        <label class="field inline" title="What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1"><span>Random faults</span><input id="rnd-faults" value="crash:1" class="narrow" aria-label="Random faults to draw"></label>
+        <label class="field inline" title="How many, as in crash:1, or how often, as in crash:0.5/s: kinds are crash, recover, pause, partition, link, omission, zone"><span>Random faults</span><input id="rnd-faults" value="crash:1" class="narrow" aria-label="Random faults to draw"></label>
         <label class="field inline"><span>Window</span><input id="rnd-window" value="0..3s" class="tiny" aria-label="When the random faults happen"></label>
         <button id="btn-rnd-faults" type="button" class="ghost" title="Draw a schedule and add it to the scenario">Draw</button>
         <button id="btn-rnd-replace" type="button" class="ghost" title="Replace the faults of the scenario with a new draw">Redraw</button>
@@ -824,9 +846,10 @@ uses PerfectLinks as pl via AckLinks</pre>
     <p class="hint">The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.</p>
     <div class="row">
       <label class="field inline"><span>Seeds</span><input id="batch-seeds" value="1..50" class="narrow" aria-label="Seeds to run"></label>
-      <label class="field inline" title="Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1"><span>Faults per run</span><input id="batch-faults" placeholder="none" class="narrow" aria-label="Generated faults per run"></label>
+      <label class="field inline" title="Faults drawn from the seed of each run: a number, as in crash:1, or a rate, as in crash:0.5/s"><span>Faults per run</span><input id="batch-faults" placeholder="none" class="narrow" aria-label="Generated faults per run"></label>
       <label class="field inline"><span>Window</span><input id="batch-window" value="0..3s" class="tiny" aria-label="When the generated faults happen"></label>
       <button type="button" id="btn-batch" class="ghost">Run over seeds</button>
+      <button type="button" id="btn-profile" class="ghost" title="Run the algorithm over a grid of fault conditions and summarize how it behaves">Behaviour profile</button>
       <span id="batch-progress" class="hint"></span>
     </div>
     <div id="batch-results"></div>
@@ -4319,6 +4342,28 @@ M('Run over many seeds', 'Esecuzione su molti semi');
 M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
 M('Seeds', 'Semi');
+M('Behaviour profile', 'Profilo di comportamento');
+M('holds', 'regge');
+P(/^holds, (\d+)% of the processes produce an output$/, m => 'regge, il ' + m[1] + '% dei processi produce un output');
+P(/^(\d+) of (\d+) run\(s\) ended with an error$/, m => m[1] + ' esecuzioni su ' + m[2] + ' terminate con un errore');
+P(/^(\w+) broken in (\d+)\/(\d+)$/, m => m[1] + ' violata in ' + m[2] + '/' + m[3]);
+P(/^(\d+) run\(s\) failed an assertion$/, m => m[1] + ' esecuzioni con un\'asserzione violata');
+P(/^Every condition held: (.+)\.$/, m => 'Ogni condizione ha retto: ' + (tr(m[1]) || m[1]) + '.');
+P(/^Holds under (.+)\. Breaks under (.+)\.$/, m => 'Regge con ' + m[1] + '. Si rompe con ' + m[2] + '.');
+M('Run the algorithm over a grid of fault conditions and summarize how it behaves', 'Esegui l\'algoritmo su una griglia di condizioni di guasto e riassumi come si comporta');
+M('condition', 'condizione'); M('messages', 'messaggi'); M('reach', 'copertura'); M('settles', 'si assesta');
+M('A batch is already running.', 'Un lotto è già in esecuzione.');
+M('A profile runs every condition: try at most 60 seeds.', 'Un profilo esegue ogni condizione: al massimo 60 semi.');
+P(/^condition (\d+) \/ (\d+): (.+)$/, m => 'condizione ' + m[1] + ' / ' + m[2] + ': ' + (tr(m[3]) || m[3]));
+P(/^(\d+) condition\(s\) in ([\d.]+) s$/, m => m[1] + ' condizioni in ' + m[2] + ' s');
+P(/^(\d+) seed\(s\) per condition\. Reach is the share of processes that produced an output; settles is the median time of the last one\.$/,
+  m => m[1] + ' semi per condizione. La copertura è la quota di processi che ha prodotto un output; "si assesta" è il tempo mediano dell\'ultimo.');
+P(/^open seed (\d+)$/, m => 'apri il seme ' + m[1]);
+P(/^(\d+) failed$/, m => m[1] + ' fallite');
+M('no faults', 'nessun guasto'); M('one crash', 'un crash'); M('two crashes', 'due crash');
+M('crash and recovery', 'crash e ripartenza'); M('one pause', 'una pausa'); M('one partition', 'una partizione');
+M('partitions 1.5/s', 'partizioni 1.5/s'); M('link failures 0.5/s', 'guasti di collegamento 0.5/s');
+M('omissions 0.5/s', 'omissioni 0.5/s'); M('a zone crashes', 'una zona cade');
 M('When', 'Quando'); M('Condition', 'Condizione'); M('For', 'Per');
 M('Fire the fault the first moment a condition holds, instead of at a fixed time', 'Fai scattare il guasto appena una condizione è vera, invece che a un istante fisso');
 M('Condition that fires the fault', 'Condizione che fa scattare il guasto');
@@ -4328,7 +4373,11 @@ M('Only the messages leaving the first group are dropped', 'Si perdono solo i me
 P(/^(.+) when (.+)$/, m => (tr(m[1]) || m[1]) + ' quando ' + m[2]);
 P(/^fault armed by a condition fired: (.+)$/, m => 'guasto armato scattato: ' + (tr(m[1]) || m[1]));
 P(/^fault condition "(.+)" could not be evaluated: (.+)$/, m => 'condizione del guasto "' + m[1] + '" non valutabile: ' + m[2]);
-P(/^fault condition "(.+)" is not a boolean$/, m => 'condizione del guasto "' + m[1] + '" non è booleana'); M('Random faults', 'Guasti casuali'); M('Random faults to draw', 'Guasti casuali da estrarre');
+P(/^fault condition "(.+)" is not a boolean$/, m => 'condizione del guasto "' + m[1] + '" non è booleana'); M('Random faults', 'Guasti casuali');
+M('How many, as in crash:1, or how often, as in crash:0.5/s: kinds are crash, recover, pause, partition, link, omission, zone',
+  'Quanti, come crash:1, oppure con che frequenza, come crash:0.5/s: i tipi sono crash, recover, pause, partition, link, omission, zone');
+M('Faults drawn from the seed of each run: a number, as in crash:1, or a rate, as in crash:0.5/s',
+  'Guasti estratti dal seme di ogni esecuzione: un numero, come crash:1, o un tasso, come crash:0.5/s'); M('Random faults to draw', 'Guasti casuali da estrarre');
 M('When the random faults happen', 'Quando avvengono i guasti casuali');
 M('What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1', 'Cosa estrarre: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
 M('Draw', 'Estrai'); M('Redraw', 'Riestrai');
@@ -5422,15 +5471,46 @@ function seedList(seeds) {
 // schedule travels with the result, ready to be pasted back into the scenario.
 const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission', 'zone'];
 
+// "crash:2" asks for two of them; "crash:0.5/s" asks for a rate, and the faults arrive as a random process
+// over the window, the way they do in a system nobody is watching.
 function parsePlan(spec) {
   const plan = {};
   for (const part of String(spec).split(/[,\s]+/).filter(Boolean)) {
-    const m = /^([a-z]+)(?::(\d+))?$/.exec(part.toLowerCase());
-    if (!m || !PLAN_TYPES.includes(m[1])) throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ')');
-    plan[m[1]] = (plan[m[1]] || 0) + (m[2] === undefined ? 1 : +m[2]);
+    const m = /^([a-z]+)(?::([\d.]+)(\/s)?)?$/.exec(part.toLowerCase());
+    if (!m || !PLAN_TYPES.includes(m[1])) {
+      throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ', or a rate such as crash:0.5/s)');
+    }
+    const value = m[2] === undefined ? 1 : Number(m[2]);
+    if (!Number.isFinite(value) || value < 0) throw new Error('Invalid amount in "' + part + '"');
+    const rate = !!m[3];
+    if (!rate && !Number.isInteger(value)) throw new Error('"' + part + '" must be a whole number, or a rate such as ' + m[1] + ':' + value + '/s');
+    const entry = plan[m[1]] = plan[m[1]] || { count: 0, rate: 0 };
+    if (rate) entry.rate += value; else entry.count += value;
   }
   if (!Object.keys(plan).length) throw new Error('The fault plan is empty');
   return plan;
+}
+// how many of this kind this draw produces: the count asked for, plus the arrivals of a Poisson process
+function amountOf(plan, kind, seconds, rnd) {
+  const entry = plan[kind] || { count: 0, rate: 0 };
+  let n = entry.count || 0;
+  if (entry.rate > 0) {
+    // inter-arrival times of a Poisson process with this rate, over the window
+    for (let t = 0; ; ) {
+      t += -Math.log(1 - rnd()) / entry.rate;
+      if (t > seconds) break;
+      n++;
+      if (n > 200) break;
+    }
+  }
+  return n;
+}
+// a duration drawn around a fraction of the window, never longer than the window itself
+function drawSpan(win, rnd, share) {
+  const span = win.to - win.from;
+  const d = Math.round(-Math.log(1 - rnd()) * span * share);
+  // exponential, but never so short that the fault cannot be noticed, and never longer than the window
+  return Math.max(Math.round(span * 0.15), Math.min(span, d));
 }
 
 // "0..3s" or "3s" (meaning from 0)
@@ -5464,57 +5544,60 @@ function planFaults(spec, window, scenario, seed) {
   const rnd = planRng(seed, JSON.stringify([plan, win]));
   const time = () => Math.round(win.from + rnd() * (win.to - win.from));
   const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const seconds = (win.to - win.from) / 1000000;
   const out = [];
   const crashed = [];
-  for (let i = 0; i < (plan.crash || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'crash', seconds, rnd); i < n; i++) {
     const node = pick(ids.filter(id => !crashed.includes(id))) || pick(ids);
     crashed.push(node);
     out.push({ type: 'crash', node, at: C.fmtDuration(time()) });
   }
-  for (let i = 0; i < (plan.recover || 0) && i < crashed.length; i++) {
+  for (let i = 0, n = amountOf(plan, 'recover', seconds, rnd); i < n && i < crashed.length; i++) {
     const crash = out.filter(f => f.type === 'crash')[i];
-    const at = C.parseDuration(crash.at) + Math.round((win.to - win.from) * (0.2 + 0.6 * rnd()));
+    // a recovery stays inside the window, like everything else a draw produces
+    const at = Math.min(win.to - 1, C.parseDuration(crash.at) + drawSpan(win, rnd, 0.4));
     out.push({ type: 'recover', node: crash.node, at: C.fmtDuration(at) });
   }
-  for (let i = 0; i < (plan.pause || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'pause', seconds, rnd); i < n; i++) {
     const from = time();
-    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.1 + 0.4 * rnd()))) });
+    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.25)) });
   }
-  for (let i = 0; i < (plan.partition || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'partition', seconds, rnd); i < n; i++) {
     const shuffled = ids.slice();
     for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
     const cut = 1 + Math.floor(rnd() * (ids.length - 1));
     const from = time();
     out.push({
       type: 'partition', groups: shuffled.slice(0, cut).sort((a, b) => a - b).join(' '),
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.3))
     });
   }
-  for (let i = 0; i < (plan.link || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'link', seconds, rnd); i < n; i++) {
     const links = (scenario.links || []).filter(l => l.enabled !== false);
     const l = links.length ? pick(links) : { a: ids[0], b: ids[1] };
     const from = time();
     out.push({
       type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.3))
     });
   }
   // a zone: several processes crash together, the way a rack or an availability zone does
-  for (let i = 0; i < (plan.zone || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'zone', seconds, rnd); i < n; i++) {
     const size = Math.max(2, Math.min(ids.length - 1, Math.round(ids.length / 3)));
     const shuffled = ids.slice();
     for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
     const at = C.fmtDuration(time());
     for (const node of shuffled.slice(0, size).sort((a, b) => a - b)) out.push({ type: 'crash', node, at, zone: true });
   }
-  for (let i = 0; i < (plan.omission || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'omission', seconds, rnd); i < n; i++) {
     const from = time();
     out.push({
       type: 'omission', node: pick(ids), direction: ['send', 'receive', 'both'][Math.floor(rnd() * 3)],
       prob: Math.round((0.3 + 0.7 * rnd()) * 100) / 100,
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.3 + 0.6 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.4))
     });
   }
+  out.sort((a, b) => C.parseDuration(a.at !== undefined ? a.at : a.from) - C.parseDuration(b.at !== undefined ? b.at : b.from));
   return out;
 }
 
@@ -5695,6 +5778,107 @@ function minimize(scenario, opts) {
   return { ok: true, faults, runs, signature, removed: (opts.faults || []).length - faults.length };
 }
 
+// ---------------------------------------------------------------- behaviour profile
+// The same algorithm, over a grid of fault conditions: one row per condition, so that "what does it survive"
+// has an answer instead of a feeling. Every row is an ordinary batch, so everything is reproducible.
+const PROFILE_GRID = [
+  { name: 'no faults', plan: '' },
+  { name: 'one crash', plan: 'crash:1' },
+  { name: 'two crashes', plan: 'crash:2' },
+  { name: 'crash and recovery', plan: 'crash:1,recover:1' },
+  { name: 'one pause', plan: 'pause:1' },
+  { name: 'one partition', plan: 'partition:1' },
+  { name: 'partitions 1.5/s', plan: 'partition:1.5/s' },
+  { name: 'link failures 0.5/s', plan: 'link:0.5/s' },
+  { name: 'omissions 0.5/s', plan: 'omission:0.5/s' },
+  { name: 'a zone crashes', plan: 'zone:1' }
+];
+
+function median(xs) {
+  if (!xs.length) return null;
+  const a = xs.slice().sort((x, y) => x - y);
+  return a[Math.floor(a.length / 2)];
+}
+
+function profileRow(scenario, row, opts) {
+  const res = runBatch(scenario, {
+    seeds: opts.seeds, preset: opts.preset, set: opts.set,
+    faults: row.plan || undefined, faultWindow: opts.faultWindow
+  });
+  const runs = res.runs;
+  const n = runs.length || 1;
+  const settle = runs.filter(r => r.outputs.length).map(r => r.outputs[r.outputs.length - 1].t);
+  const nodes = (scenario.nodes || []).length || 1;
+  const properties = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = properties[p.name] = properties[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  const out = {
+    name: row.name,
+    plan: row.plan,
+    runs: runs.length,
+    failed: runs.filter(r => !r.ok).length,
+    assertions: runs.filter(r => r.assertions > 0).length,
+    properties: Object.values(properties),
+    avgMessages: +(runs.reduce((a, r) => a + r.messages, 0) / n).toFixed(1),
+    avgLost: +(runs.reduce((a, r) => a + r.lost, 0) / n).toFixed(1),
+    avgOutputs: +(runs.reduce((a, r) => a + r.outputCount, 0) / n).toFixed(1),
+    // how much of the system produced something, and how long the last output took
+    reach: +(runs.reduce((a, r) => a + r.nodesWithOutput / nodes, 0) / n).toFixed(2),
+    settle: median(settle),
+    worstSeed: (runs.find(r => !r.ok || r.propertyFailures || r.assertions) || {}).seed || null
+  };
+  return Object.assign(out, verdictOf(out));
+}
+
+// What this condition did to the algorithm, in one word and one sentence.
+function verdictOf(row) {
+  const broken = row.properties.filter(p => p.failed);
+  if (row.failed) {
+    return { verdict: 'failed', verdictText: row.failed + ' of ' + row.runs + ' run(s) ended with an error' };
+  }
+  if (broken.length) {
+    return {
+      verdict: 'broken',
+      verdictText: broken.map(p => p.name + ' broken in ' + p.failed + '/' + row.runs).join(', ')
+    };
+  }
+  if (row.assertions) return { verdict: 'broken', verdictText: row.assertions + ' run(s) failed an assertion' };
+  if (row.reach < 0.999) return { verdict: 'degraded', verdictText: 'holds, ' + Math.round(row.reach * 100) + '% of the processes produce an output' };
+  return { verdict: 'ok', verdictText: 'holds' };
+}
+
+// The profile in three lists, for a headline: what it survives, where it degrades, what breaks it.
+function profileSummary(rows) {
+  const pick = v => rows.filter(r => r.verdict === v).map(r => r.name);
+  const survives = pick('ok');
+  const degrades = pick('degraded');
+  const broken = rows.filter(r => r.verdict === 'broken' || r.verdict === 'failed')
+    .map(r => ({ name: r.name, verdict: r.verdict, text: r.verdictText, seed: r.worstSeed }));
+  const list = xs => xs.length ? xs.join(', ') : 'nothing';
+  let headline;
+  if (!broken.length) headline = 'Every condition held: ' + list(survives.concat(degrades)) + '.';
+  else {
+    headline = 'Holds under ' + list(survives.concat(degrades)) + '. Breaks under ' +
+      broken.map(b => b.name + ' (' + b.text + ')').join('; ') + '.';
+  }
+  return { survives, degrades, broken, headline };
+}
+
+function profile(scenario, opts) {
+  opts = opts || {};
+  const grid = opts.grid || PROFILE_GRID;
+  const started = Date.now();
+  const rows = [];
+  for (const row of grid) {
+    rows.push(profileRow(scenario, row, opts));
+    if (opts.onRow && opts.onRow(rows[rows.length - 1], rows.length, grid.length) === false) break;
+  }
+  return { rows, seeds: seedList(opts.seeds !== undefined ? opts.seeds : scenario.seed || 1).length, ms: Date.now() - started };
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -5727,7 +5911,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, verdictOf, PROFILE_GRID };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);
@@ -9613,15 +9797,46 @@ function seedList(seeds) {
 // schedule travels with the result, ready to be pasted back into the scenario.
 const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission', 'zone'];
 
+// "crash:2" asks for two of them; "crash:0.5/s" asks for a rate, and the faults arrive as a random process
+// over the window, the way they do in a system nobody is watching.
 function parsePlan(spec) {
   const plan = {};
   for (const part of String(spec).split(/[,\s]+/).filter(Boolean)) {
-    const m = /^([a-z]+)(?::(\d+))?$/.exec(part.toLowerCase());
-    if (!m || !PLAN_TYPES.includes(m[1])) throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ')');
-    plan[m[1]] = (plan[m[1]] || 0) + (m[2] === undefined ? 1 : +m[2]);
+    const m = /^([a-z]+)(?::([\d.]+)(\/s)?)?$/.exec(part.toLowerCase());
+    if (!m || !PLAN_TYPES.includes(m[1])) {
+      throw new Error('Unknown fault plan: "' + part + '" (use ' + PLAN_TYPES.map(t => t + ':1').join(', ') + ', or a rate such as crash:0.5/s)');
+    }
+    const value = m[2] === undefined ? 1 : Number(m[2]);
+    if (!Number.isFinite(value) || value < 0) throw new Error('Invalid amount in "' + part + '"');
+    const rate = !!m[3];
+    if (!rate && !Number.isInteger(value)) throw new Error('"' + part + '" must be a whole number, or a rate such as ' + m[1] + ':' + value + '/s');
+    const entry = plan[m[1]] = plan[m[1]] || { count: 0, rate: 0 };
+    if (rate) entry.rate += value; else entry.count += value;
   }
   if (!Object.keys(plan).length) throw new Error('The fault plan is empty');
   return plan;
+}
+// how many of this kind this draw produces: the count asked for, plus the arrivals of a Poisson process
+function amountOf(plan, kind, seconds, rnd) {
+  const entry = plan[kind] || { count: 0, rate: 0 };
+  let n = entry.count || 0;
+  if (entry.rate > 0) {
+    // inter-arrival times of a Poisson process with this rate, over the window
+    for (let t = 0; ; ) {
+      t += -Math.log(1 - rnd()) / entry.rate;
+      if (t > seconds) break;
+      n++;
+      if (n > 200) break;
+    }
+  }
+  return n;
+}
+// a duration drawn around a fraction of the window, never longer than the window itself
+function drawSpan(win, rnd, share) {
+  const span = win.to - win.from;
+  const d = Math.round(-Math.log(1 - rnd()) * span * share);
+  // exponential, but never so short that the fault cannot be noticed, and never longer than the window
+  return Math.max(Math.round(span * 0.15), Math.min(span, d));
 }
 
 // "0..3s" or "3s" (meaning from 0)
@@ -9655,57 +9870,60 @@ function planFaults(spec, window, scenario, seed) {
   const rnd = planRng(seed, JSON.stringify([plan, win]));
   const time = () => Math.round(win.from + rnd() * (win.to - win.from));
   const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const seconds = (win.to - win.from) / 1000000;
   const out = [];
   const crashed = [];
-  for (let i = 0; i < (plan.crash || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'crash', seconds, rnd); i < n; i++) {
     const node = pick(ids.filter(id => !crashed.includes(id))) || pick(ids);
     crashed.push(node);
     out.push({ type: 'crash', node, at: C.fmtDuration(time()) });
   }
-  for (let i = 0; i < (plan.recover || 0) && i < crashed.length; i++) {
+  for (let i = 0, n = amountOf(plan, 'recover', seconds, rnd); i < n && i < crashed.length; i++) {
     const crash = out.filter(f => f.type === 'crash')[i];
-    const at = C.parseDuration(crash.at) + Math.round((win.to - win.from) * (0.2 + 0.6 * rnd()));
+    // a recovery stays inside the window, like everything else a draw produces
+    const at = Math.min(win.to - 1, C.parseDuration(crash.at) + drawSpan(win, rnd, 0.4));
     out.push({ type: 'recover', node: crash.node, at: C.fmtDuration(at) });
   }
-  for (let i = 0; i < (plan.pause || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'pause', seconds, rnd); i < n; i++) {
     const from = time();
-    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.1 + 0.4 * rnd()))) });
+    out.push({ type: 'pause', node: pick(ids), from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.25)) });
   }
-  for (let i = 0; i < (plan.partition || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'partition', seconds, rnd); i < n; i++) {
     const shuffled = ids.slice();
     for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
     const cut = 1 + Math.floor(rnd() * (ids.length - 1));
     const from = time();
     out.push({
       type: 'partition', groups: shuffled.slice(0, cut).sort((a, b) => a - b).join(' '),
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.3))
     });
   }
-  for (let i = 0; i < (plan.link || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'link', seconds, rnd); i < n; i++) {
     const links = (scenario.links || []).filter(l => l.enabled !== false);
     const l = links.length ? pick(links) : { a: ids[0], b: ids[1] };
     const from = time();
     out.push({
       type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.3))
     });
   }
   // a zone: several processes crash together, the way a rack or an availability zone does
-  for (let i = 0; i < (plan.zone || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'zone', seconds, rnd); i < n; i++) {
     const size = Math.max(2, Math.min(ids.length - 1, Math.round(ids.length / 3)));
     const shuffled = ids.slice();
     for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
     const at = C.fmtDuration(time());
     for (const node of shuffled.slice(0, size).sort((a, b) => a - b)) out.push({ type: 'crash', node, at, zone: true });
   }
-  for (let i = 0; i < (plan.omission || 0); i++) {
+  for (let i = 0, n = amountOf(plan, 'omission', seconds, rnd); i < n; i++) {
     const from = time();
     out.push({
       type: 'omission', node: pick(ids), direction: ['send', 'receive', 'both'][Math.floor(rnd() * 3)],
       prob: Math.round((0.3 + 0.7 * rnd()) * 100) / 100,
-      from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.3 + 0.6 * rnd())))
+      from: C.fmtDuration(from), to: C.fmtDuration(from + drawSpan(win, rnd, 0.4))
     });
   }
+  out.sort((a, b) => C.parseDuration(a.at !== undefined ? a.at : a.from) - C.parseDuration(b.at !== undefined ? b.at : b.from));
   return out;
 }
 
@@ -9886,6 +10104,107 @@ function minimize(scenario, opts) {
   return { ok: true, faults, runs, signature, removed: (opts.faults || []).length - faults.length };
 }
 
+// ---------------------------------------------------------------- behaviour profile
+// The same algorithm, over a grid of fault conditions: one row per condition, so that "what does it survive"
+// has an answer instead of a feeling. Every row is an ordinary batch, so everything is reproducible.
+const PROFILE_GRID = [
+  { name: 'no faults', plan: '' },
+  { name: 'one crash', plan: 'crash:1' },
+  { name: 'two crashes', plan: 'crash:2' },
+  { name: 'crash and recovery', plan: 'crash:1,recover:1' },
+  { name: 'one pause', plan: 'pause:1' },
+  { name: 'one partition', plan: 'partition:1' },
+  { name: 'partitions 1.5/s', plan: 'partition:1.5/s' },
+  { name: 'link failures 0.5/s', plan: 'link:0.5/s' },
+  { name: 'omissions 0.5/s', plan: 'omission:0.5/s' },
+  { name: 'a zone crashes', plan: 'zone:1' }
+];
+
+function median(xs) {
+  if (!xs.length) return null;
+  const a = xs.slice().sort((x, y) => x - y);
+  return a[Math.floor(a.length / 2)];
+}
+
+function profileRow(scenario, row, opts) {
+  const res = runBatch(scenario, {
+    seeds: opts.seeds, preset: opts.preset, set: opts.set,
+    faults: row.plan || undefined, faultWindow: opts.faultWindow
+  });
+  const runs = res.runs;
+  const n = runs.length || 1;
+  const settle = runs.filter(r => r.outputs.length).map(r => r.outputs[r.outputs.length - 1].t);
+  const nodes = (scenario.nodes || []).length || 1;
+  const properties = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = properties[p.name] = properties[p.name] || { name: p.name, kind: p.kind, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  const out = {
+    name: row.name,
+    plan: row.plan,
+    runs: runs.length,
+    failed: runs.filter(r => !r.ok).length,
+    assertions: runs.filter(r => r.assertions > 0).length,
+    properties: Object.values(properties),
+    avgMessages: +(runs.reduce((a, r) => a + r.messages, 0) / n).toFixed(1),
+    avgLost: +(runs.reduce((a, r) => a + r.lost, 0) / n).toFixed(1),
+    avgOutputs: +(runs.reduce((a, r) => a + r.outputCount, 0) / n).toFixed(1),
+    // how much of the system produced something, and how long the last output took
+    reach: +(runs.reduce((a, r) => a + r.nodesWithOutput / nodes, 0) / n).toFixed(2),
+    settle: median(settle),
+    worstSeed: (runs.find(r => !r.ok || r.propertyFailures || r.assertions) || {}).seed || null
+  };
+  return Object.assign(out, verdictOf(out));
+}
+
+// What this condition did to the algorithm, in one word and one sentence.
+function verdictOf(row) {
+  const broken = row.properties.filter(p => p.failed);
+  if (row.failed) {
+    return { verdict: 'failed', verdictText: row.failed + ' of ' + row.runs + ' run(s) ended with an error' };
+  }
+  if (broken.length) {
+    return {
+      verdict: 'broken',
+      verdictText: broken.map(p => p.name + ' broken in ' + p.failed + '/' + row.runs).join(', ')
+    };
+  }
+  if (row.assertions) return { verdict: 'broken', verdictText: row.assertions + ' run(s) failed an assertion' };
+  if (row.reach < 0.999) return { verdict: 'degraded', verdictText: 'holds, ' + Math.round(row.reach * 100) + '% of the processes produce an output' };
+  return { verdict: 'ok', verdictText: 'holds' };
+}
+
+// The profile in three lists, for a headline: what it survives, where it degrades, what breaks it.
+function profileSummary(rows) {
+  const pick = v => rows.filter(r => r.verdict === v).map(r => r.name);
+  const survives = pick('ok');
+  const degrades = pick('degraded');
+  const broken = rows.filter(r => r.verdict === 'broken' || r.verdict === 'failed')
+    .map(r => ({ name: r.name, verdict: r.verdict, text: r.verdictText, seed: r.worstSeed }));
+  const list = xs => xs.length ? xs.join(', ') : 'nothing';
+  let headline;
+  if (!broken.length) headline = 'Every condition held: ' + list(survives.concat(degrades)) + '.';
+  else {
+    headline = 'Holds under ' + list(survives.concat(degrades)) + '. Breaks under ' +
+      broken.map(b => b.name + ' (' + b.text + ')').join('; ') + '.';
+  }
+  return { survives, degrades, broken, headline };
+}
+
+function profile(scenario, opts) {
+  opts = opts || {};
+  const grid = opts.grid || PROFILE_GRID;
+  const started = Date.now();
+  const rows = [];
+  for (const row of grid) {
+    rows.push(profileRow(scenario, row, opts));
+    if (opts.onRow && opts.onRow(rows[rows.length - 1], rows.length, grid.length) === false) break;
+  }
+  return { rows, seeds: seedList(opts.seeds !== undefined ? opts.seeds : scenario.seed || 1).length, ms: Date.now() - started };
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -9918,7 +10237,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, verdictOf, PROFILE_GRID };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);
@@ -13100,8 +13419,98 @@ function startBatch() {
       renderBatchResults(all, seeds);
     }, faultsFor);
 }
+// The same algorithm over a grid of fault conditions, one row each: what it survives, at what cost.
+function startProfile() {
+  const R = window.SimRunner;
+  const btn = $('#btn-profile');
+  if (batchHandle) { toast('A batch is already running.'); return; }
+  const seeds = parseSeedSpec($('#batch-seeds').value);
+  if (!seeds) { toast('Seeds look like 1..50, or 3, or 1,4,9.'); return; }
+  if (seeds.length > 60) { toast('A profile runs every condition: try at most 60 seeds.'); return; }
+  let win;
+  try { win = R.parseWindow($('#batch-window').value); } catch (e) { toast(e.message); return; }
+  const grid = R.PROFILE_GRID;
+  const scenario = clone(S.scn);
+  const nodes = (scenario.nodes || []).length || 1;
+  const rows = [];
+  let i = 0;
+  btn.disabled = true;
+  $('#batch-results').textContent = '';
+  const started = Date.now();
+  const nextRow = () => {
+    if (i >= grid.length) {
+      btn.disabled = false;
+      batchHandle = null;
+      $('#batch-progress').textContent = grid.length + ' condition(s) in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s';
+      return;
+    }
+    const row = grid[i++];
+    $('#batch-progress').textContent = 'condition ' + i + ' / ' + grid.length + ': ' + row.name;
+    const faultsFor = row.plan ? seed => R.planFaults(R.parsePlan(row.plan), win, scenario, seed) : null;
+    batchHandle = runBatch(scenario, seeds, () => {}, runs => {
+      rows.push(profileRowOf(row, runs, nodes));
+      renderProfile(rows, seeds.length);
+      nextRow();
+    }, faultsFor);
+  };
+  nextRow();
+}
+const VERDICT_MARK = { ok: '●', degraded: '◐', broken: '✕', failed: '✕' };
+function profileRowOf(row, runs, nodes) {
+  const n = runs.length || 1;
+  const props = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = props[p.name] = props[p.name] || { name: p.name, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  const settle = runs.filter(r => r.outputs.length).map(r => r.outputs[r.outputs.length - 1].t).sort((a, b) => a - b);
+  const worst = runs.find(r => !r.ok || r.propertyFailures || r.assertions);
+  const out = {
+    name: row.name, runs: runs.length, failed: runs.filter(r => !r.ok).length,
+    assertions: runs.filter(r => r.assertions > 0).length,
+    properties: Object.values(props),
+    avgMessages: +(runs.reduce((a, r) => a + r.messages, 0) / n).toFixed(1),
+    reach: runs.reduce((a, r) => a + r.nodesWithOutput / nodes, 0) / n,
+    settle: settle.length ? settle[Math.floor(settle.length / 2)] : null,
+    worstSeed: worst ? worst.seed : null,
+    worst: worst || null
+  };
+  return Object.assign(out, window.SimRunner.verdictOf(out));
+}
+function renderProfile(rows, seeds) {
+  const box = $('#batch-results');
+  box.textContent = '';
+  const names = rows.length ? rows[0].properties.map(p => p.name) : [];
+  const table = el('table', { class: 'profile' });
+  const head = el('tr', {}, el('th', {}, ''), el('th', {}, 'condition'));
+  for (const n of names) head.append(el('th', {}, n));
+  head.append(el('th', {}, 'messages'), el('th', {}, 'reach'), el('th', {}, 'settles'), el('th', {}, ''));
+  table.append(head);
+  for (const r of rows) {
+    const tr = el('tr', { class: 'v-' + r.verdict, title: r.verdictText });
+    tr.append(el('td', { class: 'mark' }, VERDICT_MARK[r.verdict] || ''), el('td', {}, r.name));
+    for (const n of names) {
+      const p = r.properties.find(x => x.name === n);
+      tr.append(el('td', { class: p && p.failed ? 'bad' : 'good' }, p ? p.held + '/' + r.runs : '—'));
+    }
+    // the reach is easier to compare as a bar than as a number
+    const bar = el('span', { class: 'bar' }, el('i', {}));
+    bar.firstChild.style.width = Math.round(r.reach * 100) + '%';
+    tr.append(el('td', {}, String(r.avgMessages)),
+      el('td', { class: 'reach' }, bar, el('span', {}, Math.round(r.reach * 100) + '%')),
+      el('td', {}, r.settle === null ? '—' : C.fmtDuration(r.settle)),
+      el('td', {}, r.worst ? el('button', { type: 'button', class: 'link', onclick: () => openBatchRun(r.worst) }, 'open seed ' + r.worst.seed) : ''));
+    table.append(tr);
+  }
+  const sum = window.SimRunner.profileSummary(rows);
+  box.append(el('p', { class: 'profile-headline' + (sum.broken.length ? ' bad' : ' good') }, sum.headline));
+  box.append(el('div', { class: 'profile-wrap' }, table));
+  box.append(el('p', { class: 'hint' }, seeds + ' seed(s) per condition. Reach is the share of processes that produced an output; settles is the median time of the last one.'));
+}
 function bindBatch() {
   $('#btn-batch').addEventListener('click', startBatch);
+  $('#btn-profile').addEventListener('click', startProfile);
   $('#batch-seeds').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); startBatch(); } });
 }
 

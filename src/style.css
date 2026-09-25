@@ -546,3 +546,25 @@ body.present .pk text { font-size: 12px; }
 .batch-list li { padding: 2px 0; border-bottom: 1px solid var(--grid); display: flex; gap: 8px; align-items: baseline; }
 .batch-list .bad { color: var(--red); }
 .batch-list .hint { margin-left: auto; white-space: nowrap; }
+
+/* ---------- behaviour profile ---------- */
+table.profile { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 6px; }
+table.profile th, table.profile td { border-bottom: 1px solid var(--grid); padding: 3px 6px; text-align: right; white-space: nowrap; }
+table.profile th:first-child, table.profile td:first-child { text-align: left; }
+table.profile th { color: var(--muted); font-weight: 700; }
+table.profile td.good { color: var(--green); }
+table.profile td.bad { color: var(--red); font-weight: 700; }
+table.profile td.mark { text-align: center; padding-right: 0; }
+table.profile tr.v-ok td.mark { color: var(--green); }
+table.profile tr.v-degraded td.mark { color: var(--amber); }
+table.profile tr.v-broken td.mark, table.profile tr.v-failed td.mark { color: var(--red); }
+table.profile td.reach { white-space: nowrap; }
+table.profile .bar { display: inline-block; width: 42px; height: 7px; border-radius: 4px; background: var(--grid); margin-right: 6px; vertical-align: middle; overflow: hidden; }
+table.profile .bar i { display: block; height: 100%; background: var(--blue); }
+.profile-headline { margin: 6px 0 2px; font-size: 13.5px; line-height: 1.45; }
+.profile-headline.good { color: var(--green); }
+.profile-headline.bad { color: var(--ink); border-left: 3px solid var(--red); padding-left: 8px; }
+#batch-results { max-width: 100%; }
+.profile-wrap { overflow-x: auto; max-width: 100%; }
+.profile-wrap table.profile { width: max-content; min-width: 100%; }
+.profile-headline { overflow-wrap: anywhere; }

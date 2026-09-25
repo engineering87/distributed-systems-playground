@@ -6,6 +6,32 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.17.1]
+
+### Changed
+- The behaviour profile now reads as a summary: every condition carries a verdict (held, held with fewer processes reporting, broken), a sentence states what the algorithm holds under and what breaks it, the reach is shown as a bar in the page, and the table scrolls inside the panel instead of stretching it.
+
+## [0.17.0]
+
+### Added
+- Behaviour profile: the same algorithm run over a grid of fault conditions (no faults, crashes, crash and recovery, pause, partition, overlapping partitions, link failures, omissions, a zone), with how often each property held, messages, reach, median settling time and a failing seed to open. Available as **Behaviour profile** in the *Scenario* tab and as `dsp profile`.
+
+## [0.16.0]
+
+### Added
+- Fault plans accept rates: `crash:0.5/s` makes faults arrive as a Poisson process over the window, with durations drawn from an exponential distribution, so every run gets a different schedule. Numbers and rates can be combined.
+
+### Changed
+- Durations of generated interval faults come from an exponential distribution instead of a uniform one, with a floor of 15% of the window; generated schedules are returned in time order, and a generated recovery always falls inside the window.
+
+## [0.15.0]
+
+### Added
+- Faults armed by a condition: any fault can wait for a boolean expression over the state of every process, written like a property, and fire the first moment it holds, lasting for the duration given in *For*.
+- One-way partitions: only the messages leaving the first group are dropped.
+- `zone:1` in fault plans: about a third of the processes crash at the same instant.
+- `SimCore.parseExpression`, for a single expression such as a fault condition.
+
 ## [0.14.0]
 
 ### Added

@@ -82,6 +82,16 @@ property Agreement       (always)      held in 16/20 run(s), first broken at see
 | `partition:1` | the processes are split in two groups for part of the window |
 | `link:1` | a link goes down for part of the window, one way half of the time |
 | `omission:1` | a process omits part of its sends, receives or both |
+| `zone:1` | about a third of the processes crash at the same instant, the way a rack does |
+
+**A number or a rate.** `crash:2` asks for two crashes somewhere in the window. `crash:0.5/s` asks for a rate: the faults arrive as a Poisson process over the window, so every run gets a different number of them, and their durations come from an exponential distribution. It is the closer model of a system nobody is watching, and the difference shows:
+
+```text
+partition:1        Agreement broken in  1 of 60 runs
+partition:1.5/s    Agreement broken in 18 of 60 runs
+```
+
+One partition rarely lands where it hurts. A rate of one and a half per second produces overlapping partitions, which is what actually breaks FloodSet. Numbers and rates can be combined: `--faults crash:1,link:0.5/s`.
 
 Combine them with commas: `--faults crash:1,partition:1`. The window accepts `0..3s` or a single duration, which is read as `0..that`.
 
@@ -183,6 +193,47 @@ A workflow step that keeps an exercise honest:
 With `assert` statements in the algorithm and *Stop at the first failed assertion* in the scenario, a violated property makes the step fail and names the seed that produced it.
 
 The same batch runs are available in the page: *Run over many seeds* in the *Scenario* tab, described in [The interface](interface.md#batch-runs).
+
+## A behaviour profile
+
+One command answers "what does this algorithm survive":
+
+```sh
+node bin/dsp.mjs profile --example floodset --seeds 1..15 --fault-window 0..2s
+```
+
+```text
+      condition                Agreement     Validity  Termination   msgs  lost  reach  settles
+───────────────────────────────────────────────────────────────────────────────────────────────
+  ok  no faults                    15/15        15/15        15/15     24     0   100%    1.9 s
+ ~    one crash                    15/15        15/15        15/15   22.2   3.3    78%    1.9 s
+ ~    two crashes                  15/15        15/15        15/15   21.2   4.9    53%    1.9 s
+ FAIL crash and recovery           14/15        14/15        14/15   23.2   1.7    85%    1.9 s
+      1 of 15 run(s) ended with an error — open seed 12
+  ok  one pause                    15/15        15/15        15/15     24     0   100%    1.9 s
+  ok  one partition                15/15        15/15        15/15     24   4.2   100%    1.9 s
+ FAIL partitions 1.5/s             10/15        15/15        15/15     24  10.2   100%    1.9 s
+      Agreement broken in 5/15 — open seed 1
+  ok  link failures 0.5/s          15/15        15/15        15/15     24   0.5   100%    1.9 s
+  ok  omissions 0.5/s              15/15        15/15        15/15     24   1.2   100%    1.9 s
+ ~    a zone crashes               15/15        15/15        15/15   21.6   3.5    57%    1.9 s
+
+Holds under no faults, one pause, one partition, link failures 0.5/s, omissions 0.5/s, one
+crash, two crashes, a zone crashes. Breaks under crash and recovery (1 of 15 run(s) ended with
+an error); partitions 1.5/s (Agreement broken in 5/15).
+```
+
+The mark on the left is the verdict of the condition: `ok` when every property held and every process produced an output, `~` when it held with fewer processes reporting, `FAIL` when a property broke or a run ended in an error. The sentence at the bottom is the same profile in one line.
+
+Each row is an ordinary batch with a different fault plan, so every number is reproducible and every failing seed can be opened. Read it as a profile of the algorithm, not as a score:
+
+- **crashes** cost reach, not agreement: FloodSet tolerates them, as `f = 1` claims, and fewer processes decide because fewer are alive;
+- **overlapping partitions** are what break agreement, while a single one almost never does;
+- **crash and recovery** produces a run that fails outright, because a recovered process finds its state empty and `min(W)` has nothing to work on: FloodSet is written for crash-stop, and the profile says so in one line.
+
+`--seeds`, `--preset`, `--set` and `--fault-window` work as they do for `run`; `--json` prints the rows. The exit code is 1 when any condition broke a property, failed an assertion or failed a run, which makes the profile usable as a regression test of an algorithm.
+
+The same grid is in the page: **Behaviour profile** in the *Scenario* tab, next to the batch controls.
 
 ## The batch runner API
 

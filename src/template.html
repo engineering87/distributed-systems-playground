@@ -261,7 +261,7 @@ uses PerfectLinks as pl via AckLinks</pre>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
       </div>
       <div class="row">
-        <label class="field inline" title="What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1"><span>Random faults</span><input id="rnd-faults" value="crash:1" class="narrow" aria-label="Random faults to draw"></label>
+        <label class="field inline" title="How many, as in crash:1, or how often, as in crash:0.5/s: kinds are crash, recover, pause, partition, link, omission, zone"><span>Random faults</span><input id="rnd-faults" value="crash:1" class="narrow" aria-label="Random faults to draw"></label>
         <label class="field inline"><span>Window</span><input id="rnd-window" value="0..3s" class="tiny" aria-label="When the random faults happen"></label>
         <button id="btn-rnd-faults" type="button" class="ghost" title="Draw a schedule and add it to the scenario">Draw</button>
         <button id="btn-rnd-replace" type="button" class="ghost" title="Replace the faults of the scenario with a new draw">Redraw</button>
@@ -276,9 +276,10 @@ uses PerfectLinks as pl via AckLinks</pre>
     <p class="hint">The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.</p>
     <div class="row">
       <label class="field inline"><span>Seeds</span><input id="batch-seeds" value="1..50" class="narrow" aria-label="Seeds to run"></label>
-      <label class="field inline" title="Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1"><span>Faults per run</span><input id="batch-faults" placeholder="none" class="narrow" aria-label="Generated faults per run"></label>
+      <label class="field inline" title="Faults drawn from the seed of each run: a number, as in crash:1, or a rate, as in crash:0.5/s"><span>Faults per run</span><input id="batch-faults" placeholder="none" class="narrow" aria-label="Generated faults per run"></label>
       <label class="field inline"><span>Window</span><input id="batch-window" value="0..3s" class="tiny" aria-label="When the generated faults happen"></label>
       <button type="button" id="btn-batch" class="ghost">Run over seeds</button>
+      <button type="button" id="btn-profile" class="ghost" title="Run the algorithm over a grid of fault conditions and summarize how it behaves">Behaviour profile</button>
       <span id="batch-progress" class="hint"></span>
     </div>
     <div id="batch-results"></div>

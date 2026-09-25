@@ -181,9 +181,11 @@ test('generated faults reach the runs and the summaries, without touching the sc
   const before = JSON.stringify(scn);
   const plain = R.runBatch(scn, { seeds: '1..20' });
   assert.equal(plain.summary.withPropertyFailures, 0, 'the example holds without faults');
-  const withFaults = R.runBatch(scn, { seeds: '1..20', faults: 'partition:1', faultWindow: '0..2s' });
+  // a rate: partitions come and go, and their overlap is what breaks agreement
+  const withFaults = R.runBatch(scn, { seeds: '1..20', faults: 'partition:1.5/s', faultWindow: '0..2s' });
   assert.equal(JSON.stringify(scn), before, 'the scenario it was given is untouched');
-  assert.ok(withFaults.runs.every(r => r.faults.length === 1 && r.faults[0].type === 'partition'));
+  assert.ok(withFaults.runs.every(r => r.faults.every(f => f.type === 'partition')));
+  assert.ok(withFaults.runs.some(r => r.faults.length > 1), 'a rate gives a different number of faults per run');
   const agreement = withFaults.summary.properties.find(p => p.name === 'Agreement');
   assert.ok(agreement.failed >= 1 && agreement.failed < 20, `partitions break agreement in ${agreement.failed} of 20 runs`);
   const broken = withFaults.runs.find(r => r.propertyFailures);
@@ -196,7 +198,7 @@ test('generated faults reach the runs and the summaries, without touching the sc
 });
 
 test('the command line accepts a fault plan and reports the schedule that broke a run', () => {
-  assert.throws(() => cli('run', '--example', 'floodset', '--seeds', '1..20', '--faults', 'partition:1', '--fault-window', '0..2s'), e => {
+  assert.throws(() => cli('run', '--example', 'floodset', '--seeds', '1..20', '--faults', 'partition:1.5/s', '--fault-window', '0..2s'), e => {
     assert.equal(e.status, 1);
     assert.match(e.stdout, /Agreement broken/);
     assert.match(e.stdout, /faults: partition \{p\d+/);
@@ -211,10 +213,10 @@ test('the command line accepts a fault plan and reports the schedule that broke 
 
 test('a failing schedule is shrunk to the faults that still produce the same failure', () => {
   const scn = scenarioOf('floodset');
-  const batch = R.runBatch(scn, { seeds: '1..20', faults: 'crash:1,partition:1,pause:1,omission:1', faultWindow: '0..2s' });
+  const batch = R.runBatch(scn, { seeds: '1..20', faults: 'crash:1,partition:1.5/s,omission:1', faultWindow: '0..2s' });
   const broken = batch.runs.find(r => r.propertyFailures);
   assert.ok(broken, 'the plan breaks a property in some seed');
-  assert.equal(broken.faults.length, 4);
+  assert.ok(broken.faults.length > 2, 'the schedule has several faults: ' + broken.faults.length);
 
   const m = R.minimize(scn, { seed: broken.seed, faults: broken.faults });
   assert.equal(m.ok, true);
@@ -251,10 +253,10 @@ test('shrinking a run that does not fail says so, and respects its budget', () =
 
 test('the command line can shrink the schedules it generated', () => {
   // a broken property is an exit code of 1, so the output arrives through the error
-  assert.throws(() => cli('run', '--example', 'floodset', '--seeds', '1..6', '--faults',
-    'crash:1,partition:1,pause:1,omission:1', '--fault-window', '0..2s', '--minimize', '--quiet'), e => {
+  assert.throws(() => cli('run', '--example', 'floodset', '--seeds', '1..20', '--faults',
+    'crash:1,partition:1.5/s,omission:1', '--fault-window', '0..2s', '--minimize', '--quiet'), e => {
     assert.equal(e.status, 1);
-    assert.match(e.stdout, /seed \d+: \d of 4 fault\(s\) are enough \(\d+ runs\)/);
+    assert.match(e.stdout, /seed \d+: \d+ of \d+ fault\(s\) are enough \(\d+ runs\)/);
     return true;
   });
 });
@@ -266,5 +268,65 @@ test('a zone plan crashes several processes at the same instant', () => {
   assert.ok(faults.every(f => f.type === 'crash' && f.zone));
   assert.equal(new Set(faults.map(f => f.at)).size, 1, 'they fall together');
   assert.deepEqual(faults, R.planFaults('zone:1', '0..2s', scn, 1), 'the same seed gives the same zone');
-  assert.notDeepEqual(faults.map(f => f.node), R.planFaults('zone:1', '0..2s', scn, 2).map(f => f.node));
+  const other = [2, 3, 4, 5].map(seed => R.planFaults('zone:1', '0..2s', scn, seed).map(f => f.node).join(','));
+  assert.ok(other.some(x => x !== faults.map(f => f.node).join(',')), 'other seeds hit other processes: ' + other.join(' | '));
+});
+
+test('a rate makes faults arrive as a random process over the window', () => {
+  const scn = scenarioOf('epfd');
+  // one crash per four seconds and one link failure every two, over eight seconds: about six faults per run
+  const counts = [];
+  for (let seed = 1; seed <= 40; seed++) counts.push(R.planFaults('crash:0.25/s,link:0.5/s', '0..8s', scn, seed).length);
+  const average = counts.reduce((a, b) => a + b, 0) / counts.length;
+  assert.ok(average > 4 && average < 8, 'about six faults per run, got ' + average.toFixed(2));
+  assert.ok(new Set(counts).size > 3, 'the number varies between runs: ' + [...new Set(counts)].sort((a, b) => a - b).join(','));
+
+  const one = R.planFaults('pause:1/s', '0..5s', scn, 9);
+  assert.deepEqual(one, R.planFaults('pause:1/s', '0..5s', scn, 9), 'the same seed gives the same draw');
+  const times = one.map(f => C.parseDuration(f.at !== undefined ? f.at : f.from));
+  assert.deepEqual(times, times.slice().sort((a, b) => a - b), 'the schedule is in time order');
+  for (const f of one) {
+    assert.ok(C.parseDuration(f.to) - C.parseDuration(f.from) <= 5000000, 'no fault outlasts the window');
+    assert.doesNotThrow(() => C.normalizeFault(f));
+  }
+
+  // counts and rates can be mixed, and a fraction without a rate is refused
+  const mixed = R.planFaults('crash:1,omission:0.4/s', '0..5s', scn, 4);
+  assert.equal(mixed.filter(f => f.type === 'crash').length, 1);
+  assert.throws(() => R.parsePlan('crash:0.5'), /whole number, or a rate/);
+  assert.throws(() => R.parsePlan('crash:-1/s'), /Unknown fault plan|Invalid amount/);
+});
+
+test('a behaviour profile says what the algorithm survives', () => {
+  const scn = scenarioOf('floodset');
+  const res = R.profile(scn, { seeds: '1..15', faultWindow: '0..2s' });
+  assert.equal(res.rows.length, R.PROFILE_GRID.length);
+  assert.equal(res.seeds, 15);
+
+  const byName = Object.fromEntries(res.rows.map(r => [r.name, r]));
+  const held = (row, prop) => byName[row].properties.find(p => p.name === prop);
+  assert.equal(held('no faults', 'Agreement').failed, 0, 'without faults everything holds');
+  assert.equal(held('one crash', 'Agreement').failed, 0, 'FloodSet tolerates one crash, as f = 1 says');
+  assert.ok(held('partitions 1.5/s', 'Agreement').failed > 0, 'overlapping partitions break agreement');
+  assert.ok(byName['two crashes'].reach < byName['no faults'].reach, 'fewer processes produce an output');
+  assert.ok(byName['no faults'].settle > 0, 'the median settling time is measured');
+  assert.ok(byName['one crash'].avgMessages < byName['no faults'].avgMessages, 'a crashed process sends less');
+
+  // a run that ends in a runtime error is counted apart from a broken property
+  assert.ok(byName['crash and recovery'].failed >= 1, 'a recovered process finds its state empty');
+  assert.deepEqual(R.profile(scn, { seeds: '1..5', faultWindow: '0..2s' }).rows.map(r => r.name),
+    R.PROFILE_GRID.map(r => r.name), 'the grid is the same every time');
+});
+
+test('the command line prints a profile and fails when something breaks', () => {
+  assert.throws(() => cli('profile', '--example', 'floodset', '--seeds', '1..10', '--fault-window', '0..2s'), e => {
+    assert.equal(e.status, 1);
+    assert.match(e.stdout, /condition\s+Agreement/);
+    assert.match(e.stdout, /partitions 1\.5\/s/);
+    assert.match(e.stdout, /seed\(s\) per condition/);
+    return true;
+  });
+  const json = JSON.parse(cli('profile', '--example', 'flooding', '--seeds', '1..3', '--json'));
+  assert.equal(json.rows.length, R.PROFILE_GRID.length);
+  assert.ok(json.rows.every(r => typeof r.reach === 'number'));
 });

@@ -122,6 +122,8 @@ Write the seeds as `1..50`, `7`, or `1,4,9`, press **Run over seeds**, and the r
 - for each declared [property](language.md#properties), in how many runs it held and the first seed that broke it;
 - a list of the runs with a problem, or of all of them when there is none.
 
+**Behaviour profile** runs the same algorithm over a grid of fault conditions, one row each: no faults, one crash, two crashes, crash and recovery, a pause, a partition, overlapping partitions, link failures, omissions, a zone crashing. A sentence above the table says what the algorithm holds under and what breaks it. Each row carries a verdict (● held, ◐ held with fewer processes reporting, ✕ something broke), how often each property held, the average messages, the reach as a bar, the median time of the last output, and a button to open a failing seed. It is the quickest answer to "what does this algorithm survive".
+
 Runs that failed with more than one generated fault also offer **minimize**: it shrinks the schedule to the faults that still produce the same failure, usually turning four into one, and shows the result in place.
 
 Click a seed to load that run in the page, with everything in place to watch what happened. **Stop** ends a batch early.

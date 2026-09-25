@@ -16,7 +16,7 @@ import sys
 import time
 
 HERE = pathlib.Path(__file__).resolve().parent
-SUITES = ['commands', 'features', 'extras', 'props', 'faults', 'batch', 'security', 'touch', 'layout', 'perf']
+SUITES = ['commands', 'features', 'extras', 'props', 'faults', 'batch', 'profile', 'security', 'touch', 'layout', 'perf']
 # perf and layout report measurements rather than pass or fail
 MEASURE_ONLY = {'perf', 'layout'}
 

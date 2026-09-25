@@ -36,6 +36,7 @@ downloaded files go (`test/browser/out` by default, which is not committed).
 | `props` | global properties: counters, the log filter, the diagnostics and the translation |
 | `faults` | one-way link failures, process pauses and omissions: form, log, drawing and injection at the cursor |
 | `batch` | running a scenario over many seeds: workers, progress, results, opening a seed, stopping |
+| `profile` | the behaviour profile: the grid of conditions, the table, and opening a failing seed |
 | `security` | markup typed in the editor, prototype pollution from imports, links and storage, what a saved file contains, and what an exported image may carry |
 | `touch` | a phone: taps, dragging a process, scrolling over the graph, target sizes and dialogs |
 | `layout` | eleven screen sizes, from 320×640 to 2560×1440: overflow, clipping and touch target sizes |

@@ -18,6 +18,8 @@ const USAGE = `Distributed Systems Playground
 Usage:
   dsp run [scenario.json] [options]     run a scenario over one or more seeds
   dsp check [scenario.json] [options]   parse and check the code only
+  dsp profile [scenario.json] [options] run the algorithm over a grid of fault
+                                        conditions and summarize how it behaves
   dsp examples                          list the built-in examples
   dsp presets                           list the timing presets
 
@@ -31,9 +33,11 @@ Options:
   --preset <key>        replace the timing model with a preset
   --set <path=value>    change one scenario field, repeatable
                         (--set actual.loss=0.3 --set stopAt=5s)
-  --faults <plan>       add generated faults to every run, drawn from its seed:
-                        crash:1, partition:1, pause:1, link:1, omission:1, recover:1
-                        (combine them: --faults crash:1,partition:1)
+  --faults <plan>       add generated faults to every run, drawn from its seed.
+                        Kinds: crash, recover, pause, partition, link, omission,
+                        zone. A number asks for that many (crash:2); a rate makes
+                        them arrive at random over the window (crash:0.5/s).
+                        Combine them: --faults crash:1,link:0.5/s
   --fault-window <w>    when those faults happen, 0..3s by default
   --minimize            for each run that failed, shrink its generated schedule
                         to the faults that still produce the same failure
@@ -97,6 +101,17 @@ function loadScenario(args) {
 }
 
 const pad = (s, n) => String(s).padEnd(n);
+// wraps a sentence to the given width, for the headline of a profile
+function wrap(text, width) {
+  const out = [];
+  let line = '';
+  for (const word of String(text).split(' ')) {
+    if (line.length + word.length + 1 > width) { out.push(line); line = word; }
+    else line = line ? line + ' ' + word : word;
+  }
+  if (line) out.push(line);
+  return out.join('\n');
+}
 const padL = (s, n) => String(s).padStart(n);
 
 function printRuns(res, args) {
@@ -184,6 +199,43 @@ function cmdRun(args) {
   process.exit(bad ? 1 : 0);
 }
 
+function cmdProfile(args) {
+  const scenario = loadScenario(args);
+  let res;
+  try {
+    res = R.profile(scenario, { seeds: args.seeds || '1..20', preset: args.preset, set: args.set, faultWindow: args.faultWindow });
+  } catch (e) { fail(e.message); }
+  if (args.json) {
+    process.stdout.write(JSON.stringify(res, null, 2) + '\n');
+    process.exit(res.rows.some(r => r.failed || r.assertions || r.properties.some(p => p.failed)) ? 1 : 0);
+  }
+  const names = res.rows[0] ? res.rows[0].properties.map(p => p.name) : [];
+  const MARK = { ok: '  ok  ', degraded: ' ~    ', broken: ' FAIL ', failed: ' FAIL ' };
+  const head = ['      ', pad('condition', 21)].concat(names.map(n => padL(n.slice(0, 12), 13)))
+    .concat([padL('msgs', 7), padL('lost', 6), padL('reach', 7), padL('settles', 9)]);
+  process.stdout.write(head.join('') + '\n');
+  process.stdout.write('─'.repeat(head.join('').length) + '\n');
+  for (const r of res.rows) {
+    const cells = names.map(n => {
+      const p = r.properties.find(x => x.name === n);
+      return padL(p ? p.held + '/' + r.runs : '—', 13);
+    });
+    process.stdout.write([MARK[r.verdict] || '      ', pad(r.name, 21)].concat(cells).concat([
+      padL(r.avgMessages, 7), padL(r.avgLost, 6), padL(Math.round(r.reach * 100) + '%', 7),
+      padL(r.settle === null ? '—' : C.fmtDuration(r.settle), 9)
+    ]).join('') + '\n');
+    if (r.verdict === 'broken' || r.verdict === 'failed') {
+      process.stdout.write('      ' + r.verdictText + (r.worstSeed !== null ? ' — open seed ' + r.worstSeed : '') + '\n');
+    }
+  }
+  const sum = R.profileSummary(res.rows);
+  process.stdout.write('\n' + wrap(sum.headline, 96) + '\n');
+  process.stdout.write('\n' + res.seeds + ' seed(s) per condition, ' + res.rows.length + ' conditions, ' + res.ms + ' ms.\n');
+  process.stdout.write('reach: share of the processes that produced an output; settles: median time of the last output.\n');
+  const bad = res.rows.some(r => r.failed || r.assertions || r.properties.some(p => p.failed));
+  process.exit(bad ? 1 : 0);
+}
+
 function cmdCheck(args) {
   const scenario = loadScenario(args);
   const res = R.checkScenario(scenario);
@@ -213,6 +265,7 @@ const cmd = args._[0];
 if (args.help || !cmd) { process.stdout.write(USAGE); process.exit(args.help ? 0 : 2); }
 else if (cmd === 'run') cmdRun(args);
 else if (cmd === 'check') cmdCheck(args);
+else if (cmd === 'profile') cmdProfile(args);
 else if (cmd === 'examples') cmdExamples();
 else if (cmd === 'presets') cmdPresets();
 else fail('Unknown command: ' + cmd + '\n\n' + USAGE);

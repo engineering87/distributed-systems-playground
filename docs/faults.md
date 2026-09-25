@@ -185,7 +185,7 @@ Two things worth knowing. A step is atomic, so a fault fires at the **end** of t
 
 ## Adding faults
 
-**Drawn at random, for the run in front of you.** In the *Scenario* tab, write what to draw (`crash:1`, `partition:1`, `pause:1`, `link:1`, `omission:1`, `recover:1`, or several separated by commas), when it may happen, and press **Draw**. The faults land in the list like any other, so you can run them, watch them, edit them and export them. **Redraw** replaces them with another schedule. It is the fastest way to ask "what does this algorithm do when something goes wrong", without deciding what.
+**Drawn at random, for the run in front of you.** In the *Scenario* tab, write what to draw and press **Draw**. A number asks for that many faults (`crash:1`, `partition:2`); a rate makes them arrive at random over the window, as they do in a system nobody is watching (`crash:0.5/s`, `partition:1.5/s`), with durations drawn from an exponential distribution. The kinds are `crash`, `recover`, `pause`, `partition`, `link`, `omission` and `zone`, separated by commas. The faults land in the list like any other, so you can run them, watch them, edit them and export them. **Redraw** replaces them with another schedule. It is the fastest way to ask "what does this algorithm do when something goes wrong", without deciding what.
 
 **Generated, one schedule per run.** *Run over many seeds* in the *Scenario* tab, and `--faults` on the [command line](cli.md#generated-fault-schedules), add a random schedule to each run of a batch, drawn from its seed. It is what turns that question into an answer over hundreds of runs, with the schedule of every failing seed reported and [shrinkable](cli.md#shrinking-a-counterexample) to what matters.
 

@@ -200,7 +200,97 @@ function startBatch() {
       renderBatchResults(all, seeds);
     }, faultsFor);
 }
+// The same algorithm over a grid of fault conditions, one row each: what it survives, at what cost.
+function startProfile() {
+  const R = window.SimRunner;
+  const btn = $('#btn-profile');
+  if (batchHandle) { toast('A batch is already running.'); return; }
+  const seeds = parseSeedSpec($('#batch-seeds').value);
+  if (!seeds) { toast('Seeds look like 1..50, or 3, or 1,4,9.'); return; }
+  if (seeds.length > 60) { toast('A profile runs every condition: try at most 60 seeds.'); return; }
+  let win;
+  try { win = R.parseWindow($('#batch-window').value); } catch (e) { toast(e.message); return; }
+  const grid = R.PROFILE_GRID;
+  const scenario = clone(S.scn);
+  const nodes = (scenario.nodes || []).length || 1;
+  const rows = [];
+  let i = 0;
+  btn.disabled = true;
+  $('#batch-results').textContent = '';
+  const started = Date.now();
+  const nextRow = () => {
+    if (i >= grid.length) {
+      btn.disabled = false;
+      batchHandle = null;
+      $('#batch-progress').textContent = grid.length + ' condition(s) in ' + ((Date.now() - started) / 1000).toFixed(1) + ' s';
+      return;
+    }
+    const row = grid[i++];
+    $('#batch-progress').textContent = 'condition ' + i + ' / ' + grid.length + ': ' + row.name;
+    const faultsFor = row.plan ? seed => R.planFaults(R.parsePlan(row.plan), win, scenario, seed) : null;
+    batchHandle = runBatch(scenario, seeds, () => {}, runs => {
+      rows.push(profileRowOf(row, runs, nodes));
+      renderProfile(rows, seeds.length);
+      nextRow();
+    }, faultsFor);
+  };
+  nextRow();
+}
+const VERDICT_MARK = { ok: '●', degraded: '◐', broken: '✕', failed: '✕' };
+function profileRowOf(row, runs, nodes) {
+  const n = runs.length || 1;
+  const props = {};
+  for (const r of runs) for (const p of r.properties) {
+    const e = props[p.name] = props[p.name] || { name: p.name, held: 0, failed: 0, firstFailure: null };
+    if (p.ok) e.held++;
+    else { e.failed++; if (e.firstFailure === null) e.firstFailure = r.seed; }
+  }
+  const settle = runs.filter(r => r.outputs.length).map(r => r.outputs[r.outputs.length - 1].t).sort((a, b) => a - b);
+  const worst = runs.find(r => !r.ok || r.propertyFailures || r.assertions);
+  const out = {
+    name: row.name, runs: runs.length, failed: runs.filter(r => !r.ok).length,
+    assertions: runs.filter(r => r.assertions > 0).length,
+    properties: Object.values(props),
+    avgMessages: +(runs.reduce((a, r) => a + r.messages, 0) / n).toFixed(1),
+    reach: runs.reduce((a, r) => a + r.nodesWithOutput / nodes, 0) / n,
+    settle: settle.length ? settle[Math.floor(settle.length / 2)] : null,
+    worstSeed: worst ? worst.seed : null,
+    worst: worst || null
+  };
+  return Object.assign(out, window.SimRunner.verdictOf(out));
+}
+function renderProfile(rows, seeds) {
+  const box = $('#batch-results');
+  box.textContent = '';
+  const names = rows.length ? rows[0].properties.map(p => p.name) : [];
+  const table = el('table', { class: 'profile' });
+  const head = el('tr', {}, el('th', {}, ''), el('th', {}, 'condition'));
+  for (const n of names) head.append(el('th', {}, n));
+  head.append(el('th', {}, 'messages'), el('th', {}, 'reach'), el('th', {}, 'settles'), el('th', {}, ''));
+  table.append(head);
+  for (const r of rows) {
+    const tr = el('tr', { class: 'v-' + r.verdict, title: r.verdictText });
+    tr.append(el('td', { class: 'mark' }, VERDICT_MARK[r.verdict] || ''), el('td', {}, r.name));
+    for (const n of names) {
+      const p = r.properties.find(x => x.name === n);
+      tr.append(el('td', { class: p && p.failed ? 'bad' : 'good' }, p ? p.held + '/' + r.runs : '—'));
+    }
+    // the reach is easier to compare as a bar than as a number
+    const bar = el('span', { class: 'bar' }, el('i', {}));
+    bar.firstChild.style.width = Math.round(r.reach * 100) + '%';
+    tr.append(el('td', {}, String(r.avgMessages)),
+      el('td', { class: 'reach' }, bar, el('span', {}, Math.round(r.reach * 100) + '%')),
+      el('td', {}, r.settle === null ? '—' : C.fmtDuration(r.settle)),
+      el('td', {}, r.worst ? el('button', { type: 'button', class: 'link', onclick: () => openBatchRun(r.worst) }, 'open seed ' + r.worst.seed) : ''));
+    table.append(tr);
+  }
+  const sum = window.SimRunner.profileSummary(rows);
+  box.append(el('p', { class: 'profile-headline' + (sum.broken.length ? ' bad' : ' good') }, sum.headline));
+  box.append(el('div', { class: 'profile-wrap' }, table));
+  box.append(el('p', { class: 'hint' }, seeds + ' seed(s) per condition. Reach is the share of processes that produced an output; settles is the median time of the last one.'));
+}
 function bindBatch() {
   $('#btn-batch').addEventListener('click', startBatch);
+  $('#btn-profile').addEventListener('click', startProfile);
   $('#batch-seeds').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); startBatch(); } });
 }
