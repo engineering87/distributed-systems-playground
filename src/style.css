@@ -568,3 +568,15 @@ table.profile .bar i { display: block; height: 100%; background: var(--blue); }
 .profile-wrap { overflow-x: auto; max-width: 100%; }
 .profile-wrap table.profile { width: max-content; min-width: 100%; }
 .profile-headline { overflow-wrap: anywhere; }
+
+/* ---------- completion and quick fixes ---------- */
+.ed-main { position: relative; }
+.complete { position: absolute; z-index: 40; min-width: 210px; max-width: 340px; background: var(--surface-2);
+  border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); overflow: hidden; }
+.complete .ci { display: flex; gap: 10px; align-items: baseline; padding: 3px 9px; cursor: pointer; font: 12.5px var(--mono); }
+.complete .ci.sel { background: var(--accent-soft); }
+.complete .ct { color: var(--ink); }
+.complete .ck { margin-left: auto; color: var(--muted); font: 11px var(--sans); white-space: nowrap; }
+.diag li { display: flex; gap: 8px; align-items: baseline; }
+.diag li .msg { cursor: pointer; flex: 1; }
+.diag button.fix { white-space: nowrap; }

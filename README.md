@@ -164,6 +164,9 @@ This project exists to make that gap visible.
 **Beyond the page**
 - A command line tool that runs the same engine: many seeds in one command, outcomes grouped, exit codes for continuous integration. See [Running scenarios outside the browser](docs/cli.md).
 
+**Writing**
+- Completion from the program as parsed: instances, the events of their interfaces with their arity, state, parameters, functions, built-ins. Quick fixes that declare a variable, add a missing handler or add a module from the library.
+
 **Checking**
 - Batch runs over many seeds, in background workers, with per-property results and one click to open the seed that broke an invariant.
 - Random faults on demand: draw a schedule of crashes, partitions, pauses, link failures, omissions or a whole zone, as a fixed number or as a rate (`partition:1.5/s`) with arrivals and durations drawn at random. For one run, or a different one for every run of a batch, always reproducible from the seed.

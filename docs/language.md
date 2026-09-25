@@ -410,6 +410,13 @@ upon event ⟨timer, Timeout | retry⟩ do … end
 
 The checker warns about a `Timeout` handler for a timer the module never starts.
 
+## Writing help
+
+The editor knows the program you are writing, so it can offer what exists rather than what might:
+
+- **Completion.** Inside `⟨ … ⟩` it offers the instances of the algorithm you are in, then the events of that instance's interface, with their number of arguments. Elsewhere it offers state variables, parameters, functions, built-ins and keywords. It appears as you type a name, or on `Ctrl` + `Space`; `↑` `↓` choose, `Enter` or `Tab` accept, `Esc` closes. While an algorithm is half-written and does not parse yet, the instances are read from the header you have already typed.
+- **Quick fixes.** A diagnostic that has an obvious repair offers it as a button: *declare it in state* for an undeclared variable, *add the handler* for an indication nobody handles, with the right arguments filled in, and *add a module that implements it* for an interface with an implementation in the [library](library.md). The fix edits the code and runs the checker again, so nothing is applied that the checker would reject.
+
 ## Properties
 
 A property is a global invariant: one boolean expression over the state of **every** process, checked by the engine. It lives at the top level of the program, next to interfaces and algorithms.

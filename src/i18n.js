@@ -302,6 +302,19 @@ M('The same scenario, one run per seed, in the background. Properties and failed
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
 M('Seeds', 'Semi');
 M('Behaviour profile', 'Profilo di comportamento');
+M('declare it in state', 'dichiarala in state'); M('add a module that implements it', 'aggiungi un modulo che la implementa');
+M('declare the interface', 'dichiara l\'interfaccia'); M('add the handler', 'aggiungi l\'handler');
+M('keyword', 'parola chiave'); M('built-in', 'predefinito'); M('built-in function', 'funzione predefinita');
+M('event', 'evento'); M('instance', 'istanza');
+P(/^"(\w+)" declared in state\.$/, m => '"' + m[1] + '" dichiarata in state.');
+P(/^Interface "(\w+)" added: fill in its events\.$/, m => 'Interfaccia "' + m[1] + '" aggiunta: definisci i suoi eventi.');
+P(/^Handler for (\w+) added\.$/, m => 'Handler per ' + m[1] + ' aggiunto.');
+P(/^(implements|uses) (\w+)$/, m => (m[1] === 'uses' ? 'usa ' : 'implementa ') + m[2]);
+P(/^(request|indication) of (\w+)( with (\d+) argument\(s\))?$/, m =>
+  (m[1] === 'request' ? 'richiesta di ' : 'indicazione di ') + m[2] + (m[4] ? ' con ' + m[4] + ' argomenti' : ''));
+P(/^state of (\w+)$/, m => 'stato di ' + m[1]);
+P(/^parameter of (\w+)$/, m => 'parametro di ' + m[1]);
+P(/^function with (\d+) argument\(s\)$/, m => 'funzione con ' + m[1] + ' argomenti');
 M('holds', 'regge');
 P(/^holds, (\d+)% of the processes produce an output$/, m => 'regge, il ' + m[1] + '% dei processi produce un output');
 P(/^(\d+) of (\d+) run\(s\) ended with an error$/, m => m[1] + ' esecuzioni su ' + m[2] + ' terminate con un errore');

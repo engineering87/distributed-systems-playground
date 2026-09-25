@@ -6,6 +6,13 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.18.0]
+
+### Added
+- Contextual completion in the editor, built from the parse tree: instances inside `⟨ … ⟩`, then the events of that instance's interface with their arity, and elsewhere state variables, parameters, functions, built-ins and keywords. `Ctrl` + `Space` opens it anywhere; while an algorithm is half-written its instances are read from the header.
+- Quick fixes on diagnostics: declare an undeclared variable in `state`, add a handler for an unhandled indication with its arguments, add a module that implements a missing interface, or declare the interface.
+- `SimCore.builtinIfaces()`, so that the editor knows the events of `Net` and `Rounds`.
+
 ## [0.17.1]
 
 ### Changed

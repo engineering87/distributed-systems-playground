@@ -93,6 +93,7 @@ function checkCode() {
     else d = { errors: [{ msg: 'Internal checker error: ' + e.message, line: 0 }], warnings: [] };
   }
   S.diag = { errors: d.errors, warnings: d.warnings };
+  S.prog = prog;
   if (prog) {
     S.algos = prog.algorithms.map(a => ({ name: a.name, impl: a.implType, uses: a.uses.map(u => u.type) }));
     S.ifaces = prog.interfaces;
@@ -131,8 +132,11 @@ function renderDiag() {
   ];
   if (!items.length) { ul.append(el('li', { class: 'ok' }, 'No errors: the code is consistent with the assumed model.')); return; }
   for (const [cls, e] of items) {
-    ul.append(el('li', { class: cls, onclick: () => gotoLine(e.line, e.col) },
-      e.line ? el('span', { class: 'ln' }, 'line ' + e.line) : null, e.msg));
+    const fix = quickFixFor(e);
+    ul.append(el('li', { class: cls },
+      el('span', { class: 'msg', onclick: () => gotoLine(e.line, e.col) },
+        e.line ? el('span', { class: 'ln' }, 'line ' + e.line) : null, e.msg),
+      fix ? el('button', { type: 'button', class: 'link fix', onclick: () => fix.apply() }, fix.label) : null));
   }
 }
 function gotoLine(line, col) {

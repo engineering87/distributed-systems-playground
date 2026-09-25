@@ -33,6 +33,7 @@ downloaded files go (`test/browser/out` by default, which is not committed).
 | `commands` | every control of the interface: examples, tools, generators, properties panel, tabs, forms, playback, diagram, log, shortcuts, import and export, shared links, storage |
 | `features` | the module library, the stack view, layer colors and the causality mode |
 | `extras` | settings, themes, the palette for color vision deficiency, the Italian interface, presentation mode, the welcome tour, the gallery and image export |
+| `editor` | completion of instances, events and names, and the quick fixes offered by the diagnostics |
 | `props` | global properties: counters, the log filter, the diagnostics and the translation |
 | `faults` | one-way link failures, process pauses and omissions: form, log, drawing and injection at the cursor |
 | `batch` | running a scenario over many seeds: workers, progress, results, opening a seed, stopping |

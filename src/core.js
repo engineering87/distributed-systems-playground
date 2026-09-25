@@ -2519,7 +2519,7 @@ function parseExpression(src) {
 }
 
 const SimCore = {
-  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay, parseExpression,
+  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay, parseExpression, builtinIfaces,
   isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups, causalCone,
   DslError, fmt, KEYWORDS
 };

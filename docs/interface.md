@@ -89,7 +89,7 @@ Every *here* action adds an input or a fault to the scenario, re-runs, and conti
 - **Add module** inserts a module from the [library](library.md), with what it depends on. A short description of the module appears below.
 - **Symbol buttons** insert `⟨ ⟩ ∪ ∩ \ ∈ ∉ ∅ ≠ ≤ ≥ Π ⊆` at the cursor.
 - **Editor.** `Tab` inserts two spaces; `Enter` keeps the indentation and adds a level after `do`, `then`, `else`, `state`, `params`, `interface` and `algorithm` lines.
-- **Diagnostics** under the editor list errors (red) and warnings (amber), updated as you type. Click one to jump to its line. Runtime errors from the last run appear here too.
+- **Diagnostics** under the editor list errors (red) and warnings (amber), updated as you type. Click one to jump to its line, or press the button on its right to apply a quick fix. Runtime errors from the last run appear here too. Completion appears as you type a name and on `Ctrl` + `Space`; both are described in [Writing help](language.md#writing-help).
 - **Language quick reference** summarizes the syntax. The full reference is [The Upon language](language.md).
 
 ## Timing tab
