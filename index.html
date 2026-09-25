@@ -4200,6 +4200,9 @@ const P = (re, fn) => PAT.push([re, fn]);
   ['Causal order broadcast: questions before answers', 'Broadcast causale: domande prima delle risposte'],
   ['Gossip: spreading a rumor', 'Gossip: diffondere una voce'],
   ['Logical clocks: Lamport and vector', 'Clock logici: Lamport e vettoriale'],
+  ['Majority-quorum register (read and write)', 'Registro a quorum maggioritario (lettura e scrittura)'],
+  ['Majorities keep a replicated register correct; lose one and reads and writes simply stop.', 'Le maggioranze tengono corretto un registro replicato; persa la maggioranza, letture e scritture si fermano.'],
+  ['Replication', 'Replicazione'],
   ['Chandy-Lamport snapshot on FIFO channels', 'Snapshot di Chandy-Lamport su canali FIFO'],
   ['A Lamport counter and a vector clock side by side: what each one can and cannot tell you.', 'Un contatore di Lamport e un clock vettoriale a confronto: cosa sa dire ciascuno e cosa no.'],
   ['Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.', 'I marker tagliano l\'esecuzione in modo consistente, finché i canali non smettono di essere FIFO e le monete spariscono.'],
@@ -5578,6 +5581,133 @@ EXAMPLES.push({
   })
 });
 
+const REGISTER_CODE = `// A read-write register replicated on every process, kept correct by majority quorums.
+// Writing: stamp the value and wait for a majority to store it.
+// Reading: ask everybody, take the value with the highest stamp, write it back to a
+// majority before returning it, so that the next reader cannot see anything older.
+interface Register
+  request Write(v)
+  request Read()
+  indication WriteReturn()
+  indication ReadReturn(v)
+end
+
+algorithm MajorityRegister
+  implements Register as reg
+  uses Net as net
+  state
+    stable ts := 0
+    stable val := nil
+    stable wrote := nil
+    sn := 0
+    acks := 0
+    answers := map()
+    phase := nil
+    pending := nil
+    got := nil
+
+  // ---- the replica every process keeps
+  upon event ⟨net, Deliver | p, [READ, r]⟩ do
+    trigger ⟨net, Send | p, [VALUE, r, ts, val]⟩
+  end
+
+  upon event ⟨net, Deliver | p, [STORE, r, t, v]⟩ do
+    if t > ts then
+      ts := t
+      val := v
+    end
+    trigger ⟨net, Send | p, [ACK, r]⟩
+  end
+
+  // ---- the operation this process is running
+  upon event ⟨reg, Write | v⟩ where phase = nil do
+    sn := sn + 1
+    phase := READING
+    pending := v
+    wrote := v
+    answers := map()
+    acks := 0
+    forall q in Π do
+      trigger ⟨net, Send | q, [READ, sn]⟩
+    end
+  end
+
+  upon event ⟨reg, Read⟩ where phase = nil do
+    sn := sn + 1
+    phase := READING
+    pending := nil
+    answers := map()
+    acks := 0
+    forall q in Π do
+      trigger ⟨net, Send | q, [READ, sn]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [VALUE, r, t, v]⟩ where r = sn and phase = READING do
+    answers[p] := [t, v]
+    if 2 * #keys(answers) > N then
+      call impose()
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [ACK, r]⟩ where r = sn and phase = WRITING do
+    acks := acks + 1
+    if 2 * acks > N then
+      phase := nil
+      if pending ≠ nil then
+        trigger ⟨reg, WriteReturn⟩
+      else
+        got := val
+        trigger ⟨reg, ReadReturn | val⟩
+      end
+    end
+  end
+
+  // second phase: store the value that will be returned, on a majority
+  function impose()
+    best := 0
+    chosen := nil
+    forall q in keys(answers) do
+      if answers[q][0] ≥ best then
+        best := answers[q][0]
+        chosen := answers[q][1]
+      end
+    end
+    phase := WRITING
+    acks := 0
+    if pending ≠ nil then
+      ts := best + 1
+      val := pending
+    else
+      ts := best
+      val := chosen
+    end
+    forall q in Π do
+      trigger ⟨net, Send | q, [STORE, sn, ts, val]⟩
+    end
+  end
+end
+
+// A read never returns a value nobody wrote, and never an older one than what the writer holds.
+property ReadsAreValid always
+  #{p in Π where got[p] ≠ nil and got[p] ≠ wrote[1]} = 0
+end
+
+// The operations finish: both readers get an answer.
+property OperationsReturn eventually
+  #{p in Π where got[p] ≠ nil} ≥ 2
+end
+`;
+
+EXAMPLES.push({
+  key: 'quorum-register',
+  title: 'Majority-quorum register (read and write)',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'async', code: REGISTER_CODE, top: 'MajorityRegister',
+    inputs: '0ms 1 Write | 42\n60ms 3 Read\n80ms 5 Read', stopAt: '2s'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -5593,7 +5723,8 @@ const META = {
   'mutual-exclusion': { category: 'Coordination', summary: 'Timestamped requests and deferred replies keep two processes out of the critical section.' },
   'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' },
   'logical-clocks': { category: 'Logical time', summary: 'A Lamport counter and a vector clock side by side: what each one can and cannot tell you.' },
-  'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' }
+  'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
+  'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 
@@ -10063,6 +10194,133 @@ EXAMPLES.push({
   })
 });
 
+const REGISTER_CODE = `// A read-write register replicated on every process, kept correct by majority quorums.
+// Writing: stamp the value and wait for a majority to store it.
+// Reading: ask everybody, take the value with the highest stamp, write it back to a
+// majority before returning it, so that the next reader cannot see anything older.
+interface Register
+  request Write(v)
+  request Read()
+  indication WriteReturn()
+  indication ReadReturn(v)
+end
+
+algorithm MajorityRegister
+  implements Register as reg
+  uses Net as net
+  state
+    stable ts := 0
+    stable val := nil
+    stable wrote := nil
+    sn := 0
+    acks := 0
+    answers := map()
+    phase := nil
+    pending := nil
+    got := nil
+
+  // ---- the replica every process keeps
+  upon event ⟨net, Deliver | p, [READ, r]⟩ do
+    trigger ⟨net, Send | p, [VALUE, r, ts, val]⟩
+  end
+
+  upon event ⟨net, Deliver | p, [STORE, r, t, v]⟩ do
+    if t > ts then
+      ts := t
+      val := v
+    end
+    trigger ⟨net, Send | p, [ACK, r]⟩
+  end
+
+  // ---- the operation this process is running
+  upon event ⟨reg, Write | v⟩ where phase = nil do
+    sn := sn + 1
+    phase := READING
+    pending := v
+    wrote := v
+    answers := map()
+    acks := 0
+    forall q in Π do
+      trigger ⟨net, Send | q, [READ, sn]⟩
+    end
+  end
+
+  upon event ⟨reg, Read⟩ where phase = nil do
+    sn := sn + 1
+    phase := READING
+    pending := nil
+    answers := map()
+    acks := 0
+    forall q in Π do
+      trigger ⟨net, Send | q, [READ, sn]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [VALUE, r, t, v]⟩ where r = sn and phase = READING do
+    answers[p] := [t, v]
+    if 2 * #keys(answers) > N then
+      call impose()
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [ACK, r]⟩ where r = sn and phase = WRITING do
+    acks := acks + 1
+    if 2 * acks > N then
+      phase := nil
+      if pending ≠ nil then
+        trigger ⟨reg, WriteReturn⟩
+      else
+        got := val
+        trigger ⟨reg, ReadReturn | val⟩
+      end
+    end
+  end
+
+  // second phase: store the value that will be returned, on a majority
+  function impose()
+    best := 0
+    chosen := nil
+    forall q in keys(answers) do
+      if answers[q][0] ≥ best then
+        best := answers[q][0]
+        chosen := answers[q][1]
+      end
+    end
+    phase := WRITING
+    acks := 0
+    if pending ≠ nil then
+      ts := best + 1
+      val := pending
+    else
+      ts := best
+      val := chosen
+    end
+    forall q in Π do
+      trigger ⟨net, Send | q, [STORE, sn, ts, val]⟩
+    end
+  end
+end
+
+// A read never returns a value nobody wrote, and never an older one than what the writer holds.
+property ReadsAreValid always
+  #{p in Π where got[p] ≠ nil and got[p] ≠ wrote[1]} = 0
+end
+
+// The operations finish: both readers get an answer.
+property OperationsReturn eventually
+  #{p in Π where got[p] ≠ nil} ≥ 2
+end
+`;
+
+EXAMPLES.push({
+  key: 'quorum-register',
+  title: 'Majority-quorum register (read and write)',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'async', code: REGISTER_CODE, top: 'MajorityRegister',
+    inputs: '0ms 1 Write | 42\n60ms 3 Read\n80ms 5 Read', stopAt: '2s'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -10078,7 +10336,8 @@ const META = {
   'mutual-exclusion': { category: 'Coordination', summary: 'Timestamped requests and deferred replies keep two processes out of the critical section.' },
   'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' },
   'logical-clocks': { category: 'Logical time', summary: 'A Lamport counter and a vector clock side by side: what each one can and cannot tell you.' },
-  'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' }
+  'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
+  'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 

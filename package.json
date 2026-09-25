@@ -1,6 +1,6 @@
 {
   "name": "distributed-systems-playground",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Web app to simulate distributed algorithms with an interactive topology, upon-event pseudocode and a parametric timing model",
   "private": true,
   "homepage": "https://engineering87.github.io/distributed-systems-playground/",

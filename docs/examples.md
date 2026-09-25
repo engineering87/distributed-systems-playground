@@ -20,6 +20,7 @@ For every example this page gives the setup, what to watch, a few experiments, a
 - [Two-phase commit and the blocked participants](#two-phase-commit-and-the-blocked-participants)
 - [Logical clocks: Lamport and vector](#logical-clocks-lamport-and-vector)
 - [Chandy-Lamport snapshot on FIFO channels](#chandy-lamport-snapshot-on-fifo-channels)
+- [Majority-quorum register](#majority-quorum-register)
 - [Empty scenario](#empty-scenario)
 
 ## Flooding broadcast
@@ -265,6 +266,27 @@ Four processes start with 100 coins each and move them around. At 6 ms p1 is ask
 - **Turn off FIFO channels** in the *Timing* tab and run seeds 11 and 13. The recorded total becomes 370: coins vanish, because a marker can overtake a coin that should have been counted in flight. FIFO is not a detail of the algorithm, it is its hypothesis.
 - Move the `Snap` request later, after every transfer has arrived: the cut becomes the obvious one, with no messages in flight.
 - Ask two processes to snapshot at the same moment: the markers meet, and the cut is still consistent.
+
+## Majority-quorum register
+
+**Topic:** replication that survives a minority · **Model:** asynchronous · **Topology:** complete graph of 5 · **Seed:** 3
+
+Every process keeps a copy of one register. Writing stamps the value and waits for a majority to store it. Reading asks everybody, takes the value with the highest stamp, and **writes it back** to a majority before returning: without that second phase, a later reader could still see an older value. p1 writes 42, then p3 and p5 read.
+
+**What to watch.** Both readers return 42, and the two declared properties hold: *ReadsAreValid* (`always`, a read never returns something other than what the writer holds) and *OperationsReturn* (`eventually`, the operations finish).
+
+**Try this.** These four runs are the whole theory of quorums, and the [behaviour profile](interface.md#batch-runs) shows them in four rows:
+
+| Condition | What happens |
+|---|---|
+| no faults | everybody returns |
+| **a minority crashes** (p2 and p4) | everybody still returns: a majority is alive, and every majority meets every other |
+| **a majority crashes** (p2, p4 and p5) | nothing returns. *ReadsAreValid* still holds, *OperationsReturn* is broken: safety never depends on how many are alive, liveness always does |
+| **a partition 3 \| 2** | the side with p1, p2 and p3 keeps working; p5, alone with p4, waits forever |
+
+Run the profile over ten seeds and the point becomes a rule: *ReadsAreValid* holds under **every** condition, while *OperationsReturn* falls under crashes, partitions and a zone going down. A quorum system does not trade safety for availability; it gives up availability to keep safety.
+
+**Keep in mind.** The replica state is `stable`, so a process that comes back still has its data, as a replicated store on disk would. This is a single-writer register, so timestamps never collide. With several writers the stamps have to carry the identity of the writer as well, and the read-back phase becomes essential rather than merely useful.
 
 ## Empty scenario
 

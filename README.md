@@ -241,6 +241,7 @@ Every algorithm below ships as a scenario: the code in Upon, a topology, a timin
 | **Two-phase commit** | asynchronous | everybody commits together, and the participants block when the coordinator crashes in between | agreement, termination |
 | **Logical clocks** | asynchronous | a Lamport counter and a vector clock side by side: what each one orders and what it refuses to order | own entry is highest, everybody ticks |
 | **Chandy-Lamport snapshot** | asynchronous, FIFO | a consistent cut of a running system, and the coins that go missing as soon as channels stop being FIFO | conservation, snapshot once |
+| **Majority-quorum register** | asynchronous | replication that survives a minority: safety under every fault, liveness only while a majority is reachable | reads are valid, operations return |
 
 Ten more algorithms come as **library modules** you can build on, written in the same language: stubborn, perfect and FIFO links, best-effort, reliable, uniform reliable, FIFO, causal and probabilistic broadcast. See [the module library](docs/library.md).
 
@@ -659,6 +660,7 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Two-phase commit | asynchronous | complete graph of 4 | Crash the coordinator at `25ms` and watch the participants block. |
 | Logical clocks | asynchronous | complete graph of 4 | Remove the `max` and watch the assertion fail. |
 | Chandy-Lamport snapshot | asynchronous, FIFO | complete graph of 4 | Turn FIFO off and run seeds 11 and 13: the cut loses coins. |
+| Majority-quorum register | asynchronous | complete graph of 5 | Crash three of five and watch safety hold while liveness stops. |
 
 The *Example* menu also offers an empty scenario to start from.
 

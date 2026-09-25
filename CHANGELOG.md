@@ -6,6 +6,12 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.20.0]
+
+### Added
+- Majority-quorum register (read and write with a write-back phase), with validity of reads and termination of operations as properties, and a replica state that survives a recovery. Its behaviour profile shows safety holding under every fault condition and liveness falling with the majority.
+- New gallery category: *Replication*.
+
 ## [0.19.0]
 
 ### Added

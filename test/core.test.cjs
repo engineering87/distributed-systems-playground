@@ -778,3 +778,42 @@ test('a snapshot records a consistent cut, and loses coins without FIFO channels
   });
   assert.ok(lost.some(x => x.total < 400 && !x.ok), 'a non-FIFO run records less than everything: ' + JSON.stringify(lost));
 });
+
+test('a majority register keeps safety under every fault, and liveness only with a majority', () => {
+  const base = byKey('quorum-register');
+  const run = faults => C.runSimulation(Object.assign(clone(base), { faults }));
+  const value = r => [...new Set(r.outputs.filter(o => o.ev === 'ReadReturn').map(o => o.args[0]))];
+
+  const clean = run([]);
+  assert.equal(clean.error, null);
+  assert.ok(clean.properties.every(p => p.ok));
+  assert.deepEqual(value(clean), ['42'], 'both readers see the written value');
+
+  // a minority can crash: every majority meets every other one
+  const minority = run([{ type: 'crash', node: 2, at: '10ms' }, { type: 'crash', node: 4, at: '12ms' }]);
+  assert.ok(minority.properties.every(p => p.ok), 'reads and writes still return');
+  assert.deepEqual(value(minority), ['42']);
+
+  // a majority cannot: safety holds, liveness does not
+  const majority = run([{ type: 'crash', node: 2, at: '10ms' }, { type: 'crash', node: 4, at: '12ms' }, { type: 'crash', node: 5, at: '14ms' }]);
+  assert.equal(majority.properties.find(p => p.name === 'ReadsAreValid').ok, true);
+  assert.equal(majority.properties.find(p => p.name === 'OperationsReturn').ok, false);
+  assert.equal(majority.outputs.length, 0, 'nothing returns');
+
+  // on the two sides of a partition, only the side with a majority makes progress
+  const split = run([{ type: 'partition', groups: '1 2 3', from: '20ms', to: '2s' }]);
+  assert.equal(split.properties.find(p => p.name === 'ReadsAreValid').ok, true);
+  const returned = [...new Set(split.outputs.map(o => o.node))].sort();
+  assert.ok(returned.includes(3) && !returned.includes(5), 'p3 returns, p5 waits: ' + returned.join(','));
+});
+
+test('the register never loses safety in a behaviour profile', () => {
+  const R = require('../src/runner.js');
+  const prof = R.profile(byKey('quorum-register'), { seeds: '1..10', faultWindow: '0..80ms' });
+  for (const row of prof.rows) {
+    const safety = row.properties.find(p => p.name === 'ReadsAreValid');
+    assert.equal(safety.failed, 0, 'safety holds under ' + row.name);
+  }
+  const liveness = prof.rows.filter(r => (r.properties.find(p => p.name === 'OperationsReturn') || {}).failed);
+  assert.ok(liveness.length >= 3, 'liveness is what the faults take away: ' + liveness.map(r => r.name).join(', '));
+});
