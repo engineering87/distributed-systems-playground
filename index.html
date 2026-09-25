@@ -4203,6 +4203,8 @@ const P = (re, fn) => PAT.push([re, fn]);
   ['Majority-quorum register (read and write)', 'Registro a quorum maggioritario (lettura e scrittura)'],
   ['Total order broadcast with a sequencer', 'Total order broadcast con sequenziatore'],
   ['Paxos: consensus on one value', 'Paxos: consenso su un valore'],
+  ['Ben-Or: consensus with a coin', 'Ben-Or: consenso con una moneta'],
+  ['When the processes cannot agree, they toss a coin: randomness buys the termination that FLP denies.', 'Quando i processi non riescono ad accordarsi lanciano una moneta: la casualità compra la terminazione che FLP nega.'],
   ['Two proposers compete, majorities meet, and one value wins: safety never depends on who crashes.', 'Due proponenti competono, le maggioranze si incontrano e vince un valore: la sicurezza non dipende da chi cade.'],
   ['One process decides the order and everybody follows it — until that process is the one that crashes.', 'Un processo decide l\'ordine e tutti lo seguono, finché a cadere non è proprio quel processo.'],
   ['Majorities keep a replicated register correct; lose one and reads and writes simply stop.', 'Le maggioranze tengono corretto un registro replicato; persa la maggioranza, letture e scritture si fermano.'],
@@ -5925,6 +5927,140 @@ EXAMPLES.push({
   })
 });
 
+const BENOR_CODE = `// Ben-Or: randomized binary consensus in an asynchronous system.
+// Each round has two phases. In the first everybody reports its value and waits
+// for N - F reports: a value held by more than half becomes a proposal, otherwise
+// the process proposes NONE. In the second everybody reports that proposal and
+// waits for N - F of them: more than F equal proposals decide, a single one is
+// adopted, none at all means the process tosses a coin.
+// The coin is why FLP does not apply: no schedule can keep the processes apart
+// for ever, because eventually they all toss the same way.
+interface Consensus
+  request Propose(v)
+  indication Decide(v)
+end
+
+algorithm BenOr
+  implements Consensus as cons
+  uses Net as net
+  params
+    F := 2
+  state
+    v := nil
+    r := 0
+    phase := nil
+    p1 := map()
+    p2 := map()
+    proposed := nil
+    decided := nil
+    coins := 0
+    extra := 0
+
+  upon event ⟨cons, Propose | x⟩ where v = nil do
+    v := x
+    proposed := x
+    r := 1
+    phase := ONE
+    forall q in Π do
+      trigger ⟨net, Send | q, [VOTE, r, v]⟩
+    end
+  end
+
+  upon event ⟨cons, Propose | x⟩ where v ≠ nil do
+    skip
+  end
+
+  upon event ⟨net, Deliver | q, [VOTE, k, x]⟩ do
+    p1[[k, q]] := x
+    call tryPhaseOne()
+  end
+
+  upon event ⟨net, Deliver | q, [PROP, k, x]⟩ do
+    p2[[k, q]] := x
+    call tryPhaseTwo()
+  end
+
+  // first phase: a value held by more than half becomes this round's proposal
+  function tryPhaseOne()
+    if phase = ONE and #{q in Π where p1[[r, q]] ≠ nil} ≥ N - F then
+      w := NONE
+      forall x in {0, 1} do
+        if 2 * #{q in Π where p1[[r, q]] = x} > N then
+          w := x
+        end
+      end
+      phase := TWO
+      forall q in Π do
+        trigger ⟨net, Send | q, [PROP, r, w]⟩
+      end
+      call tryPhaseTwo()
+    end
+  end
+
+  // second phase: more than F equal proposals decide, one is adopted, none means a coin
+  function tryPhaseTwo()
+    if phase = TWO and #{q in Π where p2[[r, q]] ≠ nil} ≥ N - F then
+      support := nil
+      forall x in {0, 1} do
+        if #{q in Π where p2[[r, q]] = x} ≥ 1 then
+          support := x
+        end
+        if #{q in Π where p2[[r, q]] = x} > F and decided = nil then
+          decided := x
+          trigger ⟨cons, Decide | x⟩
+        end
+      end
+      if support ≠ nil then
+        v := support
+      else
+        v := random(0, 1)
+        coins := coins + 1
+      end
+      // a process that has decided runs one more round, to carry its value to
+      // the others, and then stops: without that round the slow ones would wait
+      if decided ≠ nil then
+        extra := extra + 1
+      end
+      if extra > 1 then
+        phase := DONE
+      else
+        r := r + 1
+        phase := ONE
+        forall q in Π do
+          trigger ⟨net, Send | q, [VOTE, r, v]⟩
+        end
+        call tryPhaseOne()
+      end
+    end
+  end
+end
+
+// Nobody decides differently, and a decided value is one that somebody proposed.
+property Agreement always
+  #toset(values(defined(decided))) ≤ 1
+end
+
+property Validity always
+  #{p in Π where decided[p] ≠ nil and decided[p] ∉ toset(values(defined(proposed)))} = 0
+end
+
+// Everybody decides — with probability one, not with certainty: this says only
+// that it happened within the simulated duration.
+property Termination eventually
+  #{p in correct where decided[p] = nil} = 0
+end
+`;
+
+EXAMPLES.push({
+  key: 'ben-or',
+  title: 'Ben-Or: consensus with a coin',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'async', code: BENOR_CODE, top: 'BenOr',
+    inputs: '0ms 1 Propose | 1\n0ms 2 Propose | 1\n0ms 3 Propose | 1\n0ms 4 Propose | 0\n0ms 5 Propose | 0',
+    stopAt: '2s'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -5943,7 +6079,8 @@ const META = {
   'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
   'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' },
   'total-order': { category: 'Broadcast', summary: 'One process decides the order and everybody follows it — until that process is the one that crashes.' },
-  'paxos': { category: 'Consensus', summary: 'Two proposers compete, majorities meet, and one value wins: safety never depends on who crashes.' }
+  'paxos': { category: 'Consensus', summary: 'Two proposers compete, majorities meet, and one value wins: safety never depends on who crashes.' },
+  'ben-or': { category: 'Consensus', summary: 'When the processes cannot agree, they toss a coin: randomness buys the termination that FLP denies.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 
@@ -10753,6 +10890,140 @@ EXAMPLES.push({
   })
 });
 
+const BENOR_CODE = `// Ben-Or: randomized binary consensus in an asynchronous system.
+// Each round has two phases. In the first everybody reports its value and waits
+// for N - F reports: a value held by more than half becomes a proposal, otherwise
+// the process proposes NONE. In the second everybody reports that proposal and
+// waits for N - F of them: more than F equal proposals decide, a single one is
+// adopted, none at all means the process tosses a coin.
+// The coin is why FLP does not apply: no schedule can keep the processes apart
+// for ever, because eventually they all toss the same way.
+interface Consensus
+  request Propose(v)
+  indication Decide(v)
+end
+
+algorithm BenOr
+  implements Consensus as cons
+  uses Net as net
+  params
+    F := 2
+  state
+    v := nil
+    r := 0
+    phase := nil
+    p1 := map()
+    p2 := map()
+    proposed := nil
+    decided := nil
+    coins := 0
+    extra := 0
+
+  upon event ⟨cons, Propose | x⟩ where v = nil do
+    v := x
+    proposed := x
+    r := 1
+    phase := ONE
+    forall q in Π do
+      trigger ⟨net, Send | q, [VOTE, r, v]⟩
+    end
+  end
+
+  upon event ⟨cons, Propose | x⟩ where v ≠ nil do
+    skip
+  end
+
+  upon event ⟨net, Deliver | q, [VOTE, k, x]⟩ do
+    p1[[k, q]] := x
+    call tryPhaseOne()
+  end
+
+  upon event ⟨net, Deliver | q, [PROP, k, x]⟩ do
+    p2[[k, q]] := x
+    call tryPhaseTwo()
+  end
+
+  // first phase: a value held by more than half becomes this round's proposal
+  function tryPhaseOne()
+    if phase = ONE and #{q in Π where p1[[r, q]] ≠ nil} ≥ N - F then
+      w := NONE
+      forall x in {0, 1} do
+        if 2 * #{q in Π where p1[[r, q]] = x} > N then
+          w := x
+        end
+      end
+      phase := TWO
+      forall q in Π do
+        trigger ⟨net, Send | q, [PROP, r, w]⟩
+      end
+      call tryPhaseTwo()
+    end
+  end
+
+  // second phase: more than F equal proposals decide, one is adopted, none means a coin
+  function tryPhaseTwo()
+    if phase = TWO and #{q in Π where p2[[r, q]] ≠ nil} ≥ N - F then
+      support := nil
+      forall x in {0, 1} do
+        if #{q in Π where p2[[r, q]] = x} ≥ 1 then
+          support := x
+        end
+        if #{q in Π where p2[[r, q]] = x} > F and decided = nil then
+          decided := x
+          trigger ⟨cons, Decide | x⟩
+        end
+      end
+      if support ≠ nil then
+        v := support
+      else
+        v := random(0, 1)
+        coins := coins + 1
+      end
+      // a process that has decided runs one more round, to carry its value to
+      // the others, and then stops: without that round the slow ones would wait
+      if decided ≠ nil then
+        extra := extra + 1
+      end
+      if extra > 1 then
+        phase := DONE
+      else
+        r := r + 1
+        phase := ONE
+        forall q in Π do
+          trigger ⟨net, Send | q, [VOTE, r, v]⟩
+        end
+        call tryPhaseOne()
+      end
+    end
+  end
+end
+
+// Nobody decides differently, and a decided value is one that somebody proposed.
+property Agreement always
+  #toset(values(defined(decided))) ≤ 1
+end
+
+property Validity always
+  #{p in Π where decided[p] ≠ nil and decided[p] ∉ toset(values(defined(proposed)))} = 0
+end
+
+// Everybody decides — with probability one, not with certainty: this says only
+// that it happened within the simulated duration.
+property Termination eventually
+  #{p in correct where decided[p] = nil} = 0
+end
+`;
+
+EXAMPLES.push({
+  key: 'ben-or',
+  title: 'Ben-Or: consensus with a coin',
+  scenario: catalogScenario({
+    n: 5, seed: 3, preset: 'async', code: BENOR_CODE, top: 'BenOr',
+    inputs: '0ms 1 Propose | 1\n0ms 2 Propose | 1\n0ms 3 Propose | 1\n0ms 4 Propose | 0\n0ms 5 Propose | 0',
+    stopAt: '2s'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -10771,7 +11042,8 @@ const META = {
   'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
   'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' },
   'total-order': { category: 'Broadcast', summary: 'One process decides the order and everybody follows it — until that process is the one that crashes.' },
-  'paxos': { category: 'Consensus', summary: 'Two proposers compete, majorities meet, and one value wins: safety never depends on who crashes.' }
+  'paxos': { category: 'Consensus', summary: 'Two proposers compete, majorities meet, and one value wins: safety never depends on who crashes.' },
+  'ben-or': { category: 'Consensus', summary: 'When the processes cannot agree, they toss a coin: randomness buys the termination that FLP denies.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 

@@ -23,6 +23,7 @@ For every example this page gives the setup, what to watch, a few experiments, a
 - [Majority-quorum register](#majority-quorum-register)
 - [Total order broadcast with a sequencer](#total-order-broadcast-with-a-sequencer)
 - [Paxos: consensus on one value](#paxos-consensus-on-one-value)
+- [Ben-Or: consensus with a coin](#ben-or-consensus-with-a-coin)
 - [Empty scenario](#empty-scenario)
 
 ## Flooding broadcast
@@ -331,6 +332,25 @@ Safety costs nothing; liveness costs a majority. This is the shape of every quor
 - Add `link:0.5/s` faults: the decision survives, because a majority is still reachable.
 
 **Keep in mind.** This is one value, one round, no reconfiguration and no leader: a proposer that keeps being outbid never gives up. Real systems add a leader (Ω), a log of values and a way to change the membership.
+
+## Ben-Or: consensus with a coin
+
+**Topic:** buying termination with randomness · **Model:** asynchronous · **Topology:** complete graph of 5 · **Seed:** 3
+
+[Paxos](#paxos-consensus-on-one-value) keeps agreement whatever happens but cannot promise to finish: that is FLP. Ben-Or finishes, with probability one, by giving up determinism.
+
+Three processes propose 1 and two propose 0. Each round has two phases: everybody reports its value and waits for `N - F` reports, and a value held by more than half becomes that process's proposal; then everybody reports that proposal and waits for `N - F` of them. More than `F` equal proposals decide; a single one is adopted; none at all, and the process **tosses a coin**. A process that has decided runs one more round to carry its value to the others, then stops.
+
+**What to watch.** With seed 3 everybody decides 0, although 0 was the minority proposal: nothing in the algorithm favours the majority, and the coin can carry either value. Change the seed and the decision changes with it — over twenty seeds the outcome is 0 in about half of them — while *Agreement* and *Validity* hold in every one.
+
+**Try this.**
+
+- **Run a batch over `1..20`**: every seed terminates, the median run costs about 255 messages and the last process decides around 240 ms, but the spread is wide. That spread *is* the algorithm: it terminates with probability one, not within a bound.
+- Make everybody propose the same value: the first round decides, with no coin at all.
+- Crash one process at `20ms`: with `F = 2` the remaining four still make progress.
+- Crash three: nothing decides, and nothing decides wrongly.
+
+**Keep in mind.** The coin is local, not shared: each process tosses its own. That is enough because a schedule that keeps the processes apart has to win every toss, and its chances halve at every round. With a shared coin the expected number of rounds would be constant rather than exponential in the worst case.
 
 ## Empty scenario
 

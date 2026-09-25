@@ -244,6 +244,7 @@ Every algorithm below ships as a scenario: the code in Upon, a topology, a timin
 | **Majority-quorum register** | asynchronous | replication that survives a minority: safety under every fault, liveness only while a majority is reachable | reads are valid, operations return |
 | **Total order broadcast** | asynchronous | one process decides the order and everybody follows, until that process crashes | total order, everybody delivers |
 | **Paxos** | asynchronous | two proposers competing, majorities meeting, one value winning: agreement under every fault, termination only with a majority | agreement, validity, termination |
+| **Ben-Or** | asynchronous | randomized consensus: when the processes cannot agree they toss a coin, and the decision changes with the seed | agreement, validity, termination |
 
 Ten more algorithms come as **library modules** you can build on, written in the same language: stubborn, perfect and FIFO links, best-effort, reliable, uniform reliable, FIFO, causal and probabilistic broadcast. See [the module library](docs/library.md).
 
@@ -665,6 +666,7 @@ The full format is described in [section 6 of the specification](docs/SPEC.md#6-
 | Majority-quorum register | asynchronous | complete graph of 5 | Crash three of five and watch safety hold while liveness stops. |
 | Total order broadcast | asynchronous | complete graph of 4 | Crash the sequencer and watch order survive while progress stops. |
 | Paxos | asynchronous | complete graph of 5 | Make both proposals start at `0ms` and watch the ballots interleave. |
+| Ben-Or | asynchronous | complete graph of 5 | Run seeds 1 to 20 and watch the decision, and the number of rounds, change. |
 
 The *Example* menu also offers an empty scenario to start from.
 

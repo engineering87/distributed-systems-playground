@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.23.0]
+
+### Added
+- Ben-Or randomized consensus, with agreement, validity and termination as properties. The decided value and the number of rounds change with the seed, which is what a randomized algorithm looks like: it terminates with probability one, not within a bound.
+
 ## [0.22.0]
 
 ### Added

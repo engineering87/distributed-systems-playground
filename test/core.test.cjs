@@ -875,3 +875,37 @@ test('Paxos never loses safety in a behaviour profile', () => {
   const lost = prof.rows.filter(r => (r.properties.find(p => p.name === 'Termination') || {}).failed);
   assert.ok(lost.length >= 2, 'termination is what the faults take away: ' + lost.map(r => r.name).join(', '));
 });
+
+test('Ben-Or decides with a coin, and the seed decides what', () => {
+  const base = byKey('ben-or');
+  const outcomes = [];
+  for (let seed = 1; seed <= 20; seed++) {
+    const r = C.runSimulation(Object.assign(clone(base), { seed }));
+    assert.equal(r.error, null, 'seed ' + seed);
+    assert.ok(r.properties.every(p => p.ok), 'every property holds at seed ' + seed);
+    assert.equal(r.outputs.length, 5, 'everybody decides at seed ' + seed);
+    const values = [...new Set(r.outputs.map(o => o.args[0]))];
+    assert.equal(values.length, 1);
+    outcomes.push({ seed, value: values[0], msgs: r.msgs.length });
+  }
+  const distinct = [...new Set(outcomes.map(o => o.value))].sort();
+  assert.deepEqual(distinct, ['0', '1'], 'the coin carries both values across seeds');
+  const costs = outcomes.map(o => o.msgs).sort((a, b) => a - b);
+  assert.ok(costs[19] > costs[0], 'the cost varies: ' + costs[0] + ' to ' + costs[19]);
+
+  // unanimous proposals need no coin at all, and cost far less
+  const same = clone(base);
+  same.inputs = '0ms * Propose | 1';
+  const unanimous = C.runSimulation(same);
+  assert.ok(unanimous.properties.every(p => p.ok));
+  assert.ok(unanimous.msgs.length < costs[0], 'agreeing from the start is cheaper: ' + unanimous.msgs.length);
+
+  // one crash is tolerated with F = 2; a majority crashing stops the decision without breaking it
+  const one = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'crash', node: 5, at: '20ms' }] }));
+  assert.ok(one.properties.every(p => p.ok), 'four processes still decide');
+  const three = C.runSimulation(Object.assign(clone(base), {
+    faults: [{ type: 'crash', node: 3, at: '20ms' }, { type: 'crash', node: 4, at: '22ms' }, { type: 'crash', node: 5, at: '24ms' }]
+  }));
+  assert.equal(three.properties.find(p => p.name === 'Agreement').ok, true);
+  assert.equal(three.properties.find(p => p.name === 'Termination').ok, false);
+});
