@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.14.0]
+
+### Added
+- **Draw** and **Redraw** in the *Scenario* tab: a random fault schedule for the run in front of you, of the kinds and within the window you name. The drawn faults become ordinary faults of the scenario, so they can be run, watched, edited and exported.
+
 ## [0.13.1]
 
 ### Changed

@@ -50,6 +50,24 @@ async def main():
         await pg.click('#g-nodes [data-node="2"]')
         await pg.click('#props button:has-text("Pause here")'); await pg.wait_for_timeout(900); await pause()
         check('p2 paused from' in await pg.inner_text('#faults'), 'pause injected at the cursor: ' + [l for l in (await pg.inner_text('#faults')).split('\n') if 'p2' in l][:1].__str__())
+        # random faults on a single run
+        await pg.select_option('#example','epfd'); await pg.wait_for_timeout(900); await pause()
+        await pg.click('[data-tab=scen]')
+        before = len((await pg.inner_text('#faults')).split('Remove')) - 1
+        await pg.fill('#rnd-faults','crash:1,partition:1'); await pg.fill('#rnd-window','0..2s')
+        await pg.click('#btn-rnd-faults'); await pg.wait_for_timeout(300)
+        after = len((await pg.inner_text('#faults')).split('Remove')) - 1
+        check(after == before + 2, f'a draw adds its faults to the scenario ({before} -> {after})')
+        check('Faults drawn:' in await pg.inner_text('#toast'), 'the draw is reported: ' + (await pg.inner_text('#toast'))[:80])
+        first = await pg.inner_text('#faults')
+        await pg.click('#btn-rnd-replace'); await pg.wait_for_timeout(300)
+        second = await pg.inner_text('#faults')
+        check(len(second.split('Remove')) - 1 == 2 and second != first, 'redraw replaces them with a different schedule')
+        await pg.click('#btn-run'); await pg.wait_for_timeout(1200); await pause()
+        check('events processed' in await pg.inner_text('#status') or 'Time limit' in await pg.inner_text('#status'),
+              'the run with drawn faults works: ' + (await pg.inner_text('#status'))[:60])
+        await pg.fill('#rnd-faults','nope:1'); await pg.click('#btn-rnd-faults')
+        check('Unknown fault plan' in await pg.inner_text('#toast'), 'a bad plan is reported')
         print(errs or 'no errors')
         await b.close()
 try:

@@ -253,7 +253,7 @@ test('injecting a partition later leaves the earlier trace unchanged', () => {
 
 test('fault definitions are validated', () => {
   assert.deepEqual(C.normalizeFault({ type: 'partition', groups: 'p1 2 | 3', from: '1s', to: '' }),
-    { type: 'partition', groups: [[1, 2], [3]], from: 1000000, to: null });
+    { type: 'partition', groups: [[1, 2], [3]], from: 1000000, to: null, oneWay: false });
   assert.throws(() => C.normalizeFault({ type: 'link', a: 1, b: 1, from: '0ms' }), /two different/);
   assert.throws(() => C.normalizeFault({ type: 'partition', groups: '1 2 | 2 3', from: '0ms' }), /more than one/);
   assert.throws(() => C.normalizeFault({ type: 'link', a: 1, b: 2, from: '2s', to: '1s' }), /after the start/);
@@ -691,4 +691,53 @@ test('two-phase commit commits together, and blocks when the coordinator crashes
 
   const late = C.runSimulation(Object.assign(clone(byKey('two-phase-commit')), { faults: [{ type: 'crash', node: 1, at: '60ms' }] }));
   assert.ok(late.properties.every(p => p.ok), 'a crash after the announcement changes nothing');
+});
+
+// ---------------------------------------------------------------- faults armed by a condition
+test('a fault can wait for a condition instead of a time', () => {
+  const base = byKey('two-phase-commit');
+  // the coordinator dies as soon as it has all but one vote: nobody ever decides
+  const early = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'crash', node: 1, when: '#keys(votes[1]) = N - 2' }] }));
+  assert.equal(early.error, null);
+  assert.equal(early.outputs.length, 0, 'nobody decides');
+  assert.equal(early.properties.find(p => p.name === 'Termination').ok, false);
+  const fired = early.log.filter(e => /armed by a condition/.test(e.text));
+  assert.equal(fired.length, 1);
+  assert.ok(fired[0].t > 0 && fired[0].t < 100000, 'it fired where the condition became true: ' + fired[0].t);
+
+  // the same fault armed after the last vote arrives: the announcement has already left
+  const late = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'crash', node: 1, when: '#keys(votes[1]) = N - 1' }] }));
+  assert.equal(late.outputs.length, 4, 'everybody decides');
+
+  // a condition that never holds fires nothing
+  const never = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'crash', node: 1, when: '#keys(votes[1]) > N' }] }));
+  assert.deepEqual(never.downs, {});
+  assert.equal(never.outputs.length, 4);
+});
+
+test('an armed fault that lasts uses "for", and a broken condition is reported', () => {
+  const base = byKey('omega-leader');
+  const paused = C.runSimulation(Object.assign(clone(base), {
+    faults: [{ type: 'pause', node: 1, when: '#toset(values(defined(leader))) = 1 and t > 3s', for: '2s' }]
+  }));
+  assert.equal(paused.error, null);
+  const pauses = paused.pauses[1];
+  assert.equal(pauses.length, 1);
+  assert.equal(pauses[0].to - pauses[0].from, 2000000, 'it lasts exactly two seconds');
+  assert.ok(pauses[0].from > 3000000);
+
+  const bad = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'crash', node: 1, when: 'leader' }] }));
+  assert.equal(bad.error, null, 'the run continues');
+  assert.ok(bad.log.some(e => e.kind === 'warn' && /is not a boolean/.test(e.text)));
+  assert.throws(() => C.normalizeFault({ type: 'crash', node: 1, when: '#(' }), /does not parse/);
+});
+
+test('a partition can be one way', () => {
+  const base = byKey('epfd');
+  const both = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'partition', groups: '1', from: '1s', to: '3s' }] }));
+  const oneWay = C.runSimulation(Object.assign(clone(base), { faults: [{ type: 'partition', groups: '1', from: '1s', to: '3s', oneWay: true }] }));
+  const cut = r => [...new Set(r.msgs.filter(m => m.status === 'dropped-cut').map(m => m.from + '>' + m.to))].sort();
+  assert.ok(cut(both).some(x => x.startsWith('1>')) && cut(both).some(x => x.endsWith('>1')), 'both directions');
+  assert.ok(cut(oneWay).every(x => x.startsWith('1>')), 'only what leaves p1: ' + cut(oneWay).join(', '));
+  assert.equal(oneWay.netFaults.partitions[0].oneWay, true);
 });

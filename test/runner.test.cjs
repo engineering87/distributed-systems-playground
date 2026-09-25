@@ -258,3 +258,13 @@ test('the command line can shrink the schedules it generated', () => {
     return true;
   });
 });
+
+test('a zone plan crashes several processes at the same instant', () => {
+  const scn = scenarioOf('floodset');
+  const faults = R.planFaults('zone:1', '0..2s', scn, 1);
+  assert.ok(faults.length >= 2, 'more than one process falls');
+  assert.ok(faults.every(f => f.type === 'crash' && f.zone));
+  assert.equal(new Set(faults.map(f => f.at)).size, 1, 'they fall together');
+  assert.deepEqual(faults, R.planFaults('zone:1', '0..2s', scn, 1), 'the same seed gives the same zone');
+  assert.notDeepEqual(faults.map(f => f.node), R.planFaults('zone:1', '0..2s', scn, 2).map(f => f.node));
+});

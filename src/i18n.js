@@ -300,7 +300,25 @@ M('or', 'o');
 M('Run over many seeds', 'Esecuzione su molti semi');
 M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
-M('Seeds', 'Semi'); M('Faults per run', 'Guasti per esecuzione'); M('Generated faults per run', 'Guasti generati per esecuzione');
+M('Seeds', 'Semi');
+M('When', 'Quando'); M('Condition', 'Condizione'); M('For', 'Per');
+M('Fire the fault the first moment a condition holds, instead of at a fixed time', 'Fai scattare il guasto appena una condizione è vera, invece che a un istante fisso');
+M('Condition that fires the fault', 'Condizione che fa scattare il guasto');
+M('How long the fault lasts', 'Quanto dura il guasto');
+M('e.g. #keys(defined(decision)) ≥ 1', 'es. #keys(defined(decision)) ≥ 1');
+M('Only the messages leaving the first group are dropped', 'Si perdono solo i messaggi che escono dal primo gruppo');
+P(/^(.+) when (.+)$/, m => (tr(m[1]) || m[1]) + ' quando ' + m[2]);
+P(/^fault armed by a condition fired: (.+)$/, m => 'guasto armato scattato: ' + (tr(m[1]) || m[1]));
+P(/^fault condition "(.+)" could not be evaluated: (.+)$/, m => 'condizione del guasto "' + m[1] + '" non valutabile: ' + m[2]);
+P(/^fault condition "(.+)" is not a boolean$/, m => 'condizione del guasto "' + m[1] + '" non è booleana'); M('Random faults', 'Guasti casuali'); M('Random faults to draw', 'Guasti casuali da estrarre');
+M('When the random faults happen', 'Quando avvengono i guasti casuali');
+M('What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1', 'Cosa estrarre: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
+M('Draw', 'Estrai'); M('Redraw', 'Riestrai');
+M('Draw a schedule and add it to the scenario', 'Estrai uno schedule e aggiungilo allo scenario');
+M('Replace the faults of the scenario with a new draw', 'Sostituisci i guasti dello scenario con una nuova estrazione');
+M('Nothing could be drawn for this topology.', 'Non è stato possibile estrarre nulla per questa topologia.');
+P(/^Faults drawn: (.+)\.$/, m => 'Guasti estratti: ' + m[1] + '.');
+P(/^Faults replaced: (.+)\.$/, m => 'Guasti sostituiti: ' + m[1] + '.'); M('Faults per run', 'Guasti per esecuzione'); M('Generated faults per run', 'Guasti generati per esecuzione');
 M('Window', 'Finestra'); M('When the generated faults happen', 'Quando avvengono i guasti generati');
 M('Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1',
   'Guasti estratti dal seme di ogni esecuzione: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');

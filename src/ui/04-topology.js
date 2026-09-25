@@ -563,6 +563,16 @@ function withoutFromPartition(f, id) {
   return groups.length ? Object.assign({}, f, { groups: groups.map(g => g.join(' ')).join(' | ') }) : null;
 }
 function describeFault(f) {
+  if (f.when) {
+    const lasts = f.for || f.hold ? ' for ' + (f.for || C.fmtDuration(f.hold)) : '';
+    const what = f.type === 'crash' ? 'p' + f.node + ' crashes'
+      : f.type === 'recover' ? 'p' + f.node + ' recovers'
+        : f.type === 'pause' ? 'p' + f.node + ' pauses'
+          : f.type === 'omission' ? 'p' + f.node + ' omits its ' + (f.direction || 'both')
+            : f.type === 'link' ? (f.oneWay ? 'one-way link p' + f.a + ' → p' + f.b : 'link p' + f.a + '–p' + f.b) + ' goes down'
+              : (f.oneWay ? 'one-way partition ' : 'partition ') + f.groups;
+    return what + lasts + ' when ' + f.when;
+  }
   const until = f.to ? ' until ' + f.to : ' onwards';
   switch (f.type) {
     case 'crash': return 'p' + f.node + ' crashes at ' + f.at;

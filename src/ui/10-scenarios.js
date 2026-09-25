@@ -167,22 +167,59 @@ function bindHeader() {
   });
   $$('.tabs [data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
   $('#log-filter').addEventListener('change', renderLog);
+  // a field of the form that carries a time: hidden when the fault is armed by a condition instead
+  const isTimeField = e => {
+    const input = e.querySelector('input');
+    return !!input && ['fault-at', 'fault-from', 'fault-to', 'fault-to2'].includes(input.id);
+  };
   const syncFaultForm = () => {
     const type = $('#fault-type').value;
-    $$('[data-ft]').forEach(e => { e.hidden = !e.dataset.ft.split(' ').includes(type); });
+    const armed = $('#fault-armed').checked;
+    $$('[data-ft]').forEach(e => {
+      const kinds = e.dataset.ft.split(' ');
+      if (kinds.includes('armed')) e.hidden = !armed;
+      else if (kinds.includes('armed-hold')) e.hidden = !armed || type === 'crash' || type === 'recover';
+      else e.hidden = !kinds.includes(type) || (armed && isTimeField(e));
+    });
   };
   $('#fault-type').addEventListener('change', syncFaultForm);
+  $('#fault-armed').addEventListener('change', syncFaultForm);
   syncFaultForm();
   $('#btn-add-fault').addEventListener('click', () => {
     const type = $('#fault-type').value;
     const v = id => $(id).value.trim();
-    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-oneway').checked }
-      : type === 'partition' ? { type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to') }
-      : type === 'pause' ? { type, node: parseInt(v('#fault-node2'), 10), from: v('#fault-from'), to: v('#fault-to2') }
-        : type === 'omission' ? { type, node: parseInt(v('#fault-node2'), 10), direction: v('#fault-direction'), prob: v('#fault-prob'), from: v('#fault-from'), to: v('#fault-to') }
-          : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
+    const armed = $('#fault-armed').checked;
+    const when = armed ? { when: v('#fault-when'), for: v('#fault-for') } : {};
+    const f = type === 'link' ? Object.assign({ type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-oneway').checked }, when)
+      : type === 'partition' ? Object.assign({ type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-part-oneway').checked }, when)
+      : type === 'pause' ? Object.assign({ type, node: parseInt(v('#fault-node2'), 10), from: v('#fault-from'), to: v('#fault-to2') }, when)
+        : type === 'omission' ? Object.assign({ type, node: parseInt(v('#fault-node2'), 10), direction: v('#fault-direction'), prob: v('#fault-prob'), from: v('#fault-from'), to: v('#fault-to') }, when)
+          : Object.assign({ type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') }, when);
     if (addFault(f)) { renderProps(); toast('Fault added: ' + describeFault(f) + '.'); }
   });
+  $('#btn-rnd-faults').addEventListener('click', () => drawRandomFaults(false));
+  $('#btn-rnd-replace').addEventListener('click', () => drawRandomFaults(true));
+}
+
+// Draws a schedule of random faults for the scenario in front of you, so that a single run can be watched
+// under conditions nobody chose. Every draw is a different one; once added, the faults are ordinary faults
+// of the scenario, so the run stays reproducible and the schedule can be edited or exported.
+let drawNonce = 0;
+function drawRandomFaults(replace) {
+  const R = window.SimRunner;
+  let faults;
+  try {
+    const plan = R.parsePlan($('#rnd-faults').value);
+    const win = R.parseWindow($('#rnd-window').value);
+    drawNonce++;
+    faults = R.planFaults(plan, win, S.scn, (S.scn.seed || 1) * 1000 + drawNonce);
+  } catch (e) { toast(e.message); return; }
+  if (replace) S.scn.faults = [];
+  let added = 0;
+  for (const f of faults) if (addFault(f)) added++;
+  renderProps();
+  toast(added ? (replace ? 'Faults replaced: ' : 'Faults drawn: ') + faults.map(f => R.describePlanFault(f)).join('; ') + '.'
+    : 'Nothing could be drawn for this topology.');
 }
 function bindKeys() {
   document.addEventListener('keydown', e => {

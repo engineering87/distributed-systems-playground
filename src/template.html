@@ -254,7 +254,17 @@ uses PerfectLinks as pl via AckLinks</pre>
         <label class="field" data-ft="link partition pause omission"><span>From</span><input id="fault-from" value="1s" class="narrow"></label>
         <label class="field" data-ft="link partition omission"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
         <label class="field" data-ft="pause"><span>Until</span><input id="fault-to2" value="3s" class="narrow" aria-label="End of the pause"></label>
+        <label class="check" title="Fire the fault the first moment a condition holds, instead of at a fixed time"><input type="checkbox" id="fault-armed"> When</label>
+        <label class="field grow" data-ft="armed"><span>Condition</span><input id="fault-when" placeholder="e.g. #keys(defined(decision)) ≥ 1" aria-label="Condition that fires the fault"></label>
+        <label class="field" data-ft="armed-hold"><span>For</span><input id="fault-for" value="1s" class="tiny" aria-label="How long the fault lasts"></label>
+        <label class="check" data-ft="partition" title="Only the messages leaving the first group are dropped"><input type="checkbox" id="fault-part-oneway"> One way</label>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
+      </div>
+      <div class="row">
+        <label class="field inline" title="What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1"><span>Random faults</span><input id="rnd-faults" value="crash:1" class="narrow" aria-label="Random faults to draw"></label>
+        <label class="field inline"><span>Window</span><input id="rnd-window" value="0..3s" class="tiny" aria-label="When the random faults happen"></label>
+        <button id="btn-rnd-faults" type="button" class="ghost" title="Draw a schedule and add it to the scenario">Draw</button>
+        <button id="btn-rnd-replace" type="button" class="ghost" title="Replace the faults of the scenario with a new draw">Redraw</button>
       </div>
       <p class="hint" data-i18n-block="hint-faults">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
       <h3>Run</h3>

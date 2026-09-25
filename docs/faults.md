@@ -12,6 +12,7 @@ Fault tolerance is the reason most distributed algorithms exist. This page descr
 - [Process pause](#process-pause)
 - [Omission](#omission)
 - [Unreliable channels](#unreliable-channels)
+- [Faults armed by a condition](#faults-armed-by-a-condition)
 - [Adding faults](#adding-faults)
 - [Seeing faults in a run](#seeing-faults-in-a-run)
 - [Recipes](#recipes)
@@ -113,6 +114,8 @@ Groups are written as process numbers separated by `|`:
 
 Processes not listed form one additional group, which is why `3` isolates p3. A process may appear in only one group.
 
+**One way.** With *One way* checked, only the messages **leaving the first group** are dropped: that side keeps hearing everybody, and nobody hears it. It is the asymmetric failure that breaks algorithms which assume silence is mutual.
+
 From the inside, a partition looks exactly like a crash of the other side: messages stop arriving. That is the heart of many impossibility results, and the [partition example](examples.md#failure-detector-across-a-partition-and-a-recovery) shows it with a failure detector.
 
 ## Process pause
@@ -159,9 +162,32 @@ A link can have its own loss and delay distribution. Select it on the graph and 
 
 **Enabled**, in the same place, disables a link for the whole run. It is the simplest way to cut a topology permanently.
 
+## Faults armed by a condition
+
+Choosing the instant of a fault by hand means guessing. A fault can instead wait for a **condition** on the state of the whole system, and fire the first moment it holds:
+
+| Field | Meaning |
+|---|---|
+| When | a boolean expression, written like a [property](language.md#properties): state variables read as maps from process to value, plus `Π`, `N`, `crashed`, `up`, `correct` and `t` |
+| For | how long the fault lasts, when it is a pause, an omission, a link failure or a partition |
+
+The condition is evaluated after every step, where properties are. Examples:
+
+```text
+crash p1        when #keys(votes[1]) = N - 2
+pause p1        when #toset(values(defined(leader))) = 1 and t > 3s     for 2s
+partition {1 2} when #keys(defined(decision)) ≥ 1                       for 1s
+```
+
+The first is the classic two-phase commit scenario: the coordinator crashes after collecting most votes and before announcing anything. Nobody decides, *Agreement* still holds, *Termination* is broken, and you did not have to find the millisecond by trial and error.
+
+Two things worth knowing. A step is atomic, so a fault fires at the **end** of the step in which the condition became true: arming a crash on "all votes are in" lets the announcement leave first, while "one vote short" does not. And a condition that never holds fires nothing, silently; one that is not a boolean is reported as a warning and the run continues.
+
 ## Adding faults
 
-**Generated, one schedule per run.** *Run over many seeds* in the *Scenario* tab, and `--faults` on the [command line](cli.md#generated-fault-schedules), add a random schedule to each run of a batch, drawn from its seed. It is the quickest way to find the combination that breaks a property.
+**Drawn at random, for the run in front of you.** In the *Scenario* tab, write what to draw (`crash:1`, `partition:1`, `pause:1`, `link:1`, `omission:1`, `recover:1`, or several separated by commas), when it may happen, and press **Draw**. The faults land in the list like any other, so you can run them, watch them, edit them and export them. **Redraw** replaces them with another schedule. It is the fastest way to ask "what does this algorithm do when something goes wrong", without deciding what.
+
+**Generated, one schedule per run.** *Run over many seeds* in the *Scenario* tab, and `--faults` on the [command line](cli.md#generated-fault-schedules), add a random schedule to each run of a batch, drawn from its seed. It is what turns that question into an answer over hundreds of runs, with the schedule of every failing seed reported and [shrinkable](cli.md#shrinking-a-counterexample) to what matters.
 
 **In the *Scenario* tab.** Choose the type, fill in the fields, press *Add fault*. The list above the form shows every fault in words; *Remove* deletes one.
 

@@ -105,7 +105,7 @@ Everything is explained in [The timing model](timing-model.md).
 ## Scenario tab
 
 - **External inputs**, one per line: `TIME NODE Event | arguments`. `NODE` is a number or `*` for every process. Arguments are Upon expressions evaluated on the target process. Lines added with **Inject event** appear here.
-- **Faults**: the list of scheduled faults, each with **Remove**, and a form to add crashes, recoveries, link failures and partitions. See [Faults](faults.md).
+- **Faults**: the list of scheduled faults, each with **Remove**, and a form to add crashes, recoveries, pauses, omissions, link failures and partitions. **Draw** adds a random schedule of the kinds you name, within the window you give; **Redraw** replaces the current faults with another one. See [Faults](faults.md).
 - **Run over many seeds**: the same scenario, one run per seed, in the background. See [Batch runs](#batch-runs).
 - **Simulated duration**: when the run stops at the latest.
 - **Stop at the first failed assertion**: turns `assert` into a hard stop.

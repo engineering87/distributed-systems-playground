@@ -802,7 +802,17 @@ uses PerfectLinks as pl via AckLinks</pre>
         <label class="field" data-ft="link partition pause omission"><span>From</span><input id="fault-from" value="1s" class="narrow"></label>
         <label class="field" data-ft="link partition omission"><span>Until</span><input id="fault-to" value="3s" placeholder="forever" class="narrow"></label>
         <label class="field" data-ft="pause"><span>Until</span><input id="fault-to2" value="3s" class="narrow" aria-label="End of the pause"></label>
+        <label class="check" title="Fire the fault the first moment a condition holds, instead of at a fixed time"><input type="checkbox" id="fault-armed"> When</label>
+        <label class="field grow" data-ft="armed"><span>Condition</span><input id="fault-when" placeholder="e.g. #keys(defined(decision)) ≥ 1" aria-label="Condition that fires the fault"></label>
+        <label class="field" data-ft="armed-hold"><span>For</span><input id="fault-for" value="1s" class="tiny" aria-label="How long the fault lasts"></label>
+        <label class="check" data-ft="partition" title="Only the messages leaving the first group are dropped"><input type="checkbox" id="fault-part-oneway"> One way</label>
         <button id="btn-add-fault" type="button" class="ghost">Add fault</button>
+      </div>
+      <div class="row">
+        <label class="field inline" title="What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1"><span>Random faults</span><input id="rnd-faults" value="crash:1" class="narrow" aria-label="Random faults to draw"></label>
+        <label class="field inline"><span>Window</span><input id="rnd-window" value="0..3s" class="tiny" aria-label="When the random faults happen"></label>
+        <button id="btn-rnd-faults" type="button" class="ghost" title="Draw a schedule and add it to the scenario">Draw</button>
+        <button id="btn-rnd-replace" type="button" class="ghost" title="Replace the faults of the scenario with a new draw">Redraw</button>
       </div>
       <p class="hint" data-i18n-block="hint-faults">Processes not listed in a partition form one more group together, so <code>3</code> alone isolates p3. Leave <em>Until</em> empty for a permanent failure. A recovered process restarts with its volatile state reset: variables declared <code>stable</code> keep their value, and each module receives <code>Recovery</code> if it handles it, <code>Init</code> otherwise. During playback you can also select a process or a link and inject a crash, recovery, isolation or link failure at the current time.</p>
       <h3>Run</h3>
@@ -2785,9 +2795,16 @@ function runSimulation(scn) {
   }
   const fifoLast = new Map();
 
-  const linkCuts = cfg.faults.filter(f => f.type === 'link');
-  const pauses = cfg.faults.filter(f => f.type === 'pause');
-  const omissions = cfg.faults.filter(f => f.type === 'omission');
+  const linkCuts = cfg.faults.filter(f => f.type === 'link' && !f.when);
+  const pauses = cfg.faults.filter(f => f.type === 'pause' && !f.when);
+  const omissions = cfg.faults.filter(f => f.type === 'omission' && !f.when);
+  // Faults armed by a condition: they have no time of their own and fire the first moment it holds.
+  const armed = cfg.faults.filter(f => f.when).map(f => {
+    let expr = null;
+    try { expr = parseExpression(f.when); }
+    catch (e) { throw new RtError('Fault condition "' + f.when + '": ' + e.message, 0); }
+    return { fault: f, expr, fired: false, error: null };
+  });
   for (const p of pauses) {
     (out.pauses[p.node] = out.pauses[p.node] || []).push({ from: p.from, to: p.to });
     // logged from the schedule, so that a pause is visible even when no event runs into it
@@ -2809,14 +2826,15 @@ function runSimulation(scn) {
     }
     return false;
   }
-  const partitions = cfg.faults.filter(f => f.type === 'partition').map(p => {
+  const groupsText = g => g.map(x => '{' + x.map(id => 'p' + id).join(', ') + '}').join(' | ');
+  const partitions = cfg.faults.filter(f => f.type === 'partition' && !f.when).map(p => {
     const groupOf = new Map();
     p.groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
     return Object.assign({}, p, { groupOf });
   });
   out.netFaults = {
     links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to, oneWay: !!l.oneWay })),
-    partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to }))
+    partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to, oneWay: !!p.oneWay }))
   };
   // is the channel between a and b interrupted at time t? (processes not listed in a partition form one more group)
   function cutAt(a, b, t) {
@@ -2828,7 +2846,9 @@ function runSimulation(scn) {
       if (t < p.from || (p.to !== null && t >= p.to)) continue;
       const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1;
       const gb = p.groupOf.has(b) ? p.groupOf.get(b) : -1;
-      if (ga !== gb) return 'network partition';
+      if (ga === gb) continue;
+      // one way: only what leaves the first group is dropped
+      if (!p.oneWay || ga === 0) return 'network partition';
     }
     return null;
   }
@@ -2971,6 +2991,70 @@ function runSimulation(scn) {
     const inst = { state: {}, params: {}, algo: { funcs: new Map() } };
     return { node: null, inst, locals, sim, rng: streams.get('input'), time: t, property: true };
   }
+  // Starts a fault that was waiting for its condition. Interval faults last for "hold", or until the end.
+  function fireFault(f, t) {
+    const until = f.hold ? t + f.hold : null;
+    const describe = () => 'fault armed by a condition fired: ';
+    if (f.type === 'crash' || f.type === 'recover') {
+      const n = byId.get(f.node);
+      if (!n) return;
+      push({ t, cls: CLS.crash, node: n.idx, type: f.type });
+      logE(t, f.node, 'fault', describe() + 'p' + f.node + (f.type === 'crash' ? ' crashes' : ' recovers'));
+      return;
+    }
+    if (f.type === 'pause') {
+      pauses.push({ node: f.node, from: t, to: until === null ? t + 1000000 : until });
+      const p = pauses[pauses.length - 1];
+      (out.pauses[f.node] = out.pauses[f.node] || []).push({ from: p.from, to: p.to });
+      logE(t, f.node, 'fault', describe() + 'p' + f.node + ' pauses: it handles nothing until ' + fmtDuration(p.to));
+      logE(p.to, f.node, 'fault', 'p' + f.node + ' resumes');
+      return;
+    }
+    if (f.type === 'omission') {
+      omissions.push({ node: f.node, direction: f.direction, prob: f.prob, from: t, to: until });
+      logE(t, f.node, 'fault', describe() + 'p' + f.node + ' omits its ' + f.direction);
+      return;
+    }
+    if (f.type === 'link') {
+      linkCuts.push({ a: f.a, b: f.b, from: t, to: until, oneWay: f.oneWay });
+      out.netFaults.links.push({ a: f.a, b: f.b, from: t, to: until, oneWay: !!f.oneWay });
+      logE(t, f.a, 'fault', describe() + 'link p' + f.a + '–p' + f.b + ' goes down');
+      return;
+    }
+    if (f.type === 'partition') {
+      const listed = new Set(f.groups.flat());
+      const rest = nodes.filter(n => !listed.has(n.id)).map(n => n.id);
+      const groups = rest.length ? f.groups.concat([rest]) : f.groups;
+      const groupOf = new Map();
+      groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
+      partitions.push({ groups, from: t, to: until, oneWay: f.oneWay, groupOf });
+      out.netFaults.partitions.push({ groups, from: t, to: until, oneWay: !!f.oneWay });
+      logE(t, nodes[0].id, 'fault', describe() + 'network partition: ' + groupsText(groups));
+    }
+  }
+  // Conditions are evaluated where the properties are: after every step, over the state of every process.
+  function checkArmed(t, nodeId) {
+    if (!armed.length) return;
+    let env = null;
+    for (const a of armed) {
+      if (a.fired || a.error) continue;
+      if (!env) env = propEnv(t);
+      let v;
+      try { v = evalExpr(a.expr, env); }
+      catch (e) {
+        a.error = e instanceof RtError ? e.message : String(e && e.message || e);
+        logE(t, nodeId, 'warn', 'fault condition "' + a.fault.when + '" could not be evaluated: ' + a.error);
+        continue;
+      }
+      if (typeof v !== 'boolean') {
+        a.error = 'the condition is not a boolean';
+        logE(t, nodeId, 'warn', 'fault condition "' + a.fault.when + '" is not a boolean');
+        continue;
+      }
+      if (v) { a.fired = true; fireFault(a.fault, t); }
+    }
+  }
+
   function checkProperties(t, nodeId) {
     if (!props.length) return;
     let env = null;
@@ -3026,8 +3110,8 @@ function runSimulation(scn) {
     // Init from the bottom up
     push({ t: 0, cls: CLS.input - 0.5, node: n.idx, type: 'init' });
   }
-  const groupsText = g => g.map(x => '{' + x.map(id => 'p' + id).join(', ') + '}').join(' | ');
   for (const f of cfg.faults) {
+    if (f.when) continue;   // armed faults have no time yet
     if (f.type === 'crash' || f.type === 'recover') {
       const n = byId.get(f.node);
       if (!n) { out.warnings.push('Fault on missing process p' + f.node); continue; }
@@ -3096,6 +3180,7 @@ function runSimulation(scn) {
     }
     drain(node);
     snapshot(node, t);
+    checkArmed(t, node.id);
     checkProperties(t, node.id);
     out.activity.push({ t, end: t, node: node.id, type: 'recover', msg: null });
   }
@@ -3191,6 +3276,7 @@ function runSimulation(scn) {
       // processing activity, used by the UI to animate nodes
       if (ev.type !== 'init') out.activity.push({ t: ev.t, end: curEnd, node: node.id, type: ev.type, msg: ev.type === 'deliver' ? ev.rec.id : null });
       snapshot(node, ev.t);
+      checkArmed(curEnd, node.id);
       checkProperties(curEnd, node.id);
     }
     out.properties = props.map(p => ({ name: p.name, kind: p.kind, ok: p.error ? false : p.ok, at: p.at, node: p.node, error: p.error, line: p.line }));
@@ -3291,6 +3377,34 @@ function normalizeFault(f, n) {
     return x;
   };
   const type = f.type || 'crash';
+  // A fault with a condition has no time of its own: it fires the first moment the condition holds, and
+  // lasts for "for" when it is an interval fault.
+  const when = f.when === undefined || f.when === null ? '' : String(f.when).trim();
+  if (when) {
+    try { parseExpression(when); }
+    catch (e) { throw new Error(where + 'the condition does not parse: ' + e.message); }
+    const hold = f.for === undefined || String(f.for).trim() === '' ? null : dur(f.for, 'duration');
+    if (type === 'crash' || type === 'recover') return { type, node: pid(f.node, 'process'), when, at: null };
+    if (type === 'pause') return { type, node: pid(f.node, 'process'), when, hold: hold === null ? 1000000 : hold };
+    if (type === 'omission') {
+      const dir = f.direction || 'both';
+      if (!['send', 'receive', 'both'].includes(dir)) throw new Error(where + 'direction must be send, receive or both');
+      const prob = f.prob === undefined || f.prob === '' ? 1 : Number(f.prob);
+      if (!Number.isFinite(prob) || prob < 0 || prob > 1) throw new Error(where + 'probability must be between 0 and 1');
+      return { type, node: pid(f.node, 'process'), direction: dir, prob, when, hold };
+    }
+    if (type === 'link') {
+      const a = pid(f.a, 'first process'), b = pid(f.b, 'second process');
+      if (a === b) throw new Error(where + 'a link needs two different processes');
+      return { type, a, b, oneWay: !!f.oneWay, when, hold };
+    }
+    if (type === 'partition') {
+      let groups;
+      try { groups = parseGroups(f.groups); } catch (e) { throw new Error(where + e.message); }
+      return { type, groups, oneWay: !!f.oneWay, when, hold };
+    }
+    throw new Error(where + 'unknown type "' + type + '"');
+  }
   switch (type) {
     case 'crash': case 'recover':
       return { type, node: pid(f.node, 'process'), at: dur(f.at, 'time') };
@@ -3323,7 +3437,8 @@ function normalizeFault(f, n) {
       try { groups = parseGroups(f.groups); } catch (e) { throw new Error(where + e.message); }
       const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
       if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
-      return { type, groups, from, to };
+      // one way: only the messages from the first group to the others are dropped
+      return { type, groups, from, to, oneWay: !!f.oneWay };
     }
   }
   throw new Error(where + 'unknown type "' + type + '"');
@@ -3418,8 +3533,16 @@ function causalCone(res, node, t) {
   return { node, t, past, future, counts };
 }
 
+// A single expression, as written in a fault condition. Throws a DslError with line and column.
+function parseExpression(src) {
+  const p = new Parser(String(src));
+  const e = p.expr();
+  if (p.tok.t !== 'eof') p.err('Unexpected ' + p.desc(p.tok) + ' after the condition');
+  return e;
+}
+
 const SimCore = {
-  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay,
+  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay, parseExpression,
   isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups, causalCone,
   DslError, fmt, KEYWORDS
 };
@@ -4195,7 +4318,25 @@ M('or', 'o');
 M('Run over many seeds', 'Esecuzione su molti semi');
 M('The same scenario, one run per seed, in the background. Properties and failed assertions are reported per seed; click a seed to open that run.',
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
-M('Seeds', 'Semi'); M('Faults per run', 'Guasti per esecuzione'); M('Generated faults per run', 'Guasti generati per esecuzione');
+M('Seeds', 'Semi');
+M('When', 'Quando'); M('Condition', 'Condizione'); M('For', 'Per');
+M('Fire the fault the first moment a condition holds, instead of at a fixed time', 'Fai scattare il guasto appena una condizione è vera, invece che a un istante fisso');
+M('Condition that fires the fault', 'Condizione che fa scattare il guasto');
+M('How long the fault lasts', 'Quanto dura il guasto');
+M('e.g. #keys(defined(decision)) ≥ 1', 'es. #keys(defined(decision)) ≥ 1');
+M('Only the messages leaving the first group are dropped', 'Si perdono solo i messaggi che escono dal primo gruppo');
+P(/^(.+) when (.+)$/, m => (tr(m[1]) || m[1]) + ' quando ' + m[2]);
+P(/^fault armed by a condition fired: (.+)$/, m => 'guasto armato scattato: ' + (tr(m[1]) || m[1]));
+P(/^fault condition "(.+)" could not be evaluated: (.+)$/, m => 'condizione del guasto "' + m[1] + '" non valutabile: ' + m[2]);
+P(/^fault condition "(.+)" is not a boolean$/, m => 'condizione del guasto "' + m[1] + '" non è booleana'); M('Random faults', 'Guasti casuali'); M('Random faults to draw', 'Guasti casuali da estrarre');
+M('When the random faults happen', 'Quando avvengono i guasti casuali');
+M('What to draw: crash:1, partition:1, pause:1, link:1, omission:1, recover:1', 'Cosa estrarre: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
+M('Draw', 'Estrai'); M('Redraw', 'Riestrai');
+M('Draw a schedule and add it to the scenario', 'Estrai uno schedule e aggiungilo allo scenario');
+M('Replace the faults of the scenario with a new draw', 'Sostituisci i guasti dello scenario con una nuova estrazione');
+M('Nothing could be drawn for this topology.', 'Non è stato possibile estrarre nulla per questa topologia.');
+P(/^Faults drawn: (.+)\.$/, m => 'Guasti estratti: ' + m[1] + '.');
+P(/^Faults replaced: (.+)\.$/, m => 'Guasti sostituiti: ' + m[1] + '.'); M('Faults per run', 'Guasti per esecuzione'); M('Generated faults per run', 'Guasti generati per esecuzione');
 M('Window', 'Finestra'); M('When the generated faults happen', 'Quando avvengono i guasti generati');
 M('Faults drawn from the seed of each run: crash:1, partition:1, pause:1, link:1, omission:1, recover:1',
   'Guasti estratti dal seme di ogni esecuzione: crash:1, partition:1, pause:1, link:1, omission:1, recover:1');
@@ -5279,7 +5420,7 @@ function seedList(seeds) {
 // A plan such as "crash:1,partition:1" adds that many faults to every run of a batch, drawn from the seed of
 // the run, so a scenario stays reproducible: the same seed and the same plan give the same schedule, and the
 // schedule travels with the result, ready to be pasted back into the scenario.
-const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission'];
+const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission', 'zone'];
 
 function parsePlan(spec) {
   const plan = {};
@@ -5357,6 +5498,14 @@ function planFaults(spec, window, scenario, seed) {
       type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
       from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
     });
+  }
+  // a zone: several processes crash together, the way a rack or an availability zone does
+  for (let i = 0; i < (plan.zone || 0); i++) {
+    const size = Math.max(2, Math.min(ids.length - 1, Math.round(ids.length / 3)));
+    const shuffled = ids.slice();
+    for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
+    const at = C.fmtDuration(time());
+    for (const node of shuffled.slice(0, size).sort((a, b) => a - b)) out.push({ type: 'crash', node, at, zone: true });
   }
   for (let i = 0; i < (plan.omission || 0); i++) {
     const from = time();
@@ -7362,9 +7511,16 @@ function runSimulation(scn) {
   }
   const fifoLast = new Map();
 
-  const linkCuts = cfg.faults.filter(f => f.type === 'link');
-  const pauses = cfg.faults.filter(f => f.type === 'pause');
-  const omissions = cfg.faults.filter(f => f.type === 'omission');
+  const linkCuts = cfg.faults.filter(f => f.type === 'link' && !f.when);
+  const pauses = cfg.faults.filter(f => f.type === 'pause' && !f.when);
+  const omissions = cfg.faults.filter(f => f.type === 'omission' && !f.when);
+  // Faults armed by a condition: they have no time of their own and fire the first moment it holds.
+  const armed = cfg.faults.filter(f => f.when).map(f => {
+    let expr = null;
+    try { expr = parseExpression(f.when); }
+    catch (e) { throw new RtError('Fault condition "' + f.when + '": ' + e.message, 0); }
+    return { fault: f, expr, fired: false, error: null };
+  });
   for (const p of pauses) {
     (out.pauses[p.node] = out.pauses[p.node] || []).push({ from: p.from, to: p.to });
     // logged from the schedule, so that a pause is visible even when no event runs into it
@@ -7386,14 +7542,15 @@ function runSimulation(scn) {
     }
     return false;
   }
-  const partitions = cfg.faults.filter(f => f.type === 'partition').map(p => {
+  const groupsText = g => g.map(x => '{' + x.map(id => 'p' + id).join(', ') + '}').join(' | ');
+  const partitions = cfg.faults.filter(f => f.type === 'partition' && !f.when).map(p => {
     const groupOf = new Map();
     p.groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
     return Object.assign({}, p, { groupOf });
   });
   out.netFaults = {
     links: linkCuts.map(l => ({ a: l.a, b: l.b, from: l.from, to: l.to, oneWay: !!l.oneWay })),
-    partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to }))
+    partitions: partitions.map(p => ({ groups: p.groups, from: p.from, to: p.to, oneWay: !!p.oneWay }))
   };
   // is the channel between a and b interrupted at time t? (processes not listed in a partition form one more group)
   function cutAt(a, b, t) {
@@ -7405,7 +7562,9 @@ function runSimulation(scn) {
       if (t < p.from || (p.to !== null && t >= p.to)) continue;
       const ga = p.groupOf.has(a) ? p.groupOf.get(a) : -1;
       const gb = p.groupOf.has(b) ? p.groupOf.get(b) : -1;
-      if (ga !== gb) return 'network partition';
+      if (ga === gb) continue;
+      // one way: only what leaves the first group is dropped
+      if (!p.oneWay || ga === 0) return 'network partition';
     }
     return null;
   }
@@ -7548,6 +7707,70 @@ function runSimulation(scn) {
     const inst = { state: {}, params: {}, algo: { funcs: new Map() } };
     return { node: null, inst, locals, sim, rng: streams.get('input'), time: t, property: true };
   }
+  // Starts a fault that was waiting for its condition. Interval faults last for "hold", or until the end.
+  function fireFault(f, t) {
+    const until = f.hold ? t + f.hold : null;
+    const describe = () => 'fault armed by a condition fired: ';
+    if (f.type === 'crash' || f.type === 'recover') {
+      const n = byId.get(f.node);
+      if (!n) return;
+      push({ t, cls: CLS.crash, node: n.idx, type: f.type });
+      logE(t, f.node, 'fault', describe() + 'p' + f.node + (f.type === 'crash' ? ' crashes' : ' recovers'));
+      return;
+    }
+    if (f.type === 'pause') {
+      pauses.push({ node: f.node, from: t, to: until === null ? t + 1000000 : until });
+      const p = pauses[pauses.length - 1];
+      (out.pauses[f.node] = out.pauses[f.node] || []).push({ from: p.from, to: p.to });
+      logE(t, f.node, 'fault', describe() + 'p' + f.node + ' pauses: it handles nothing until ' + fmtDuration(p.to));
+      logE(p.to, f.node, 'fault', 'p' + f.node + ' resumes');
+      return;
+    }
+    if (f.type === 'omission') {
+      omissions.push({ node: f.node, direction: f.direction, prob: f.prob, from: t, to: until });
+      logE(t, f.node, 'fault', describe() + 'p' + f.node + ' omits its ' + f.direction);
+      return;
+    }
+    if (f.type === 'link') {
+      linkCuts.push({ a: f.a, b: f.b, from: t, to: until, oneWay: f.oneWay });
+      out.netFaults.links.push({ a: f.a, b: f.b, from: t, to: until, oneWay: !!f.oneWay });
+      logE(t, f.a, 'fault', describe() + 'link p' + f.a + '–p' + f.b + ' goes down');
+      return;
+    }
+    if (f.type === 'partition') {
+      const listed = new Set(f.groups.flat());
+      const rest = nodes.filter(n => !listed.has(n.id)).map(n => n.id);
+      const groups = rest.length ? f.groups.concat([rest]) : f.groups;
+      const groupOf = new Map();
+      groups.forEach((g, i) => g.forEach(id => groupOf.set(id, i)));
+      partitions.push({ groups, from: t, to: until, oneWay: f.oneWay, groupOf });
+      out.netFaults.partitions.push({ groups, from: t, to: until, oneWay: !!f.oneWay });
+      logE(t, nodes[0].id, 'fault', describe() + 'network partition: ' + groupsText(groups));
+    }
+  }
+  // Conditions are evaluated where the properties are: after every step, over the state of every process.
+  function checkArmed(t, nodeId) {
+    if (!armed.length) return;
+    let env = null;
+    for (const a of armed) {
+      if (a.fired || a.error) continue;
+      if (!env) env = propEnv(t);
+      let v;
+      try { v = evalExpr(a.expr, env); }
+      catch (e) {
+        a.error = e instanceof RtError ? e.message : String(e && e.message || e);
+        logE(t, nodeId, 'warn', 'fault condition "' + a.fault.when + '" could not be evaluated: ' + a.error);
+        continue;
+      }
+      if (typeof v !== 'boolean') {
+        a.error = 'the condition is not a boolean';
+        logE(t, nodeId, 'warn', 'fault condition "' + a.fault.when + '" is not a boolean');
+        continue;
+      }
+      if (v) { a.fired = true; fireFault(a.fault, t); }
+    }
+  }
+
   function checkProperties(t, nodeId) {
     if (!props.length) return;
     let env = null;
@@ -7603,8 +7826,8 @@ function runSimulation(scn) {
     // Init from the bottom up
     push({ t: 0, cls: CLS.input - 0.5, node: n.idx, type: 'init' });
   }
-  const groupsText = g => g.map(x => '{' + x.map(id => 'p' + id).join(', ') + '}').join(' | ');
   for (const f of cfg.faults) {
+    if (f.when) continue;   // armed faults have no time yet
     if (f.type === 'crash' || f.type === 'recover') {
       const n = byId.get(f.node);
       if (!n) { out.warnings.push('Fault on missing process p' + f.node); continue; }
@@ -7673,6 +7896,7 @@ function runSimulation(scn) {
     }
     drain(node);
     snapshot(node, t);
+    checkArmed(t, node.id);
     checkProperties(t, node.id);
     out.activity.push({ t, end: t, node: node.id, type: 'recover', msg: null });
   }
@@ -7768,6 +7992,7 @@ function runSimulation(scn) {
       // processing activity, used by the UI to animate nodes
       if (ev.type !== 'init') out.activity.push({ t: ev.t, end: curEnd, node: node.id, type: ev.type, msg: ev.type === 'deliver' ? ev.rec.id : null });
       snapshot(node, ev.t);
+      checkArmed(curEnd, node.id);
       checkProperties(curEnd, node.id);
     }
     out.properties = props.map(p => ({ name: p.name, kind: p.kind, ok: p.error ? false : p.ok, at: p.at, node: p.node, error: p.error, line: p.line }));
@@ -7868,6 +8093,34 @@ function normalizeFault(f, n) {
     return x;
   };
   const type = f.type || 'crash';
+  // A fault with a condition has no time of its own: it fires the first moment the condition holds, and
+  // lasts for "for" when it is an interval fault.
+  const when = f.when === undefined || f.when === null ? '' : String(f.when).trim();
+  if (when) {
+    try { parseExpression(when); }
+    catch (e) { throw new Error(where + 'the condition does not parse: ' + e.message); }
+    const hold = f.for === undefined || String(f.for).trim() === '' ? null : dur(f.for, 'duration');
+    if (type === 'crash' || type === 'recover') return { type, node: pid(f.node, 'process'), when, at: null };
+    if (type === 'pause') return { type, node: pid(f.node, 'process'), when, hold: hold === null ? 1000000 : hold };
+    if (type === 'omission') {
+      const dir = f.direction || 'both';
+      if (!['send', 'receive', 'both'].includes(dir)) throw new Error(where + 'direction must be send, receive or both');
+      const prob = f.prob === undefined || f.prob === '' ? 1 : Number(f.prob);
+      if (!Number.isFinite(prob) || prob < 0 || prob > 1) throw new Error(where + 'probability must be between 0 and 1');
+      return { type, node: pid(f.node, 'process'), direction: dir, prob, when, hold };
+    }
+    if (type === 'link') {
+      const a = pid(f.a, 'first process'), b = pid(f.b, 'second process');
+      if (a === b) throw new Error(where + 'a link needs two different processes');
+      return { type, a, b, oneWay: !!f.oneWay, when, hold };
+    }
+    if (type === 'partition') {
+      let groups;
+      try { groups = parseGroups(f.groups); } catch (e) { throw new Error(where + e.message); }
+      return { type, groups, oneWay: !!f.oneWay, when, hold };
+    }
+    throw new Error(where + 'unknown type "' + type + '"');
+  }
   switch (type) {
     case 'crash': case 'recover':
       return { type, node: pid(f.node, 'process'), at: dur(f.at, 'time') };
@@ -7900,7 +8153,8 @@ function normalizeFault(f, n) {
       try { groups = parseGroups(f.groups); } catch (e) { throw new Error(where + e.message); }
       const from = dur(f.from, 'start'), to = dur(f.to, 'end', true);
       if (to !== null && to <= from) throw new Error(where + 'the end must come after the start');
-      return { type, groups, from, to };
+      // one way: only the messages from the first group to the others are dropped
+      return { type, groups, from, to, oneWay: !!f.oneWay };
     }
   }
   throw new Error(where + 'unknown type "' + type + '"');
@@ -7995,8 +8249,16 @@ function causalCone(res, node, t) {
   return { node, t, past, future, counts };
 }
 
+// A single expression, as written in a fault condition. Throws a DslError with line and column.
+function parseExpression(src) {
+  const p = new Parser(String(src));
+  const e = p.expr();
+  if (p.tok.t !== 'eof') p.err('Unexpected ' + p.desc(p.tok) + ' after the condition');
+  return e;
+}
+
 const SimCore = {
-  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay,
+  runSimulation, parseProgram, check, lex, parseDuration, fmtDuration, parseDist, previewDist, previewDelay, parseExpression,
   isAtomName: isAtomNamePublic, BUILTIN_VARS, BUILTIN_FUNS, parseInputs, normalizeFault, parseGroups, causalCone,
   DslError, fmt, KEYWORDS
 };
@@ -9349,7 +9611,7 @@ function seedList(seeds) {
 // A plan such as "crash:1,partition:1" adds that many faults to every run of a batch, drawn from the seed of
 // the run, so a scenario stays reproducible: the same seed and the same plan give the same schedule, and the
 // schedule travels with the result, ready to be pasted back into the scenario.
-const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission'];
+const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission', 'zone'];
 
 function parsePlan(spec) {
   const plan = {};
@@ -9427,6 +9689,14 @@ function planFaults(spec, window, scenario, seed) {
       type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
       from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
     });
+  }
+  // a zone: several processes crash together, the way a rack or an availability zone does
+  for (let i = 0; i < (plan.zone || 0); i++) {
+    const size = Math.max(2, Math.min(ids.length - 1, Math.round(ids.length / 3)));
+    const shuffled = ids.slice();
+    for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
+    const at = C.fmtDuration(time());
+    for (const node of shuffled.slice(0, size).sort((a, b) => a - b)) out.push({ type: 'crash', node, at, zone: true });
   }
   for (let i = 0; i < (plan.omission || 0); i++) {
     const from = time();
@@ -10726,6 +10996,16 @@ function withoutFromPartition(f, id) {
   return groups.length ? Object.assign({}, f, { groups: groups.map(g => g.join(' ')).join(' | ') }) : null;
 }
 function describeFault(f) {
+  if (f.when) {
+    const lasts = f.for || f.hold ? ' for ' + (f.for || C.fmtDuration(f.hold)) : '';
+    const what = f.type === 'crash' ? 'p' + f.node + ' crashes'
+      : f.type === 'recover' ? 'p' + f.node + ' recovers'
+        : f.type === 'pause' ? 'p' + f.node + ' pauses'
+          : f.type === 'omission' ? 'p' + f.node + ' omits its ' + (f.direction || 'both')
+            : f.type === 'link' ? (f.oneWay ? 'one-way link p' + f.a + ' → p' + f.b : 'link p' + f.a + '–p' + f.b) + ' goes down'
+              : (f.oneWay ? 'one-way partition ' : 'partition ') + f.groups;
+    return what + lasts + ' when ' + f.when;
+  }
   const until = f.to ? ' until ' + f.to : ' onwards';
   switch (f.type) {
     case 'crash': return 'p' + f.node + ' crashes at ' + f.at;
@@ -12202,22 +12482,59 @@ function bindHeader() {
   });
   $$('.tabs [data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
   $('#log-filter').addEventListener('change', renderLog);
+  // a field of the form that carries a time: hidden when the fault is armed by a condition instead
+  const isTimeField = e => {
+    const input = e.querySelector('input');
+    return !!input && ['fault-at', 'fault-from', 'fault-to', 'fault-to2'].includes(input.id);
+  };
   const syncFaultForm = () => {
     const type = $('#fault-type').value;
-    $$('[data-ft]').forEach(e => { e.hidden = !e.dataset.ft.split(' ').includes(type); });
+    const armed = $('#fault-armed').checked;
+    $$('[data-ft]').forEach(e => {
+      const kinds = e.dataset.ft.split(' ');
+      if (kinds.includes('armed')) e.hidden = !armed;
+      else if (kinds.includes('armed-hold')) e.hidden = !armed || type === 'crash' || type === 'recover';
+      else e.hidden = !kinds.includes(type) || (armed && isTimeField(e));
+    });
   };
   $('#fault-type').addEventListener('change', syncFaultForm);
+  $('#fault-armed').addEventListener('change', syncFaultForm);
   syncFaultForm();
   $('#btn-add-fault').addEventListener('click', () => {
     const type = $('#fault-type').value;
     const v = id => $(id).value.trim();
-    const f = type === 'link' ? { type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-oneway').checked }
-      : type === 'partition' ? { type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to') }
-      : type === 'pause' ? { type, node: parseInt(v('#fault-node2'), 10), from: v('#fault-from'), to: v('#fault-to2') }
-        : type === 'omission' ? { type, node: parseInt(v('#fault-node2'), 10), direction: v('#fault-direction'), prob: v('#fault-prob'), from: v('#fault-from'), to: v('#fault-to') }
-          : { type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') };
+    const armed = $('#fault-armed').checked;
+    const when = armed ? { when: v('#fault-when'), for: v('#fault-for') } : {};
+    const f = type === 'link' ? Object.assign({ type, a: parseInt(v('#fault-a'), 10), b: parseInt(v('#fault-b'), 10), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-oneway').checked }, when)
+      : type === 'partition' ? Object.assign({ type, groups: v('#fault-groups'), from: v('#fault-from'), to: v('#fault-to'), oneWay: $('#fault-part-oneway').checked }, when)
+      : type === 'pause' ? Object.assign({ type, node: parseInt(v('#fault-node2'), 10), from: v('#fault-from'), to: v('#fault-to2') }, when)
+        : type === 'omission' ? Object.assign({ type, node: parseInt(v('#fault-node2'), 10), direction: v('#fault-direction'), prob: v('#fault-prob'), from: v('#fault-from'), to: v('#fault-to') }, when)
+          : Object.assign({ type, node: parseInt(v('#fault-node'), 10), at: v('#fault-at') }, when);
     if (addFault(f)) { renderProps(); toast('Fault added: ' + describeFault(f) + '.'); }
   });
+  $('#btn-rnd-faults').addEventListener('click', () => drawRandomFaults(false));
+  $('#btn-rnd-replace').addEventListener('click', () => drawRandomFaults(true));
+}
+
+// Draws a schedule of random faults for the scenario in front of you, so that a single run can be watched
+// under conditions nobody chose. Every draw is a different one; once added, the faults are ordinary faults
+// of the scenario, so the run stays reproducible and the schedule can be edited or exported.
+let drawNonce = 0;
+function drawRandomFaults(replace) {
+  const R = window.SimRunner;
+  let faults;
+  try {
+    const plan = R.parsePlan($('#rnd-faults').value);
+    const win = R.parseWindow($('#rnd-window').value);
+    drawNonce++;
+    faults = R.planFaults(plan, win, S.scn, (S.scn.seed || 1) * 1000 + drawNonce);
+  } catch (e) { toast(e.message); return; }
+  if (replace) S.scn.faults = [];
+  let added = 0;
+  for (const f of faults) if (addFault(f)) added++;
+  renderProps();
+  toast(added ? (replace ? 'Faults replaced: ' : 'Faults drawn: ') + faults.map(f => R.describePlanFault(f)).join('; ') + '.'
+    : 'Nothing could be drawn for this topology.');
 }
 function bindKeys() {
   document.addEventListener('keydown', e => {

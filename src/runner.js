@@ -51,7 +51,7 @@ function seedList(seeds) {
 // A plan such as "crash:1,partition:1" adds that many faults to every run of a batch, drawn from the seed of
 // the run, so a scenario stays reproducible: the same seed and the same plan give the same schedule, and the
 // schedule travels with the result, ready to be pasted back into the scenario.
-const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission'];
+const PLAN_TYPES = ['crash', 'recover', 'pause', 'partition', 'link', 'omission', 'zone'];
 
 function parsePlan(spec) {
   const plan = {};
@@ -129,6 +129,14 @@ function planFaults(spec, window, scenario, seed) {
       type: 'link', a: Math.trunc(+l.a), b: Math.trunc(+l.b), oneWay: rnd() < 0.5,
       from: C.fmtDuration(from), to: C.fmtDuration(from + Math.round((win.to - win.from) * (0.2 + 0.5 * rnd())))
     });
+  }
+  // a zone: several processes crash together, the way a rack or an availability zone does
+  for (let i = 0; i < (plan.zone || 0); i++) {
+    const size = Math.max(2, Math.min(ids.length - 1, Math.round(ids.length / 3)));
+    const shuffled = ids.slice();
+    for (let k = shuffled.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [shuffled[k], shuffled[j]] = [shuffled[j], shuffled[k]]; }
+    const at = C.fmtDuration(time());
+    for (const node of shuffled.slice(0, size).sort((a, b) => a - b)) out.push({ type: 'crash', node, at, zone: true });
   }
   for (let i = 0; i < (plan.omission || 0); i++) {
     const from = time();

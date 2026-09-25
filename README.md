@@ -166,7 +166,7 @@ This project exists to make that gap visible.
 
 **Checking**
 - Batch runs over many seeds, in background workers, with per-property results and one click to open the seed that broke an invariant.
-- Generated fault schedules: each run of a batch gets its own crashes, partitions, pauses, link failures or omissions, drawn from its seed and reproducible.
+- Random faults on demand: draw a schedule of crashes, partitions, pauses, link failures or omissions for the run in front of you, or give every run of a batch its own, drawn from its seed and reproducible.
 - Shrinking of a failing schedule to the faults that are actually needed, in the page and on the command line.
 - Global properties written next to the algorithm: `property Agreement always … end`, checked after every step over the state of every process, with the instant and the process of the first violation.
 
