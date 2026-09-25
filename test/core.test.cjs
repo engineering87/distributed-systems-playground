@@ -817,3 +817,27 @@ test('the register never loses safety in a behaviour profile', () => {
   const liveness = prof.rows.filter(r => (r.properties.find(p => p.name === 'OperationsReturn') || {}).failed);
   assert.ok(liveness.length >= 3, 'liveness is what the faults take away: ' + liveness.map(r => r.name).join(', '));
 });
+
+test('total order broadcast delivers the same sequence everywhere', () => {
+  const r = C.runSimulation(byKey('total-order'));
+  assert.equal(r.error, null);
+  assert.ok(r.properties.every(p => p.ok), JSON.stringify(r.properties.map(p => [p.name, p.ok])));
+  const per = {};
+  for (const o of r.outputs) (per[o.node] = per[o.node] || []).push(o.args[1]);
+  const orders = [...new Set(Object.values(per).map(x => x.join(',')))];
+  assert.equal(orders.length, 1, 'every process delivers the same sequence: ' + JSON.stringify(per));
+  assert.equal(orders[0], '"b","c","a"', 'the order is the sequencer\'s, not the senders\'');
+
+  // the sequencer is the single point of failure: order survives, progress does not
+  const crashed = C.runSimulation(Object.assign(clone(byKey('total-order')), { faults: [{ type: 'crash', node: 1, at: '3ms' }] }));
+  assert.equal(crashed.properties.find(p => p.name === 'TotalOrder').ok, true);
+  assert.equal(crashed.properties.find(p => p.name === 'EverybodyDelivers').ok, false);
+  assert.equal(crashed.outputs.length, 0);
+
+  // delivering without waiting for the order breaks the property
+  const broken = clone(byKey('total-order'));
+  broken.code = broken.code.replace('upon event ⟨net, Deliver | p, [DATA, s, m]⟩ where self ≠ SEQ do\n    skip\n  end',
+    'upon event ⟨net, Deliver | p, [DATA, s, m]⟩ where self ≠ SEQ do\n    dlv := append(dlv, [s, m])\n    trigger ⟨tob, Deliver | s, m⟩\n  end');
+  const bad = C.runSimulation(broken);
+  assert.equal(bad.properties.find(p => p.name === 'TotalOrder').ok, false, 'the property has teeth');
+});

@@ -148,6 +148,8 @@ const P = (re, fn) => PAT.push([re, fn]);
   ['Gossip: spreading a rumor', 'Gossip: diffondere una voce'],
   ['Logical clocks: Lamport and vector', 'Clock logici: Lamport e vettoriale'],
   ['Majority-quorum register (read and write)', 'Registro a quorum maggioritario (lettura e scrittura)'],
+  ['Total order broadcast with a sequencer', 'Total order broadcast con sequenziatore'],
+  ['One process decides the order and everybody follows it — until that process is the one that crashes.', 'Un processo decide l\'ordine e tutti lo seguono, finché a cadere non è proprio quel processo.'],
   ['Majorities keep a replicated register correct; lose one and reads and writes simply stop.', 'Le maggioranze tengono corretto un registro replicato; persa la maggioranza, letture e scritture si fermano.'],
   ['Replication', 'Replicazione'],
   ['Chandy-Lamport snapshot on FIFO channels', 'Snapshot di Chandy-Lamport su canali FIFO'],

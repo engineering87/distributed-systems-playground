@@ -4201,6 +4201,8 @@ const P = (re, fn) => PAT.push([re, fn]);
   ['Gossip: spreading a rumor', 'Gossip: diffondere una voce'],
   ['Logical clocks: Lamport and vector', 'Clock logici: Lamport e vettoriale'],
   ['Majority-quorum register (read and write)', 'Registro a quorum maggioritario (lettura e scrittura)'],
+  ['Total order broadcast with a sequencer', 'Total order broadcast con sequenziatore'],
+  ['One process decides the order and everybody follows it — until that process is the one that crashes.', 'Un processo decide l\'ordine e tutti lo seguono, finché a cadere non è proprio quel processo.'],
   ['Majorities keep a replicated register correct; lose one and reads and writes simply stop.', 'Le maggioranze tengono corretto un registro replicato; persa la maggioranza, letture e scritture si fermano.'],
   ['Replication', 'Replicazione'],
   ['Chandy-Lamport snapshot on FIFO channels', 'Snapshot di Chandy-Lamport su canali FIFO'],
@@ -5708,6 +5710,79 @@ EXAMPLES.push({
   })
 });
 
+const TOB_CODE = `// Total order broadcast with a sequencer.
+// Everybody sends its message to all; p1, the sequencer, is the only one that
+// decides the order, and announces it. A process delivers a message only when
+// every earlier sequence number has arrived, so all of them deliver the same
+// sequence, in the same order.
+interface TotalOrder
+  request Broadcast(m)
+  indication Deliver(s, m)
+end
+
+algorithm SequencerTotalOrder
+  implements TotalOrder as tob
+  uses Net as net
+  params
+    SEQ := 1
+  state
+    dlv := []
+    order := map()
+    next := 1
+    assigned := 0
+
+  upon event ⟨tob, Broadcast | m⟩ do
+    forall q in Π do
+      trigger ⟨net, Send | q, [DATA, self, m]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [DATA, s, m]⟩ where self = SEQ do
+    assigned := assigned + 1
+    forall q in Π do
+      trigger ⟨net, Send | q, [ORDER, assigned, s, m]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [DATA, s, m]⟩ where self ≠ SEQ do
+    skip
+  end
+
+  upon event ⟨net, Deliver | p, [ORDER, n, s, m]⟩ do
+    order[n] := [s, m]
+    call flush()
+  end
+
+  function flush()
+    while order[next] ≠ nil do
+      dlv := append(dlv, order[next])
+      trigger ⟨tob, Deliver | order[next][0], order[next][1]⟩
+      next := next + 1
+    end
+  end
+end
+
+// What one process has delivered is a prefix of what any other has delivered:
+// nobody ever sees two messages in a different order.
+property TotalOrder always
+  #{p in Π where #{q in Π where #dlv[p] ≤ #dlv[q] and slice(dlv[q], 0, #dlv[p]) ≠ dlv[p]} > 0} = 0
+end
+
+// Everything that was broadcast reaches everybody.
+property EverybodyDelivers eventually
+  #{p in Π where #dlv[p] < 3} = 0
+end
+`;
+
+EXAMPLES.push({
+  key: 'total-order',
+  title: 'Total order broadcast with a sequencer',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: TOB_CODE, top: 'SequencerTotalOrder',
+    inputs: '0ms 2 Broadcast | "a"\n1ms 3 Broadcast | "b"\n2ms 4 Broadcast | "c"', stopAt: '500ms'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -5724,7 +5799,8 @@ const META = {
   'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' },
   'logical-clocks': { category: 'Logical time', summary: 'A Lamport counter and a vector clock side by side: what each one can and cannot tell you.' },
   'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
-  'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' }
+  'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' },
+  'total-order': { category: 'Broadcast', summary: 'One process decides the order and everybody follows it — until that process is the one that crashes.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 
@@ -10321,6 +10397,79 @@ EXAMPLES.push({
   })
 });
 
+const TOB_CODE = `// Total order broadcast with a sequencer.
+// Everybody sends its message to all; p1, the sequencer, is the only one that
+// decides the order, and announces it. A process delivers a message only when
+// every earlier sequence number has arrived, so all of them deliver the same
+// sequence, in the same order.
+interface TotalOrder
+  request Broadcast(m)
+  indication Deliver(s, m)
+end
+
+algorithm SequencerTotalOrder
+  implements TotalOrder as tob
+  uses Net as net
+  params
+    SEQ := 1
+  state
+    dlv := []
+    order := map()
+    next := 1
+    assigned := 0
+
+  upon event ⟨tob, Broadcast | m⟩ do
+    forall q in Π do
+      trigger ⟨net, Send | q, [DATA, self, m]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [DATA, s, m]⟩ where self = SEQ do
+    assigned := assigned + 1
+    forall q in Π do
+      trigger ⟨net, Send | q, [ORDER, assigned, s, m]⟩
+    end
+  end
+
+  upon event ⟨net, Deliver | p, [DATA, s, m]⟩ where self ≠ SEQ do
+    skip
+  end
+
+  upon event ⟨net, Deliver | p, [ORDER, n, s, m]⟩ do
+    order[n] := [s, m]
+    call flush()
+  end
+
+  function flush()
+    while order[next] ≠ nil do
+      dlv := append(dlv, order[next])
+      trigger ⟨tob, Deliver | order[next][0], order[next][1]⟩
+      next := next + 1
+    end
+  end
+end
+
+// What one process has delivered is a prefix of what any other has delivered:
+// nobody ever sees two messages in a different order.
+property TotalOrder always
+  #{p in Π where #{q in Π where #dlv[p] ≤ #dlv[q] and slice(dlv[q], 0, #dlv[p]) ≠ dlv[p]} > 0} = 0
+end
+
+// Everything that was broadcast reaches everybody.
+property EverybodyDelivers eventually
+  #{p in Π where #dlv[p] < 3} = 0
+end
+`;
+
+EXAMPLES.push({
+  key: 'total-order',
+  title: 'Total order broadcast with a sequencer',
+  scenario: catalogScenario({
+    n: 4, seed: 3, preset: 'async', code: TOB_CODE, top: 'SequencerTotalOrder',
+    inputs: '0ms 2 Broadcast | "a"\n1ms 3 Broadcast | "b"\n2ms 4 Broadcast | "c"', stopAt: '500ms'
+  })
+});
+
 // Gallery metadata
 const META = {
   'flooding': { category: 'Broadcast', summary: 'Two messages spread across a grid; each process forwards what it has not seen yet.' },
@@ -10337,7 +10486,8 @@ const META = {
   'two-phase-commit': { category: 'Coordination', summary: 'Everybody commits together; crash the coordinator before it announces and the others are blocked.' },
   'logical-clocks': { category: 'Logical time', summary: 'A Lamport counter and a vector clock side by side: what each one can and cannot tell you.' },
   'snapshot': { category: 'Global state', summary: 'Markers cut the execution consistently — until the channels stop being FIFO and coins go missing.' },
-  'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' }
+  'quorum-register': { category: 'Replication', summary: 'Majorities keep a replicated register correct; lose one and reads and writes simply stop.' },
+  'total-order': { category: 'Broadcast', summary: 'One process decides the order and everybody follows it — until that process is the one that crashes.' }
 };
 for (const ex of EXAMPLES) Object.assign(ex, META[ex.key] || { category: 'Other', summary: '' });
 

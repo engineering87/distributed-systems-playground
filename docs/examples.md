@@ -21,6 +21,7 @@ For every example this page gives the setup, what to watch, a few experiments, a
 - [Logical clocks: Lamport and vector](#logical-clocks-lamport-and-vector)
 - [Chandy-Lamport snapshot on FIFO channels](#chandy-lamport-snapshot-on-fifo-channels)
 - [Majority-quorum register](#majority-quorum-register)
+- [Total order broadcast with a sequencer](#total-order-broadcast-with-a-sequencer)
 - [Empty scenario](#empty-scenario)
 
 ## Flooding broadcast
@@ -287,6 +288,20 @@ Every process keeps a copy of one register. Writing stamps the value and waits f
 Run the profile over ten seeds and the point becomes a rule: *ReadsAreValid* holds under **every** condition, while *OperationsReturn* falls under crashes, partitions and a zone going down. A quorum system does not trade safety for availability; it gives up availability to keep safety.
 
 **Keep in mind.** The replica state is `stable`, so a process that comes back still has its data, as a replicated store on disk would. This is a single-writer register, so timestamps never collide. With several writers the stamps have to carry the identity of the writer as well, and the read-back phase becomes essential rather than merely useful.
+
+## Total order broadcast with a sequencer
+
+**Topic:** agreeing on an order, cheaply · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
+
+Everybody sends its message to all; p1, the sequencer, is the only process that decides the order and announces it. A process delivers a message only once every earlier sequence number has arrived.
+
+**What to watch.** The three messages are broadcast in the order a, b, c and delivered by everybody as **b, c, a**: the order is the one the sequencer saw, not the one the senders intended, and that is the point. The property *TotalOrder* (`always`) says what the algorithm promises: what one process has delivered is a prefix of what any other has delivered, so nobody ever sees two messages in a different order.
+
+**Try this.**
+
+- **Crash the sequencer** at `3ms`: deliveries stop altogether. *TotalOrder* still holds — nobody has seen anything wrong — while *EverybodyDelivers* is broken. One process deciding the order is cheap and fragile at the same time; making it fault-tolerant is what consensus is for.
+- **Deliver without waiting for the order**, by replacing the `skip` in the second `DATA` handler with an immediate delivery: *TotalOrder* breaks at once, which is what a property is for.
+- Turn off FIFO channels: the algorithm still holds, because the sequence numbers, not the channels, carry the order.
 
 ## Empty scenario
 

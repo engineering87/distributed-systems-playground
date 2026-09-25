@@ -6,6 +6,11 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [0.21.0]
+
+### Added
+- Total order broadcast with a sequencer, with the prefix property (what one process delivered is a prefix of what any other delivered) and delivery of everything as properties. Crashing the sequencer keeps the order and stops progress; delivering without waiting for the order breaks the property at once.
+
 ## [0.20.0]
 
 ### Added
