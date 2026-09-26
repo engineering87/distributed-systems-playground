@@ -29,7 +29,7 @@ jobs:
         browser: ${{ github.ref == 'refs/heads/main' && fromJSON('["chromium","firefox","webkit"]') || fromJSON('["chromium"]') }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install -r test/browser/requirements.txt
