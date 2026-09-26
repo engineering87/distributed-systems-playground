@@ -47,9 +47,10 @@ export function checkMessage(message) {
 }
 
 function messagesFromRange(range) {
-  const sep = '\u0000';
-  const out = execFileSync('git', ['log', '--reverse', '--format=%B' + sep, range], { encoding: 'utf8' });
-  return out.split(sep).map(s => s.trim()).filter(Boolean);
+  // -z separates the entries of the output with a NUL; a NUL cannot be passed inside an argument,
+  // which is why the separator does not belong in --format.
+  const out = execFileSync('git', ['log', '--reverse', '-z', '--format=%B', range], { encoding: 'utf8' });
+  return out.split('\u0000').map(s => s.trim()).filter(Boolean);
 }
 
 function main(argv) {

@@ -185,6 +185,16 @@ test('the commit message checker accepts our shape and refuses the rest', async 
   }
 });
 
+// The checker ran into it in CI: a NUL byte cannot travel inside a command line argument.
+test('the commit checker separates git output, not its arguments', () => {
+  const src = read('scripts/check-commits.mjs');
+  assert.ok(src.includes("'-z'"), 'git -z separates the entries of the output');
+  assert.ok(!src.includes("'--format=%B' + sep"), 'the separator must not be part of an argument');
+  for (const line of src.split('\n')) {
+    if (line.includes('execFileSync')) assert.ok(!line.includes('\\u0000'), 'no NUL inside an argument: ' + line.trim());
+  }
+});
+
 test('the repository configuration is in place', () => {
   const dependabot = read('.github/dependabot.yml');
   assert.match(dependabot, /package-ecosystem: github-actions/);
