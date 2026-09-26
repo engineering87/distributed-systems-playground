@@ -38,13 +38,19 @@ async def main():
         await pg.select_option('#log-filter','fault')
         log2 = await pg.inner_text('#log')
         check('p5 pauses' in log2 and 'p5 resumes' in log2, 'pause start and end in the log')
-        # visuals at a moment inside the pause
-        await pg.evaluate("(()=>{const s=document.querySelector('#scrub'); s.value=3000; s.dispatchEvent(new Event('input'));})()")
-        await pg.wait_for_timeout(200)
-        cls = await pg.evaluate("[...document.querySelectorAll('#g-nodes .nd')].map(n=>n.getAttribute('class')).join(' ')")
-        await pg.click('#g-nodes [data-node=\"5\"]'); await pg.click('[data-tab=state]')
-        inspector = await pg.inner_text('#inspector')
-        check('paused until' in inspector or 'paused' in cls, 'paused process shown: ' + inspector.split('\n')[0][:60])
+        # Visuals at a moment inside the pause. Which scrub position that is depends on how long the run
+        # turned out to be, so look for it instead of assuming one.
+        await pg.click('#g-nodes [data-node="5"]'); await pg.click('[data-tab=state]')
+        found, at = False, None
+        for pos in range(200, 10000, 200):
+            await pg.evaluate(f"(()=>{{const s=document.querySelector('#scrub'); s.value={pos}; s.dispatchEvent(new Event('input'));}})()")
+            await pg.wait_for_timeout(60)
+            cls = await pg.evaluate("[...document.querySelectorAll('#g-nodes .nd')].map(n=>n.getAttribute('class')).join(' ')")
+            inspector = await pg.inner_text('#inspector')
+            if 'paused until' in inspector or 'paused' in cls:
+                found, at = True, await pg.inner_text('#tlabel')
+                break
+        check(found, f'the paused process is shown while it is paused (cursor at {at})')
         await pg.screenshot(path='faults.png')
         # inject a pause at the cursor
         await pg.click('#g-nodes [data-node="2"]')

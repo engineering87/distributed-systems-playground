@@ -57,3 +57,7 @@ step throws, so a failure still shows how far it got.
 
 Start from an existing file. Keep the shape: a list of `check(condition, message)` calls, a `print` of the
 page errors at the end, and no assumption about where the file is run from (`common.py` resolves paths).
+
+Two habits keep a suite from breaking on a machine or an engine that is not yours: never assume a fixed
+cursor position or a fixed instant — look for the moment you need — and never assume that something slow is
+still running when you come back to it.
