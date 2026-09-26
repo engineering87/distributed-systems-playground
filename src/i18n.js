@@ -317,6 +317,15 @@ M('The same scenario, one run per seed, in the background. Properties and failed
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
 M('Seeds', 'Semi');
 M('Behaviour profile', 'Profilo di comportamento');
+M('About this project', 'Informazioni sul progetto');
+M('The scenario as JSON', 'Lo scenario in JSON');
+M('Space-time diagram: one line per process, one arrow per message', 'Diagramma spazio-tempo: una linea per processo, una freccia per messaggio'); M('Author', 'Autore');
+M('A playground for distributed algorithms: write them in the pseudocode of the textbooks, run them against a network that does not keep its promises, and check the properties they should satisfy.',
+  'Un laboratorio per algoritmi distribuiti: scrivili nello pseudocodice dei libri di testo, eseguili contro una rete che non mantiene le promesse e verifica le proprietà che dovrebbero soddisfare.');
+M('Repository and issues', 'Repository e segnalazioni');
+M('MIT licensed. Contributions, corrections and new algorithms are welcome.', 'Licenza MIT. Contributi, correzioni e nuovi algoritmi sono benvenuti.');
+M('Copy the profile as a Markdown report', 'Copia il profilo come report Markdown'); M('Copy report', 'Copia report');
+P(/^Version (.+)$/, m => 'Versione ' + m[1]);
 M('declare it in state', 'dichiarala in state'); M('add a module that implements it', 'aggiungi un modulo che la implementa');
 M('declare the interface', 'dichiara l\'interfaccia'); M('add the handler', 'aggiungi l\'handler');
 M('keyword', 'parola chiave'); M('built-in', 'predefinito'); M('built-in function', 'funzione predefinita');

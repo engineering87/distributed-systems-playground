@@ -7,6 +7,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+// piping into head or less closes the output early: that is not an error
+process.stdout.on('error', e => { if (e.code === 'EPIPE') process.exit(0); throw e; });
+
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const C = require(join(here, '../src/core.js'));
@@ -41,6 +44,8 @@ Options:
   --fault-window <w>    when those faults happen, 0..3s by default
   --minimize            for each run that failed, shrink its generated schedule
                         to the faults that still produce the same failure
+  --suite               take seeds, faults and window from the scenario itself
+  --markdown            print a profile as a Markdown report
   --stop-on-failure     stop at the first run that fails or breaks a property
   --outcomes            group the runs by the outputs they produced
   --outputs             print the outputs of every run
@@ -74,6 +79,8 @@ function parseArgs(argv) {
       if (eq < 1) fail('Expected --set path=value, found ' + kv);
       out.set[kv.slice(0, eq)] = kv.slice(eq + 1);
     } else if (a === '--minimize') out.minimize = true;
+    else if (a === '--suite') out.suite = true;
+    else if (a === '--markdown') out.markdown = true;
     else if (a === '--stop-on-failure') out.stopOnFailure = true;
     else if (a === '--outcomes') out.outcomes = true;
     else if (a === '--outputs') out.outputs = true;
@@ -169,6 +176,7 @@ function printOutcomes(res) {
 
 function cmdRun(args) {
   const scenario = loadScenario(args);
+  applySuite(scenario, args);
   let res;
   try {
     res = R.runBatch(scenario, {
@@ -199,15 +207,31 @@ function cmdRun(args) {
   process.exit(bad ? 1 : 0);
 }
 
+// the suite the scenario carries: seeds, generated faults and their window
+function applySuite(scenario, args) {
+  if (!args.suite) return;
+  const suite = scenario.suite;
+  if (!suite) fail('This scenario carries no suite: give --seeds and --faults instead.');
+  if (args.seeds === undefined) args.seeds = suite.seeds;
+  if (args.faults === undefined && suite.faults) args.faults = suite.faults;
+  if (args.faultWindow === undefined && suite.window) args.faultWindow = suite.window;
+}
+
 function cmdProfile(args) {
   const scenario = loadScenario(args);
+  applySuite(scenario, args);
   let res;
   try {
     res = R.profile(scenario, { seeds: args.seeds || '1..20', preset: args.preset, set: args.set, faultWindow: args.faultWindow });
   } catch (e) { fail(e.message); }
+  const anyBroken = () => res.rows.some(r => r.failed || r.assertions || r.properties.some(p => p.failed));
   if (args.json) {
     process.stdout.write(JSON.stringify(res, null, 2) + '\n');
-    process.exit(res.rows.some(r => r.failed || r.assertions || r.properties.some(p => p.failed)) ? 1 : 0);
+    process.exit(anyBroken() ? 1 : 0);
+  }
+  if (args.markdown) {
+    process.stdout.write(R.profileMarkdown(res, { window: args.faultWindow || '0..3s' }));
+    process.exit(anyBroken() ? 1 : 0);
   }
   const names = res.rows[0] ? res.rows[0].properties.map(p => p.name) : [];
   const MARK = { ok: '  ok  ', degraded: ' ~    ', broken: ' FAIL ', failed: ' FAIL ' };

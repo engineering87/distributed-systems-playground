@@ -15,6 +15,7 @@ const KEEP = new Set(['Distributed Systems Playground', 'Upon', 'DELTA', 'PHI', 
   'Net', 'Rounds', 'Stack', 'Scenario', 'Broadcast', 'Crash', 'Standard', 'English', 'Italiano', 'Zoom', 'unknown',
   'output', 'offset', 'round', 'log', 'input', 'Ring', 'Grid', 'Random', 'Star', 'Line', 'Complete', 'Binary tree',
   'Ctrl', 'Cmd', 'Enter', 'Space', 'Home', 'End', 'Page Up', 'Page Down', 'Delete', 'Esc', 'V', 'N', 'L', 'D', 'P', 'F', '?',
+  'Francesco Del Re', 'GitHub: engineering87', 'Blog: engineering87.github.io',
   'const(d)', 'uniform(a, b)', 'exp(mean)', 'normal(μ, σ)', 'lognormal(μ, σ)', 'pareto(xm, α)', 'empirical(a, b, …)']);
 
 // Walks the template once, instead of cutting pieces out of it with regular expressions: comments, code

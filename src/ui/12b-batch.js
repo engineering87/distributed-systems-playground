@@ -95,6 +95,7 @@ function parseSeedSpec(text) {
   catch (e) { return null; }
 }
 let lastRuns = [], lastSeeds = [];
+let lastProfile = null;
 function renderBatchResults(runs, seeds) {
   lastRuns = runs; lastSeeds = seeds;
   const box = $('#batch-results');
@@ -285,12 +286,39 @@ function renderProfile(rows, seeds) {
     table.append(tr);
   }
   const sum = window.SimRunner.profileSummary(rows);
+  lastProfile = { rows, seeds };
+  $('#btn-profile-md').hidden = false;
   box.append(el('p', { class: 'profile-headline' + (sum.broken.length ? ' bad' : ' good') }, sum.headline));
   box.append(el('div', { class: 'profile-wrap' }, table));
   box.append(el('p', { class: 'hint' }, seeds + ' seed(s) per condition. Reach is the share of processes that produced an output; settles is the median time of the last one.'));
 }
+// The batch fields are the suite of the scenario: they are filled from it and saved into it.
+function fillSuite() {
+  const suite = S.scn.suite || {};
+  $('#batch-seeds').value = suite.seeds || '1..50';
+  $('#batch-faults').value = suite.faults || '';
+  $('#batch-window').value = suite.window || '0..3s';
+}
+function saveSuite() {
+  S.scn.suite = {
+    seeds: $('#batch-seeds').value.trim() || '1..50',
+    faults: $('#batch-faults').value.trim(),
+    window: $('#batch-window').value.trim() || '0..3s'
+  };
+  markStale();
+}
 function bindBatch() {
+  for (const id of ['#batch-seeds', '#batch-faults', '#batch-window']) {
+    $(id).addEventListener('change', saveSuite);
+  }
   $('#btn-batch').addEventListener('click', startBatch);
   $('#btn-profile').addEventListener('click', startProfile);
+  $('#btn-profile-md').addEventListener('click', () => {
+    if (!lastProfile) return;
+    const md = window.SimRunner.profileMarkdown(
+      { rows: lastProfile.rows, seeds: lastProfile.seeds },
+      { title: S.scn.top, window: $('#batch-window').value });
+    copyText(md, $('#batch-progress'));
+  });
   $('#batch-seeds').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); startBatch(); } });
 }

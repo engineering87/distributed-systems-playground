@@ -330,3 +330,42 @@ test('the command line prints a profile and fails when something breaks', () => 
   assert.equal(json.rows.length, R.PROFILE_GRID.length);
   assert.ok(json.rows.every(r => typeof r.reach === 'number'));
 });
+
+test('a profile can be written as a Markdown report', () => {
+  const res = R.profile(scenarioOf('paxos'), { seeds: '1..5', faultWindow: '0..60ms' });
+  const md = R.profileMarkdown(res, { title: 'Paxos', window: '0..60ms' });
+  assert.match(md, /^# Behaviour profile: Paxos/);
+  assert.match(md, /\| condition \| Agreement \| Validity \| Termination \|/);
+  assert.equal(md.split('\n').filter(l => l.startsWith('| ')).length, res.rows.length + 1, 'one row per condition, plus the header');
+  assert.match(md, /## What broke/);
+  assert.match(md, /5 seed\(s\) per condition, faults within 0\.\.60ms/);
+  // a profile where nothing breaks has no "what broke" section
+  const clean = R.profile(scenarioOf('flooding'), { seeds: '1..3', grid: [{ name: 'no faults', plan: '' }] });
+  assert.doesNotMatch(R.profileMarkdown(clean, {}), /## What broke/);
+});
+
+test('the command line can take the suite from the scenario', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsp-suite-'));
+  const file = path.join(dir, 'scenario.json');
+  const scn = scenarioOf('paxos');
+  scn.suite = { seeds: '1..6', faults: 'crash:1', window: '0..60ms' };
+  fs.writeFileSync(file, JSON.stringify(scn));
+
+  // the generated crashes can break termination, which is an exit code of 1, so read the output either way
+  const output = cmd => { try { return cmd(); } catch (e) { return e.stdout; } };
+  const out = output(() => cli('run', file, '--suite', '--quiet'));
+  assert.match(out, /6 run\(s\)/, 'the seeds come from the scenario');
+
+  const md = output(() => cli('profile', file, '--suite', '--markdown'));
+  assert.match(md, /# Behaviour profile/);
+  assert.match(md, /6 seed\(s\) per condition/);
+
+  // a scenario without a suite says so instead of guessing
+  fs.writeFileSync(file, JSON.stringify(scenarioOf('paxos')));
+  assert.throws(() => cli('run', file, '--suite'), e => {
+    assert.equal(e.status, 2);
+    assert.match(e.stderr, /carries no suite/);
+    return true;
+  });
+  fs.rmSync(dir, { recursive: true, force: true });
+});

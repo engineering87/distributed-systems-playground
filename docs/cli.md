@@ -17,6 +17,12 @@ You need Node.js 18 or later and a copy of the repository. There is nothing to i
 
 ## The command line tool
 
+Installed from npm it is `dsp`, with no clone at all:
+
+```sh
+npx distributed-systems-playground profile scenario.json
+```
+
 ```sh
 node bin/dsp.mjs --help          # or: npm run dsp -- --help
 node bin/dsp.mjs examples        # the built-in examples and their timing model
@@ -114,6 +120,23 @@ seed 1: 1 of 4 fault(s) are enough (7 runs)
 The four faults of that run become one: a single process dropping part of what it receives is enough to make FloodSet disagree. Shrinking drops faults one at a time while the run keeps failing **in the same way** (the same properties broken, the same error, the same failed assertions), then shortens what is left and lowers omission probabilities. Each attempt is a whole simulation, and the number of them is capped, so it stays quick.
 
 The same button is in the page, next to the failing seeds of a batch.
+
+## A suite that travels with the scenario
+
+A scenario can carry the batch it should run: the seeds, the generated faults and their window. The fields under *Run over many seeds* in the page are that suite, and they are saved with the scenario, so an exercise handed to a class brings its own criterion of correctness:
+
+```json
+"suite": { "seeds": "1..50", "faults": "crash:1", "window": "0..3s" }
+```
+
+`--suite` reads it, which makes a scenario a one-line check in continuous integration:
+
+```sh
+node bin/dsp.mjs run solution.json --suite
+node bin/dsp.mjs profile solution.json --suite --markdown > profile.md
+```
+
+A scenario without a suite says so rather than guessing. Anything given on the command line wins over the suite.
 
 ## Properties across a batch
 
@@ -234,6 +257,8 @@ Each row is an ordinary batch with a different fault plan, so every number is re
 `--seeds`, `--preset`, `--set` and `--fault-window` work as they do for `run`; `--json` prints the rows. The exit code is 1 when any condition broke a property, failed an assertion or failed a run, which makes the profile usable as a regression test of an algorithm.
 
 The same grid is in the page: **Behaviour profile** in the *Scenario* tab, next to the batch controls.
+
+`--markdown` prints the profile as a report — the headline, the table, what broke and where — ready to paste into an issue or a handout. The page has the same thing behind **Copy report**.
 
 ## The batch runner API
 

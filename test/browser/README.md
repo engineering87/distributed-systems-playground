@@ -38,6 +38,8 @@ downloaded files go (`test/browser/out` by default, which is not committed).
 | `faults` | one-way link failures, process pauses and omissions: form, log, drawing and injection at the cursor |
 | `batch` | running a scenario over many seeds: workers, progress, results, opening a seed, stopping |
 | `profile` | the behaviour profile: the grid of conditions, the table, and opening a failing seed |
+| `about` | the about dialog: version, author, external links and its Italian version |
+| `a11y` | names of the controls, landmarks, keyboard focus, dialogs and colour contrast in both themes |
 | `security` | markup typed in the editor, prototype pollution from imports, links and storage, what a saved file contains, and what an exported image may carry |
 | `touch` | a phone: taps, dragging a process, scrolling over the graph, target sizes and dialogs |
 | `layout` | eleven screen sizes, from 320×640 to 2560×1440: overflow, clipping and touch target sizes |

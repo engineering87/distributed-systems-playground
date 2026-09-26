@@ -594,6 +594,13 @@ table.profile .bar i { display: block; height: 100%; background: var(--blue); }
 .diag li .msg { cursor: pointer; flex: 1; }
 .diag button.fix { white-space: nowrap; }
 
+/* ---------- about ---------- */
+#dlg-about { max-width: 460px; }
+#dlg-about h3 { margin: 14px 0 4px; font-size: 13px; }
+.about-links { list-style: none; margin: 4px 0 10px; padding: 0; }
+.about-links li { padding: 2px 0; }
+.about-links a { color: var(--blue); }
+
 </style>
 </head>
 <body data-timing="asynchronous">
@@ -633,6 +640,7 @@ table.profile .bar i { display: block; height: 100%; background: var(--blue); }
     <button id="btn-export" class="ghost" type="button">Export</button>
     <button id="btn-import" class="ghost" type="button">Import</button>
     <button id="btn-shortcuts" class="ghost icon" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+    <button id="btn-about" class="ghost icon" type="button" title="About this project" aria-label="About this project">ⓘ</button>
     <button id="btn-settings" class="ghost icon" type="button" title="Settings" aria-label="Settings">⚙</button>
   </div>
 </header>
@@ -862,6 +870,7 @@ uses PerfectLinks as pl via AckLinks</pre>
       <label class="field inline"><span>Window</span><input id="batch-window" value="0..3s" class="tiny" aria-label="When the generated faults happen"></label>
       <button type="button" id="btn-batch" class="ghost">Run over seeds</button>
       <button type="button" id="btn-profile" class="ghost" title="Run the algorithm over a grid of fault conditions and summarize how it behaves">Behaviour profile</button>
+      <button type="button" id="btn-profile-md" class="ghost" hidden title="Copy the profile as a Markdown report">Copy report</button>
       <span id="batch-progress" class="hint"></span>
     </div>
     <div id="batch-results"></div>
@@ -915,7 +924,7 @@ uses PerfectLinks as pl via AckLinks</pre>
           </span>
         </div>
         <div id="cone-info" class="cone-info" hidden></div>
-        <div id="st-wrap" class="st-wrap"><canvas id="st"></canvas><div id="tip" class="tip" hidden></div></div>
+        <div id="st-wrap" class="st-wrap"><canvas id="st" role="img" aria-label="Space-time diagram: one line per process, one arrow per message"></canvas><div id="tip" class="tip" hidden></div></div>
         <div class="legend">
           <span><i class="lg deliver"></i>delivered</span>
           <span><i class="lg late"></i>violation</span>
@@ -953,7 +962,7 @@ uses PerfectLinks as pl via AckLinks</pre>
   <form method="dialog">
     <h2>Export the scenario</h2>
     <p class="hint">The JSON file holds topology, code, timing model, inputs, faults and seed: opening it again reproduces the same run.</p>
-    <textarea id="export-text" rows="12" class="mono" readonly></textarea>
+    <textarea id="export-text" rows="12" class="mono" readonly aria-label="The scenario as JSON"></textarea>
     <label class="field"><span>Shareable link</span><input id="export-link" readonly></label>
     <div class="field"><span>Images of the current view</span>
       <div class="row">
@@ -983,6 +992,21 @@ uses PerfectLinks as pl via AckLinks</pre>
       <button type="button" id="btn-do-import" class="primary">Import</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="dlg-about">
+  <h2>Distributed Systems Playground</h2>
+  <p class="hint" id="about-version"></p>
+  <p>A playground for distributed algorithms: write them in the pseudocode of the textbooks, run them against a network that does not keep its promises, and check the properties they should satisfy.</p>
+  <h3>Author</h3>
+  <p><b>Francesco Del Re</b></p>
+  <ul class="about-links">
+    <li><a href="https://github.com/engineering87" target="_blank" rel="noopener noreferrer">GitHub: engineering87</a></li>
+    <li><a href="https://engineering87.github.io" target="_blank" rel="noopener noreferrer">Blog: engineering87.github.io</a></li>
+    <li><a href="https://github.com/engineering87/distributed-systems-playground" target="_blank" rel="noopener noreferrer">Repository and issues</a></li>
+  </ul>
+  <p class="hint">MIT licensed. Contributions, corrections and new algorithms are welcome.</p>
+  <div class="row end"><button type="button" class="ghost" data-close>Close</button></div>
 </dialog>
 
 <dialog id="dlg-settings">
@@ -4370,6 +4394,15 @@ M('The same scenario, one run per seed, in the background. Properties and failed
   'Lo stesso scenario, un\'esecuzione per seme, in background. Proprietà e asserzioni violate sono riportate per seme; clicca un seme per aprire quell\'esecuzione.');
 M('Seeds', 'Semi');
 M('Behaviour profile', 'Profilo di comportamento');
+M('About this project', 'Informazioni sul progetto');
+M('The scenario as JSON', 'Lo scenario in JSON');
+M('Space-time diagram: one line per process, one arrow per message', 'Diagramma spazio-tempo: una linea per processo, una freccia per messaggio'); M('Author', 'Autore');
+M('A playground for distributed algorithms: write them in the pseudocode of the textbooks, run them against a network that does not keep its promises, and check the properties they should satisfy.',
+  'Un laboratorio per algoritmi distribuiti: scrivili nello pseudocodice dei libri di testo, eseguili contro una rete che non mantiene le promesse e verifica le proprietà che dovrebbero soddisfare.');
+M('Repository and issues', 'Repository e segnalazioni');
+M('MIT licensed. Contributions, corrections and new algorithms are welcome.', 'Licenza MIT. Contributi, correzioni e nuovi algoritmi sono benvenuti.');
+M('Copy the profile as a Markdown report', 'Copia il profilo come report Markdown'); M('Copy report', 'Copia report');
+P(/^Version (.+)$/, m => 'Versione ' + m[1]);
 M('declare it in state', 'dichiarala in state'); M('add a module that implements it', 'aggiungi un modulo che la implementa');
 M('declare the interface', 'dichiara l\'interfaccia'); M('add the handler', 'aggiungi l\'handler');
 M('keyword', 'parola chiave'); M('built-in', 'predefinito'); M('built-in function', 'funzione predefinita');
@@ -6554,6 +6587,45 @@ function profile(scenario, opts) {
   return { rows, seeds: seedList(opts.seeds !== undefined ? opts.seeds : scenario.seed || 1).length, ms: Date.now() - started };
 }
 
+// The profile as a Markdown report: a table, the verdicts and the sentence, ready to paste into an issue,
+// a handout or a pull request.
+function profileMarkdown(res, meta) {
+  const rows = res.rows || res;
+  const sum = profileSummary(rows);
+  const names = rows.length ? rows[0].properties.map(p => p.name) : [];
+  const MARK = { ok: 'held', degraded: 'held (partial reach)', broken: 'broken', failed: 'failed' };
+  const out = [];
+  out.push('# Behaviour profile' + (meta && meta.title ? ': ' + meta.title : ''));
+  out.push('');
+  out.push(sum.headline);
+  out.push('');
+  out.push('| condition | ' + names.concat(['messages', 'reach', 'settles', 'verdict']).join(' | ') + ' |');
+  out.push('|---|' + names.concat(['', '', '', '']).map(() => '---|').join(''));
+  for (const r of rows) {
+    const cells = names.map(n => {
+      const p = r.properties.find(x => x.name === n);
+      return p ? p.held + '/' + r.runs : '—';
+    });
+    cells.push(String(r.avgMessages), Math.round(r.reach * 100) + '%',
+      r.settle === null ? '—' : C.fmtDuration(r.settle), MARK[r.verdict] || r.verdict);
+    out.push('| ' + r.name + ' | ' + cells.join(' | ') + ' |');
+  }
+  const broken = rows.filter(r => r.verdict === 'broken' || r.verdict === 'failed');
+  if (broken.length) {
+    out.push('');
+    out.push('## What broke');
+    out.push('');
+    for (const r of broken) {
+      out.push('- **' + r.name + '**: ' + r.verdictText + (r.worstSeed !== null ? ' (seed ' + r.worstSeed + ')' : ''));
+    }
+  }
+  out.push('');
+  out.push('_' + (res.seeds || rows[0] && rows[0].runs || 0) + ' seed(s) per condition' +
+    (meta && meta.window ? ', faults within ' + meta.window : '') +
+    '. Reach is the share of processes that produced an output; settles is the median time of the last one._');
+  return out.join('\n') + '\n';
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -6586,7 +6658,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, verdictOf, PROFILE_GRID };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, profileMarkdown, verdictOf, PROFILE_GRID };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);
@@ -11515,6 +11587,45 @@ function profile(scenario, opts) {
   return { rows, seeds: seedList(opts.seeds !== undefined ? opts.seeds : scenario.seed || 1).length, ms: Date.now() - started };
 }
 
+// The profile as a Markdown report: a table, the verdicts and the sentence, ready to paste into an issue,
+// a handout or a pull request.
+function profileMarkdown(res, meta) {
+  const rows = res.rows || res;
+  const sum = profileSummary(rows);
+  const names = rows.length ? rows[0].properties.map(p => p.name) : [];
+  const MARK = { ok: 'held', degraded: 'held (partial reach)', broken: 'broken', failed: 'failed' };
+  const out = [];
+  out.push('# Behaviour profile' + (meta && meta.title ? ': ' + meta.title : ''));
+  out.push('');
+  out.push(sum.headline);
+  out.push('');
+  out.push('| condition | ' + names.concat(['messages', 'reach', 'settles', 'verdict']).join(' | ') + ' |');
+  out.push('|---|' + names.concat(['', '', '', '']).map(() => '---|').join(''));
+  for (const r of rows) {
+    const cells = names.map(n => {
+      const p = r.properties.find(x => x.name === n);
+      return p ? p.held + '/' + r.runs : '—';
+    });
+    cells.push(String(r.avgMessages), Math.round(r.reach * 100) + '%',
+      r.settle === null ? '—' : C.fmtDuration(r.settle), MARK[r.verdict] || r.verdict);
+    out.push('| ' + r.name + ' | ' + cells.join(' | ') + ' |');
+  }
+  const broken = rows.filter(r => r.verdict === 'broken' || r.verdict === 'failed');
+  if (broken.length) {
+    out.push('');
+    out.push('## What broke');
+    out.push('');
+    for (const r of broken) {
+      out.push('- **' + r.name + '**: ' + r.verdictText + (r.worstSeed !== null ? ' (seed ' + r.worstSeed + ')' : ''));
+    }
+  }
+  out.push('');
+  out.push('_' + (res.seeds || rows[0] && rows[0].runs || 0) + ' seed(s) per condition' +
+    (meta && meta.window ? ', faults within ' + meta.window : '') +
+    '. Reach is the share of processes that produced an output; settles is the median time of the last one._');
+  return out.join('\n') + '\n';
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -11547,7 +11658,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, verdictOf, PROFILE_GRID };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, profileMarkdown, verdictOf, PROFILE_GRID };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);
@@ -11574,6 +11685,8 @@ self.onmessage = function (e) {
 <script>
 (function () {
 'use strict';
+
+const APP_VERSION = '1.1.0';
 
 // 01-base.js — state, helpers and small utilities shared by the rest of the interface
 
@@ -11689,6 +11802,15 @@ function ensureScenario(s) {
     version: 1, seed: 1, nodes: [], links: [], code: '', top: '', inputs: '', faults: [], preset: 'custom',
     stopAt: '5s', tieBreak: 'stable', violationPolicy: base.violationPolicy, haltOnAssert: false
   }, s);
+  // The suite is what a batch of this scenario should run: seeds, generated faults and their window.
+  // It is optional, so scenarios exported before it still load.
+  if (s.suite && typeof s.suite === 'object' && !Array.isArray(s.suite)) {
+    out.suite = {
+      seeds: String(s.suite.seeds || '1..50'),
+      faults: String(s.suite.faults || ''),
+      window: String(s.suite.window || '0..3s')
+    };
+  } else delete out.suite;
   out.assumed = Object.assign({}, base.assumed, s.assumed || {});
   out.actual = Object.assign({}, base.actual, s.actual || {});
   out.seed = parseInt(out.seed, 10) || 0;
@@ -14318,7 +14440,7 @@ function loadScenario(obj, msg, noUndo) {
   topoChanged(); resetPools();
   S.selected = null; S.linkFrom = null; S.runtimeErr = null; S.res = null; S.cursor = 0;
   S.algos = []; S.ifaces = null; S.topReqs = [];
-  fillForms(); fitView(); checkCode(); renderTopo(); renderProps();
+  fillForms(); fillSuite(); fitView(); checkCode(); renderTopo(); renderProps();
   store.set(STORE_KEY, JSON.stringify(S.scn));
   run(false);
   if (msg) {
@@ -14633,6 +14755,15 @@ function applySettings() {
   if (S.scn) { renderTopo(); drawDiagram(); drawPreview(); renderLayerLegend(); if (S.tab === 'stack') renderStack(true); }
 }
 function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(SET)); }
+// who made this, where to report a problem, which version is running
+function bindAbout() {
+  const dlg = $('#dlg-about');
+  $('#btn-about').addEventListener('click', () => {
+    $('#about-version').textContent = 'Version ' + APP_VERSION;
+    dlg.showModal();
+  });
+  dlg.querySelector('[data-close]').addEventListener('click', () => dlg.close());
+}
 function bindSettings() {
   const dlg = $('#dlg-settings');
   $('#btn-settings').addEventListener('click', () => {
@@ -14861,6 +14992,7 @@ function parseSeedSpec(text) {
   catch (e) { return null; }
 }
 let lastRuns = [], lastSeeds = [];
+let lastProfile = null;
 function renderBatchResults(runs, seeds) {
   lastRuns = runs; lastSeeds = seeds;
   const box = $('#batch-results');
@@ -15051,13 +15183,40 @@ function renderProfile(rows, seeds) {
     table.append(tr);
   }
   const sum = window.SimRunner.profileSummary(rows);
+  lastProfile = { rows, seeds };
+  $('#btn-profile-md').hidden = false;
   box.append(el('p', { class: 'profile-headline' + (sum.broken.length ? ' bad' : ' good') }, sum.headline));
   box.append(el('div', { class: 'profile-wrap' }, table));
   box.append(el('p', { class: 'hint' }, seeds + ' seed(s) per condition. Reach is the share of processes that produced an output; settles is the median time of the last one.'));
 }
+// The batch fields are the suite of the scenario: they are filled from it and saved into it.
+function fillSuite() {
+  const suite = S.scn.suite || {};
+  $('#batch-seeds').value = suite.seeds || '1..50';
+  $('#batch-faults').value = suite.faults || '';
+  $('#batch-window').value = suite.window || '0..3s';
+}
+function saveSuite() {
+  S.scn.suite = {
+    seeds: $('#batch-seeds').value.trim() || '1..50',
+    faults: $('#batch-faults').value.trim(),
+    window: $('#batch-window').value.trim() || '0..3s'
+  };
+  markStale();
+}
 function bindBatch() {
+  for (const id of ['#batch-seeds', '#batch-faults', '#batch-window']) {
+    $(id).addEventListener('change', saveSuite);
+  }
   $('#btn-batch').addEventListener('click', startBatch);
   $('#btn-profile').addEventListener('click', startProfile);
+  $('#btn-profile-md').addEventListener('click', () => {
+    if (!lastProfile) return;
+    const md = window.SimRunner.profileMarkdown(
+      { rows: lastProfile.rows, seeds: lastProfile.seeds },
+      { title: S.scn.top, window: $('#batch-window').value });
+    copyText(md, $('#batch-progress'));
+  });
   $('#batch-seeds').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); startBatch(); } });
 }
 
@@ -15071,7 +15230,7 @@ async function init() {
   $('#toast').setAttribute('role', 'status');
   applySettings();
   bindHeader(); bindForms(); bindEditor(); bindTopo(); bindDiagram(); bindTransport(); bindDialogs(); bindKeys();
-  bindSettings(); bindTour(); bindGallery(); bindBatch(); bindCompletion();
+  bindSettings(); bindAbout(); bindTour(); bindGallery(); bindBatch(); bindCompletion();
   window.addEventListener('resize', () => { if (S.tab === 'time') drawPreview(); });
   window.addEventListener('hashchange', async () => {
     try { const shared = await fromHash(); if (shared) loadScenario(shared, 'Opened the shared scenario.'); }

@@ -112,6 +112,15 @@ function ensureScenario(s) {
     version: 1, seed: 1, nodes: [], links: [], code: '', top: '', inputs: '', faults: [], preset: 'custom',
     stopAt: '5s', tieBreak: 'stable', violationPolicy: base.violationPolicy, haltOnAssert: false
   }, s);
+  // The suite is what a batch of this scenario should run: seeds, generated faults and their window.
+  // It is optional, so scenarios exported before it still load.
+  if (s.suite && typeof s.suite === 'object' && !Array.isArray(s.suite)) {
+    out.suite = {
+      seeds: String(s.suite.seeds || '1..50'),
+      faults: String(s.suite.faults || ''),
+      window: String(s.suite.window || '0..3s')
+    };
+  } else delete out.suite;
   out.assumed = Object.assign({}, base.assumed, s.assumed || {});
   out.actual = Object.assign({}, base.actual, s.actual || {});
   out.seed = parseInt(out.seed, 10) || 0;

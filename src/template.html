@@ -51,6 +51,7 @@
     <button id="btn-export" class="ghost" type="button">Export</button>
     <button id="btn-import" class="ghost" type="button">Import</button>
     <button id="btn-shortcuts" class="ghost icon" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+    <button id="btn-about" class="ghost icon" type="button" title="About this project" aria-label="About this project">ⓘ</button>
     <button id="btn-settings" class="ghost icon" type="button" title="Settings" aria-label="Settings">⚙</button>
   </div>
 </header>
@@ -280,6 +281,7 @@ uses PerfectLinks as pl via AckLinks</pre>
       <label class="field inline"><span>Window</span><input id="batch-window" value="0..3s" class="tiny" aria-label="When the generated faults happen"></label>
       <button type="button" id="btn-batch" class="ghost">Run over seeds</button>
       <button type="button" id="btn-profile" class="ghost" title="Run the algorithm over a grid of fault conditions and summarize how it behaves">Behaviour profile</button>
+      <button type="button" id="btn-profile-md" class="ghost" hidden title="Copy the profile as a Markdown report">Copy report</button>
       <span id="batch-progress" class="hint"></span>
     </div>
     <div id="batch-results"></div>
@@ -333,7 +335,7 @@ uses PerfectLinks as pl via AckLinks</pre>
           </span>
         </div>
         <div id="cone-info" class="cone-info" hidden></div>
-        <div id="st-wrap" class="st-wrap"><canvas id="st"></canvas><div id="tip" class="tip" hidden></div></div>
+        <div id="st-wrap" class="st-wrap"><canvas id="st" role="img" aria-label="Space-time diagram: one line per process, one arrow per message"></canvas><div id="tip" class="tip" hidden></div></div>
         <div class="legend">
           <span><i class="lg deliver"></i>delivered</span>
           <span><i class="lg late"></i>violation</span>
@@ -371,7 +373,7 @@ uses PerfectLinks as pl via AckLinks</pre>
   <form method="dialog">
     <h2>Export the scenario</h2>
     <p class="hint">The JSON file holds topology, code, timing model, inputs, faults and seed: opening it again reproduces the same run.</p>
-    <textarea id="export-text" rows="12" class="mono" readonly></textarea>
+    <textarea id="export-text" rows="12" class="mono" readonly aria-label="The scenario as JSON"></textarea>
     <label class="field"><span>Shareable link</span><input id="export-link" readonly></label>
     <div class="field"><span>Images of the current view</span>
       <div class="row">
@@ -401,6 +403,21 @@ uses PerfectLinks as pl via AckLinks</pre>
       <button type="button" id="btn-do-import" class="primary">Import</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="dlg-about">
+  <h2>Distributed Systems Playground</h2>
+  <p class="hint" id="about-version"></p>
+  <p>A playground for distributed algorithms: write them in the pseudocode of the textbooks, run them against a network that does not keep its promises, and check the properties they should satisfy.</p>
+  <h3>Author</h3>
+  <p><b>Francesco Del Re</b></p>
+  <ul class="about-links">
+    <li><a href="https://github.com/engineering87" target="_blank" rel="noopener noreferrer">GitHub: engineering87</a></li>
+    <li><a href="https://engineering87.github.io" target="_blank" rel="noopener noreferrer">Blog: engineering87.github.io</a></li>
+    <li><a href="https://github.com/engineering87/distributed-systems-playground" target="_blank" rel="noopener noreferrer">Repository and issues</a></li>
+  </ul>
+  <p class="hint">MIT licensed. Contributions, corrections and new algorithms are welcome.</p>
+  <div class="row end"><button type="button" class="ghost" data-close>Close</button></div>
 </dialog>
 
 <dialog id="dlg-settings">

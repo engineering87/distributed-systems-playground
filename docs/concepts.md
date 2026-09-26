@@ -211,3 +211,54 @@ The CAP theorem, stated by Brewer in 2000 and proved by Gilbert and Lynch in 200
 - T. D. Chandra, S. Toueg. Unreliable Failure Detectors for Reliable Distributed Systems. *Journal of the ACM* 43(2), 1996.
 - T. D. Chandra, V. Hadzilacos, S. Toueg. The Weakest Failure Detector for Solving Consensus. *Journal of the ACM* 43(4), 1996.
 - S. Gilbert, N. Lynch. Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services. *ACM SIGACT News* 33(2), 2002.
+
+## Why distributed systems are hard
+
+A distributed system is a set of independent processes that cooperate by exchanging messages. Databases that replicate data across data centers, payment networks, container orchestrators, blockchains and the services behind any large website are all distributed systems. They are built this way for fault tolerance, scale and geography, and they pay for it with a set of problems that do not exist on a single machine.
+
+## No shared memory, no shared clock
+
+Processes do not share memory. The only way for one process to learn something about another is to receive a message from it, and by the time the message arrives, the sender may have changed its state, or stopped.
+
+There is also no global clock. Each machine has its own oscillator, clocks drift apart, and synchronization protocols can only bound the error, not remove it. Leslie Lamport showed in 1978 that the meaningful notion of time in such a system is causal: an event *happened before* another only if information could have flowed from the first to the second. A **space-time diagram**, with one horizontal line per process and one arrow per message, is the standard way to draw this relation, and it is the main view of this playground.
+
+## Partial failures
+
+On a single computer, a failure usually stops everything. In a distributed system, some processes fail while others keep running, and the survivors have to decide what to do without knowing exactly what happened. The literature classifies failures by how badly a process can misbehave:
+
+| Failure model | What a faulty process can do |
+|---|---|
+| Crash-stop | stop at an arbitrary moment and never come back |
+| Crash-recovery | stop and later restart, possibly losing volatile state |
+| Omission | fail to send or receive some messages |
+| Byzantine | behave arbitrarily, including lying or colluding |
+
+Channels fail too. Messages can be lost, duplicated, reordered or delayed, and a link can fail while both endpoints keep working. A slow process and a crashed one look identical from the outside, which is the root of most of the difficulty.
+
+## Timing models
+
+What an algorithm can achieve depends heavily on what it may assume about time:
+
+- **Synchronous.** There are known bounds on message delay, on processing time and on clock drift. Algorithms can proceed in rounds and treat a missing message as proof of failure.
+- **Asynchronous.** There are no bounds at all. This is the weakest and safest assumption, but Fischer, Lynch and Paterson proved in 1985 that no deterministic algorithm can guarantee consensus in this model if even one process may crash (the FLP impossibility result).
+- **Partially synchronous.** Bounds exist but are unknown, or hold only after some unknown Global Stabilization Time (GST). Dwork, Lynch and Stockmeyer introduced this model in 1988, and practical consensus protocols such as Paxos and Raft are designed for it: they are always safe, and they make progress once the network behaves.
+
+Unreliable **failure detectors**, introduced by Chandra and Toueg, package these timing assumptions into an abstraction. An *eventually perfect* detector may suspect correct processes for a while, but eventually suspects exactly the crashed ones.
+
+## Layers of abstraction
+
+Textbooks, most notably *Introduction to Reliable and Secure Distributed Programming* by Cachin, Guerraoui and Rodrigues, build distributed algorithms as stacks of modules. A perfect link is built on a lossy link, a reliable broadcast on perfect links, a failure detector on timers and links, and consensus on top of broadcast and failure detection. Each module reacts to events from the layers around it:
+
+```
+upon event ⟨pl, Deliver | p, m⟩ do
+  trigger ⟨beb, Deliver | p, m⟩
+end
+```
+
+This notation is precise enough to reason about and close enough to code that it can be executed. The playground executes it.
+
+## The gap between the model and the network
+
+Proofs hold under their assumptions. When a course states that FloodSet solves consensus in f + 1 synchronous rounds, the statement is correct, and it is also silent about what happens when a round-2 message arrives 5 milliseconds after the round closed. Real networks have long-tailed latency, sporadic spikes, drifting clocks and garbage-collection pauses. The consequences of that gap are hard to see on a whiteboard, and they are the reason distributed systems fail in production.
+
+This project exists to make that gap visible.

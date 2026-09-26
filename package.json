@@ -1,16 +1,40 @@
 {
   "name": "distributed-systems-playground",
-  "version": "0.23.0",
-  "description": "Web app to simulate distributed algorithms with an interactive topology, upon-event pseudocode and a parametric timing model",
-  "private": true,
+  "version": "1.1.0",
+  "description": "Write distributed algorithms in textbook pseudocode, run them against a network that does not keep its promises, and check the properties they should satisfy.",
+  "keywords": [
+    "distributed-systems",
+    "simulator",
+    "consensus",
+    "broadcast",
+    "failure-detector",
+    "teaching",
+    "algorithms"
+  ],
   "homepage": "https://engineering87.github.io/distributed-systems-playground/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/engineering87/distributed-systems-playground.git"
+    "url": "git+https://github.com/engineering87/distributed-systems-playground.git"
+  },
+  "bugs": {
+    "url": "https://github.com/engineering87/distributed-systems-playground/issues"
   },
   "license": "MIT",
   "author": "Francesco Del Re",
-  "engines": { "node": ">=18" },
+  "bin": {
+    "dsp": "bin/dsp.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "index.html",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "node scripts/build.mjs && node scripts/build-docs.mjs",
     "check": "node scripts/build.mjs --check && node scripts/build-docs.mjs --check",

@@ -9,12 +9,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => readFileSync(join(root, 'src', f), 'utf8');
 // The interface is written as one scope split over several files: they are concatenated in name order and
 // wrapped once, so no part has to export anything to the others.
+const VERSION = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 function readUi() {
   const dir = join(root, 'src', 'ui');
   const files = readdirSync(dir).filter(f => f.endsWith('.js')).sort();
   if (!files.length) throw new Error('src/ui/ has no parts');
   const body = files.map(f => readFileSync(join(dir, f), 'utf8').trimEnd()).join('\n\n');
-  return "(function () {\n'use strict';\n\n" + body + "\n})();\n";
+  return "(function () {\n'use strict';\n\nconst APP_VERSION = '" + VERSION + "';\n\n" + body + "\n})();\n";
 }
 
 let html = read('template.html');

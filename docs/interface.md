@@ -38,7 +38,7 @@ On screens narrower than 960 pixels the areas stack in one column: graph, run, s
 
 - **Example** loads a ready-made scenario and runs it. The notification that appears offers **Undo**, which restores what you had before. See [Examples](examples.md).
 - **Gallery** shows the same examples as cards, with a thumbnail of the topology, a short description, the topic and the timing model. The buttons above the cards filter by topic.
-- **?** lists the keyboard shortcuts; **⚙** opens the [settings](#settings).
+- **?** lists the keyboard shortcuts; **ⓘ** shows the project, its author and the version you are running; **⚙** opens the [settings](#settings).
 - **Seed** fixes every random choice of the run. The same scenario with the same seed always gives the same run.
 - **⚄** picks a random seed and runs again.
 - **Run** simulates the current scenario. It is highlighted when the scenario has changed since the last run.
@@ -116,13 +116,15 @@ Everything is explained in [The timing model](timing-model.md).
 
 Write the seeds as `1..50`, `7`, or `1,4,9`, press **Run over seeds**, and the runs happen in the background: the page stays usable while they go.
 
+The three fields (**Seeds**, **Faults per run**, **Window**) are the *suite* of the scenario: they are saved with it, so a scenario opened again, shared as a link or handed to somebody else runs the same batch. From a terminal, `dsp run scenario.json --suite` uses exactly those.
+
 **Faults per run** adds a generated schedule to every run, drawn from its seed: `crash:1`, `partition:1`, `pause:1`, `link:1`, `omission:1`, `recover:1`, or several separated by commas. **Window** says when they happen. The schedule of a run that had a problem is shown next to its seed, and opening that seed adds exactly those faults to the scenario, so the failure is in front of you, reproducible and editable. The panel reports, as results arrive:
 
 - how many runs finished and how many had a problem;
 - for each declared [property](language.md#properties), in how many runs it held and the first seed that broke it;
 - a list of the runs with a problem, or of all of them when there is none.
 
-**Behaviour profile** runs the same algorithm over a grid of fault conditions, one row each: no faults, one crash, two crashes, crash and recovery, a pause, a partition, overlapping partitions, link failures, omissions, a zone crashing. A sentence above the table says what the algorithm holds under and what breaks it. Each row carries a verdict (● held, ◐ held with fewer processes reporting, ✕ something broke), how often each property held, the average messages, the reach as a bar, the median time of the last output, and a button to open a failing seed. It is the quickest answer to "what does this algorithm survive".
+**Behaviour profile** runs the same algorithm over a grid of fault conditions, one row each: no faults, one crash, two crashes, crash and recovery, a pause, a partition, overlapping partitions, link failures, omissions, a zone crashing. A sentence above the table says what the algorithm holds under and what breaks it, and **Copy report** puts the whole profile on the clipboard as Markdown. Each row carries a verdict (● held, ◐ held with fewer processes reporting, ✕ something broke), how often each property held, the average messages, the reach as a bar, the median time of the last output, and a button to open a failing seed. It is the quickest answer to "what does this algorithm survive".
 
 Runs that failed with more than one generated fault also offer **minimize**: it shrinks the schedule to the faults that still produce the same failure, usually turning four into one, and shows the result in place.
 

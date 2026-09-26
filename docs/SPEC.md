@@ -1,6 +1,6 @@
 # SPEC — Distributed Systems Playground
 
-Version: 0.5 (draft) · Status: proposal, partially implemented (see Appendix B)
+Status: this is the original design document. What the implementation does today, and where it departs from this text, is in Appendix B.
 
 ## 1. Purpose
 
@@ -364,7 +364,7 @@ A scenario is self-contained and can be shared as a file or as a URL (deflate-co
 - `inputs` holds external events, one per line: `TIME NODE Event | arguments`, where `NODE` is a number or `*` and the arguments are DSL expressions.
 - `faults` follows §4.1; `groups` may also be an array of arrays of node ids.
 - `top` is the main algorithm; its interface requests are the events accepted as inputs. For each `uses X`, the first algorithm implementing `X` is instantiated.
-- An explicit `stack` of instances and global `invariants` are planned (Appendix B).
+- An explicit `stack` of instances was replaced by binding in the code, and global invariants became `property` declarations (Appendix B).
 
 ---
 
@@ -395,7 +395,7 @@ A scenario is self-contained and can be shared as a file or as a URL (deflate-co
 
 ## 8. Architecture and repository
 
-Target architecture (see Appendix B for what v0.x does instead):
+Target architecture (see Appendix B for what the implementation does instead):
 
 - TypeScript, Vite, React.
 - Parser: Lezer, sharing the grammar with CodeMirror 6 highlighting.
@@ -436,7 +436,8 @@ The parser and the engine have no DOM dependencies and also run under Node, whic
 | **v0.13** | catalog algorithms with their properties: P, Ω, mutual exclusion, two-phase commit |
 | **v0.18** | writing help: contextual completion and quick fixes |
 | **v0.19** | catalog: logical clocks and the Chandy-Lamport snapshot |
-| **v1.0** | a test suite saved with the scenario |
+| **v0.20–0.23** | catalog: quorum register, total order broadcast, Paxos, Ben-Or |
+| **v1.0** | suite saved with the scenario, Markdown reports, npm package, accessibility |
 | **v1.1** | failure detectors (P, ◇P ping-pong, Ω, φ-accrual, SWIM) with suspicion matrix and quality metrics |
 | **v1.2** | algorithm catalog (clocks, snapshots, elections, mutual exclusion, consensus, replication, 2PC) with the properties they must satisfy |
 | **v1.1** | global invariants, node pauses and omissions, one-way link failures, side-by-side comparison |
@@ -539,34 +540,33 @@ end
 
 ---
 
-## Appendix B — Implementation status (v0.5)
+## Appendix B — Implementation status (version 1.x)
 
 ### Implemented
 
-- The full DSL of §5.2, including `condition` and `exists` guards, comprehensions, maps and the ASCII syntax.
-- The static checks of §5.6.
-- The parametric timing model of §3 with its five presets, violation policies (`next-round` is covered by `deliver-late` with emulated rounds), lockstep and emulated rounds, GST with the DLS constraint.
-- Deterministic engine with activity trace; crashes and recoveries; link failures and partitions over time; disabled links; per-link loss and delay.
-- The whole UI of §7 except side-by-side comparison, in English.
+- The full language of §5.2, including `condition` and `exists` guards, comprehensions, maps, functions with `via` binding, and the ASCII syntax; plus global `property` declarations checked after every step.
+- The static checks of §5.6, and completion and quick fixes built from the same parse tree.
+- The parametric timing model of §3 with its five presets, violation policies, lockstep and emulated rounds, GST with the DLS constraint.
+- A deterministic engine with an activity trace; crashes, recoveries, process pauses, send and receive omissions, link failures in one or both directions, partitions (symmetric or one way), disabled links, per-link loss and delay, and faults armed by a condition on the global state.
+- Batch runs over many seeds in worker threads, generated fault schedules by count or by rate, shrinking of a failing schedule, and a behaviour profile over a grid of fault conditions, in the page and on the command line.
+- The whole interface of §7 except side-by-side comparison, in English and Italian.
 
 ### Differences from the specification
 
-| Specification | v0.2 | Reason |
+| Specification | version 1.x | Reason |
 |---|---|---|
 | TypeScript, Vite, React, Lezer, CodeMirror, React Flow | dependency-free JavaScript, SVG and canvas, custom highlighting editor | one static file, no build step needed to use it |
-| Engine in a Web Worker | engine on the main thread, capped at 150,000 events | simplicity; enough for teaching scenarios |
-| Canvas for animation beyond a few hundred nodes | SVG with a static layer redrawn only on topology changes, a separate composited layer for animations, pooled elements, and batched canvas drawing for the diagram; packets switch to a compact form when many are in flight | keeps editing simple while playing large runs smoothly |
+| Engine in a Web Worker | the interactive run is on the main thread, capped at 150,000 events; batches and profiles run in a pool of workers | the single run stays simple to reason about, the heavy work does not block the page |
+| Canvas for animation beyond a few hundred nodes | SVG with a static layer redrawn only on topology changes, a separate composited layer for animations, pooled elements, and batched canvas drawing for the diagram | keeps editing simple while playing large runs smoothly |
 | Periodic snapshots for time travel | the whole run is computed first and then replayed; state recorded at every step that changes it | equivalent thanks to determinism, and simpler |
 | Explicit `stack` in the scenario | binding in the code: `via` when needed, otherwise the first algorithm implementing `X` | the choice lives next to the code that depends on it |
 | Standard library in `.dalg` files | a library of Upon modules in `library.js`, added from the editor; `RetransmitLinks` retransmits a bounded number of times | textbook stubborn links retransmit forever and make traces grow too much |
-| Global invariants | local `assert` only, with an optional halt | v1.1 |
-| Per-node process parameters, GC pauses, `pauses` | global `step` distribution only | v1.1 |
-| Omission failures of a process | omissions come from channel loss only | v1.1 |
+| Properties over the whole system | `property … always/eventually` over the state of the main algorithm of every process; deeper modules must expose what they want observed | the property language stays the expression language, with no new syntax |
 
-### Suggested next steps
+### What is still missing
 
-1. Failure detectors (P, ◇P ping-pong, Ω, φ-accrual, simplified SWIM), a suspicion matrix over time and quality metrics.
-2. An algorithm catalog grouped by topic, with automatic checks of agreement, validity, termination and mutual exclusion.
-3. Global invariants written by the user, checked at every step and shown on the timeline.
-4. Node pauses, send and receive omissions, one-way link failures.
-5. Engine in a Web Worker for larger traces.
+1. Byzantine processes: a process running a different algorithm, lying or saying different things to different processes. This is the one gap in the fault model, and it needs a mechanism the engine does not have.
+2. Message corruption, clock jumps and partial slowdowns (a pause is all or nothing).
+3. Side-by-side comparison of two runs.
+4. The interactive run in a worker, so that a single heavy run cannot block the page.
+5. A configurable grid for the behaviour profile.

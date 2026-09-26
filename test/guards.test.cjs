@@ -74,6 +74,16 @@ test('the version is the same everywhere and has a changelog entry', () => {
   assert.ok(read('CHANGELOG.md').includes('## [' + version + ']'), 'CHANGELOG.md has no section for ' + version);
 });
 
+// The status appendix described v0.5 while the code was at v0.23: a whole major line out of date.
+test('the specification reports the status of the current major version', () => {
+  const major = JSON.parse(read('package.json')).version.split('.')[0];
+  const spec = read('docs/SPEC.md');
+  assert.ok(spec.includes('Implementation status (version ' + major + '.x)'),
+    'docs/SPEC.md still reports the status of another major version, not ' + major + '.x');
+  assert.ok(spec.includes('| Specification | version ' + major + '.x | Reason |'),
+    'the differences table still compares against another major version');
+});
+
 // The numbers the documentation quotes come from real runs. If the engine changes, these fail before a reader does.
 test('the examples still produce the numbers the documentation quotes', () => {
   const examples = read('docs/examples.md');

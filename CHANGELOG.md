@@ -6,6 +6,33 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
+## [1.1.0]
+
+### Changed
+- The README is a quarter of its size: 231 lines instead of 838. What it kept is what a reader needs before deciding to try the project — what it is for, how to start, the algorithms it runs, what it does and where the documentation is. Everything that duplicated the documentation now points at it.
+
+### Added
+- Documentation pages for the material that only lived in the README: [A guided tour](docs/tour.md) and [Questions, related tools and references](docs/faq.md). The section on why distributed systems are hard moved into [Concepts](docs/concepts.md).
+
+## [1.0.1]
+
+### Changed
+- The specification reports the status of version 1.0 instead of 0.5, with what is implemented, how it differs from the original design and what is still missing; a guard test keeps that appendix from drifting from the version again.
+- The about button is documented in the interface guide and in the README, and covered by its own browser suite.
+
+## [1.0.0]
+
+### Added
+- A suite that travels with the scenario: the seeds, the generated faults and their window are saved in the JSON and read back into the batch fields; `--suite` on the command line uses them, which turns a scenario into a one-line check in continuous integration.
+- The behaviour profile as a Markdown report: `--markdown` on the command line, **Copy report** in the page.
+- The command line is published as an npm package: `npx distributed-systems-playground profile scenario.json`.
+- An **About** button with the author, the repository and the version.
+- An accessibility suite: names of every control, landmarks, keyboard focus, dialogs and colour contrast in both themes.
+
+### Fixed
+- The export box and the space-time diagram carry a description for assistive technology.
+- The command line no longer fails when its output is closed early, as `| head` does.
+
 ## [0.23.0]
 
 ### Added

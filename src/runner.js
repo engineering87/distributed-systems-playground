@@ -461,6 +461,45 @@ function profile(scenario, opts) {
   return { rows, seeds: seedList(opts.seeds !== undefined ? opts.seeds : scenario.seed || 1).length, ms: Date.now() - started };
 }
 
+// The profile as a Markdown report: a table, the verdicts and the sentence, ready to paste into an issue,
+// a handout or a pull request.
+function profileMarkdown(res, meta) {
+  const rows = res.rows || res;
+  const sum = profileSummary(rows);
+  const names = rows.length ? rows[0].properties.map(p => p.name) : [];
+  const MARK = { ok: 'held', degraded: 'held (partial reach)', broken: 'broken', failed: 'failed' };
+  const out = [];
+  out.push('# Behaviour profile' + (meta && meta.title ? ': ' + meta.title : ''));
+  out.push('');
+  out.push(sum.headline);
+  out.push('');
+  out.push('| condition | ' + names.concat(['messages', 'reach', 'settles', 'verdict']).join(' | ') + ' |');
+  out.push('|---|' + names.concat(['', '', '', '']).map(() => '---|').join(''));
+  for (const r of rows) {
+    const cells = names.map(n => {
+      const p = r.properties.find(x => x.name === n);
+      return p ? p.held + '/' + r.runs : '—';
+    });
+    cells.push(String(r.avgMessages), Math.round(r.reach * 100) + '%',
+      r.settle === null ? '—' : C.fmtDuration(r.settle), MARK[r.verdict] || r.verdict);
+    out.push('| ' + r.name + ' | ' + cells.join(' | ') + ' |');
+  }
+  const broken = rows.filter(r => r.verdict === 'broken' || r.verdict === 'failed');
+  if (broken.length) {
+    out.push('');
+    out.push('## What broke');
+    out.push('');
+    for (const r of broken) {
+      out.push('- **' + r.name + '**: ' + r.verdictText + (r.worstSeed !== null ? ' (seed ' + r.worstSeed + ')' : ''));
+    }
+  }
+  out.push('');
+  out.push('_' + (res.seeds || rows[0] && rows[0].runs || 0) + ' seed(s) per condition' +
+    (meta && meta.window ? ', faults within ' + meta.window : '') +
+    '. Reach is the share of processes that produced an output; settles is the median time of the last one._');
+  return out.join('\n') + '\n';
+}
+
 // Groups the runs by the values the processes produced, which is the usual question asked of a batch:
 // "did every run end the same way?". `pick` turns an output into the value to compare (its text by default).
 function outcomes(runs, pick) {
@@ -493,7 +532,7 @@ function checkScenario(scenario) {
   return { ok: !res.errors.length, errors: res.errors.map(e => ({ line: e.line, msg: e.msg })), warnings: res.warnings.slice() };
 }
 
-const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, verdictOf, PROFILE_GRID };
+const Runner = { runBatch, summarize, aggregate, outcomes, seedList, applyOverride, checkScenario, planFaults, parsePlan, parseWindow, describePlanFault, minimize, failureSignature, profile, profileSummary, profileMarkdown, verdictOf, PROFILE_GRID };
 if (typeof module !== 'undefined' && module.exports) module.exports = Runner;
 else root.SimRunner = Runner;
 })(typeof self !== 'undefined' ? self : this);

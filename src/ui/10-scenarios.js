@@ -137,7 +137,7 @@ function loadScenario(obj, msg, noUndo) {
   topoChanged(); resetPools();
   S.selected = null; S.linkFrom = null; S.runtimeErr = null; S.res = null; S.cursor = 0;
   S.algos = []; S.ifaces = null; S.topReqs = [];
-  fillForms(); fitView(); checkCode(); renderTopo(); renderProps();
+  fillForms(); fillSuite(); fitView(); checkCode(); renderTopo(); renderProps();
   store.set(STORE_KEY, JSON.stringify(S.scn));
   run(false);
   if (msg) {

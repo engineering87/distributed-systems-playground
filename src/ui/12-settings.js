@@ -22,6 +22,15 @@ function applySettings() {
   if (S.scn) { renderTopo(); drawDiagram(); drawPreview(); renderLayerLegend(); if (S.tab === 'stack') renderStack(true); }
 }
 function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(SET)); }
+// who made this, where to report a problem, which version is running
+function bindAbout() {
+  const dlg = $('#dlg-about');
+  $('#btn-about').addEventListener('click', () => {
+    $('#about-version').textContent = 'Version ' + APP_VERSION;
+    dlg.showModal();
+  });
+  dlg.querySelector('[data-close]').addEventListener('click', () => dlg.close());
+}
 function bindSettings() {
   const dlg = $('#dlg-settings');
   $('#btn-settings').addEventListener('click', () => {
