@@ -150,3 +150,79 @@ test('the parser and the checker survive malformed programs', () => {
     assert.ok(Array.isArray(res.errors) && Array.isArray(res.warnings), 'check returns diagnostics for: ' + src);
   }
 });
+
+// ---------------------------------------------------------------- commit messages
+test('the commit message checker accepts our shape and refuses the rest', async () => {
+  const { checkMessage, TYPES } = await import('../scripts/check-commits.mjs');
+  const ok = [
+    'feat: add the behaviour profile',
+    'fix(engine): drop messages that arrive after the round',
+    'docs: explain what a quorum buys you',
+    'feat!: change the scenario format',
+    'refactor: split the interface into one file per area\n\nThe parts share one scope.',
+    'Merge branch \'main\' into feature'
+  ];
+  for (const m of ok) assert.deepEqual(checkMessage(m), [], m.split('\n')[0]);
+
+  const bad = [
+    ['Added stuff.', /type: what changed/],
+    ['feat: x', /too short/],
+    ['feat: Add the profile', /lower case/],
+    ['fix: drop late messages.', /punctuation/],
+    ['wip: something happened here', /is not one of/],
+    ['feat: ' + 'a'.repeat(80), /first line is/],
+    ['feat: add a thing\nno blank line', /blank line/]
+  ];
+  for (const [m, re] of bad) {
+    const problems = checkMessage(m);
+    assert.ok(problems.length, 'should be refused: ' + m.slice(0, 40));
+    assert.ok(problems.some(p => re.test(p)), m.slice(0, 40) + ' → ' + problems.join('; '));
+  }
+
+  // the types are the ones the changelog is written from
+  for (const t of ['feat', 'fix', 'docs', 'test', 'refactor', 'perf', 'chore', 'ci', 'build']) {
+    assert.ok(TYPES.includes(t), t);
+  }
+});
+
+test('the repository configuration is in place', () => {
+  const dependabot = read('.github/dependabot.yml');
+  assert.match(dependabot, /package-ecosystem: github-actions/);
+  assert.match(dependabot, /package-ecosystem: pip/, 'the browser suites pin Playwright');
+  assert.match(read('test/browser/requirements.txt'), /playwright==/);
+
+  const ci = read('.github/workflows/ci.yml');
+  assert.match(ci, /permissions:\s*\n\s*contents: read/, 'the workflow asks for no more than it needs');
+  assert.match(ci, /check-commits\.mjs --range/, 'pull requests check their commit messages');
+  assert.match(ci, /requirements\.txt/, 'the browser job installs the pinned Playwright');
+
+  const release = read('.github/workflows/release.yml');
+  assert.match(release, /tag v\$TAG but package\.json says/, 'a release refuses to disagree with the version');
+  assert.match(release, /CHANGELOG\.md has no section/, 'a release refuses to ship without notes');
+
+  // generated artifacts are marked as such, so reviews and language statistics stay honest
+  const attrs = read('.gitattributes');
+  for (const path of ['index.html', 'manual/**']) assert.ok(attrs.includes(path + ' linguist-generated=true'), path);
+});
+
+// A badge that lies is worse than no badge: these are checked against the code they describe.
+test('the badges of the README match what the repository contains', () => {
+  const readme = read('README.md');
+  const { EXAMPLES } = require('../src/examples.js');
+  const properties = EXAMPLES.reduce((n, e) => n + (C.parseProgram(e.scenario.code).properties || []).length, 0);
+  const pages = fs.readdirSync(path.join(root, 'manual')).filter(f => f.endsWith('.html')).length;
+
+  // read the number out of "img.shields.io/badge/<name>-<number>-", without building a pattern from data
+  const badge = name => {
+    const at = readme.indexOf('img.shields.io/badge/' + name + '-');
+    assert.notEqual(at, -1, 'the README has no ' + name + ' badge');
+    const from = at + ('img.shields.io/badge/' + name + '-').length;
+    let digits = '';
+    for (let i = from; i < readme.length && readme[i] >= '0' && readme[i] <= '9'; i++) digits += readme[i];
+    assert.ok(digits, 'the ' + name + ' badge carries no number');
+    return +digits;
+  };
+  assert.equal(badge('algorithms'), EXAMPLES.length, 'the algorithms badge counts the examples');
+  assert.equal(badge('properties%20checked'), properties, 'the properties badge counts the declared properties');
+  assert.equal(badge('docs'), pages, 'the docs badge counts the pages of the documentation site');
+});

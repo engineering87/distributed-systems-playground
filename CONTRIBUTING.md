@@ -15,7 +15,7 @@ npm test
 The suites that need a page are separate, because they need a browser:
 
 ```sh
-pip install playwright && playwright install chromium
+pip install -r test/browser/requirements.txt && playwright install chromium
 npm run build && npm run test:browser
 ```
 
@@ -64,6 +64,16 @@ CI runs the tests and `npm run check`, which fails if `index.html` or `manual/` 
 **Library modules.** Follow the steps in [Writing your own](docs/library.md#writing-your-own). The test must check the module's guarantee under the conditions it is meant to survive. Document every difference from the textbook version.
 
 **Examples.** Add the scenario to `src/examples.js`, a test that checks what the example is meant to show, and a section in [Examples](docs/examples.md). Quote only numbers you obtained from the engine with the stated seed.
+
+**Badges.** The ones that carry a number — algorithms, properties, documentation pages — are checked against the repository by the test suite. Adding an example or a page means updating the badge, and the tests will say so.
+
+**Commit messages.** They follow the conventional shape, because the changelog is written from them:
+
+```
+type(scope): what changed, in lower case, no full stop
+```
+
+Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `style`, `revert`. The first line stays under 72 characters; the body explains why, wrapped at 100. Pull requests are checked by `node scripts/check-commits.mjs --range origin/main..HEAD`, and `npm run hooks` installs a local hook that checks each message as you write it, plus a pre-push hook that runs the Node tests.
 
 **Security.** Never match or clean up HTML with regular expressions, in the application or in the tooling: build markup safely, with an allowlist of elements and attributes and escaping per value, and read it by walking the text. A guard test enforces this, and another one fails if a regular expression is built from data: compare strings, or write the pattern as a literal. Data that comes from outside the page (imported files, shared links, local storage) is parsed without keys that could reach a prototype.
 

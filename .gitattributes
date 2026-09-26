@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+# index.html and manual/ are produced by "npm run build": they are committed so that
+# GitHub Pages can serve them, but they are not source. Collapsing them keeps reviews
+# readable and keeps the language statistics honest.
+index.html linguist-generated=true
+manual/** linguist-generated=true
+docs/assets/*.svg linguist-generated=true
+
+*.png binary
+*.gif binary

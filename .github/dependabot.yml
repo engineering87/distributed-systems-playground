@@ -1,0 +1,19 @@
+# The application itself has no dependencies; what can go stale is the tooling around it:
+# the actions used by the workflows and the Playwright version the browser suites install.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
+    labels: [dependencies]
+
+  - package-ecosystem: pip
+    directory: /test/browser
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore"
+    labels: [dependencies, tests]

@@ -13,6 +13,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 [![Live demo](https://img.shields.io/badge/demo-GitHub%20Pages-2350a3.svg)](https://engineering87.github.io/distributed-systems-playground/)
+[![Documentation](https://img.shields.io/badge/docs-19%20pages-2350a3.svg)](https://engineering87.github.io/distributed-systems-playground/manual/)
+[![Algorithms](https://img.shields.io/badge/algorithms-18-6f42c1.svg)](docs/examples.md)
+[![Properties checked](https://img.shields.io/badge/properties%20checked-23-6f42c1.svg)](docs/language.md#properties)
 
 [Live demo](https://engineering87.github.io/distributed-systems-playground/) · [Documentation site](https://engineering87.github.io/distributed-systems-playground/manual/) · [Getting started](docs/getting-started.md) · [Assumptions](docs/assumptions.md) · [Changelog](CHANGELOG.md)
 
@@ -189,6 +192,7 @@ manual/            generated documentation site
 Requires Node.js 18 or later. There are no dependencies to install.
 
 ```sh
+npm run hooks    # once: commit-message and pre-push hooks
 npm test         # engine, library, language, guards, documentation
 npm run test:browser   # the interface, with Playwright (pip install playwright)
 npx distributed-systems-playground profile --example paxos      # from npm, without cloning

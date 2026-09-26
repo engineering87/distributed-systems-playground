@@ -32,8 +32,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install playwright
+      - run: pip install -r test/browser/requirements.txt
       - run: playwright install --with-deps ${{ matrix.browser }}
       - run: python test/browser/run_all.py
         env:
           DSP_BROWSER: ${{ matrix.browser }}
+
+  commits:
+    # the shape of the messages is what makes the changelog readable
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-commits.mjs --range ${{ github.event.pull_request.base.sha }}..HEAD

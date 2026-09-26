@@ -1,0 +1,43 @@
+# Cuts a release from a tag: checks that everything agrees, then publishes the notes
+# that are already in the changelog. Nothing here decides anything the repository does not
+# already say — it only refuses to release when the pieces disagree.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: The tag, package.json and the changelog must agree
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag v$TAG but package.json says $PKG"; exit 1
+          fi
+          grep -q "^## \[$TAG\]" CHANGELOG.md || { echo "CHANGELOG.md has no section for $TAG"; exit 1; }
+
+      - run: npm test
+      - run: npm run check
+
+      - name: Take the notes from the changelog
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          awk -v v="## [$TAG]" '$0 == v {found=1; next} /^## \[/ {found=0} found' CHANGELOG.md > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md

@@ -6,30 +6,51 @@ All notable changes to this project are listed here. Versions follow [semantic v
 
 Nothing yet.
 
-## [1.1.0]
-
-### Changed
-- The README is a quarter of its size: 231 lines instead of 838. What it kept is what a reader needs before deciding to try the project — what it is for, how to start, the algorithms it runs, what it does and where the documentation is. Everything that duplicated the documentation now points at it.
-
-### Added
-- Documentation pages for the material that only lived in the README: [A guided tour](docs/tour.md) and [Questions, related tools and references](docs/faq.md). The section on why distributed systems are hard moved into [Concepts](docs/concepts.md).
-
-## [1.0.1]
-
-### Changed
-- The specification reports the status of version 1.0 instead of 0.5, with what is implemented, how it differs from the original design and what is still missing; a guard test keeps that appendix from drifting from the version again.
-- The about button is documented in the interface guide and in the README, and covered by its own browser suite.
-
 ## [1.0.0]
 
+The first stable release. The playground writes, runs, checks and reports on distributed
+algorithms, and the repository around it is set up to keep it that way.
+
 ### Added
-- A suite that travels with the scenario: the seeds, the generated faults and their window are saved in the JSON and read back into the batch fields; `--suite` on the command line uses them, which turns a scenario into a one-line check in continuous integration.
-- The behaviour profile as a Markdown report: `--markdown` on the command line, **Copy report** in the page.
-- The command line is published as an npm package: `npx distributed-systems-playground profile scenario.json`.
-- An **About** button with the author, the repository and the version.
-- An accessibility suite: names of every control, landmarks, keyboard focus, dialogs and colour contrast in both themes.
+
+- **Eighteen algorithms** with the properties they must satisfy, from flooding and reliable
+  broadcast to logical clocks, the Chandy-Lamport snapshot, a majority-quorum register, total
+  order broadcast, Paxos and Ben-Or.
+- **Properties** written next to the algorithm and checked after every step, with the instant and
+  the process of the first violation.
+- **Batch runs** over many seeds in background workers, **fault schedules** drawn by count or by
+  rate, **shrinking** of a failing schedule to what is necessary, and a **behaviour profile** over
+  a grid of fault conditions, exportable as a Markdown report.
+- A **suite that travels with the scenario**: seeds, generated faults and their window are saved in
+  the JSON, so `dsp run scenario.json --suite` is a one-line check in continuous integration.
+- **Writing help** in the editor: completion built from the parse tree and quick fixes that declare
+  a variable, add a missing handler or add a module from the library.
+- The command line as an **npm package**: `npx distributed-systems-playground profile scenario.json`.
+- An **About** button with the project, its author and the running version.
+- An **accessibility suite**: names of every control, landmarks, keyboard focus, dialogs and colour
+  contrast in both themes.
+- Three badges that say something: how many algorithms ship, how many properties they declare and how
+  many documentation pages there are, each checked against the repository by the test suite.
+- **Dependabot** for the workflow actions and the pinned Playwright of the browser suites, with
+  `test/browser/requirements.txt` pinning that version.
+- **Commit message checks** with `scripts/check-commits.mjs`, on pull requests and, with
+  `npm run hooks`, locally as you write them, alongside a pre-push hook that runs the Node tests.
+- A **release workflow**: a tag runs the tests, refuses to ship when the tag, `package.json` and the
+  changelog disagree, and publishes the notes already written in the changelog.
+
+### Changed
+
+- The **README** is a quarter of its former size: what a reader needs before deciding to try the
+  project, with everything that duplicated the documentation pointing at it instead. Two pages were
+  added for the material that only lived there: [A guided tour](docs/tour.md) and
+  [Questions, related tools and references](docs/faq.md).
+- The **specification** reports the status of the current implementation rather than of version 0.5,
+  and a guard test keeps that appendix from drifting again.
+- `.gitattributes` marks `index.html` and `manual/` as generated, so reviews collapse them and the
+  language statistics stay honest; `.editorconfig` and `CODEOWNERS` complete the setup.
 
 ### Fixed
+
 - The export box and the space-time diagram carry a description for assistive technology.
 - The command line no longer fails when its output is closed early, as `| head` does.
 

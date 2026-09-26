@@ -1,6 +1,6 @@
 {
   "name": "distributed-systems-playground",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "description": "Write distributed algorithms in textbook pseudocode, run them against a network that does not keep its promises, and check the properties they should satisfy.",
   "keywords": [
     "distributed-systems",
@@ -40,6 +40,8 @@
     "check": "node scripts/build.mjs --check && node scripts/build-docs.mjs --check",
     "test": "node --test test/core.test.cjs test/runner.test.cjs test/guards.test.cjs test/i18n.test.cjs test/docs.test.cjs",
     "dsp": "node bin/dsp.mjs",
-    "test:browser": "python3 test/browser/run_all.py"
+    "test:browser": "python3 test/browser/run_all.py",
+    "lint:commits": "node scripts/check-commits.mjs --range origin/main..HEAD",
+    "hooks": "node scripts/install-hooks.mjs"
   }
 }
