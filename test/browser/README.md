@@ -48,7 +48,9 @@ downloaded files go (`test/browser/out` by default, which is not committed).
 `layout` and `perf` report measurements: the runner does not fail on their numbers, but it prints them.
 
 `touch` checks real gestures through a CDP session, which only Chromium offers; on Firefox and WebKit it runs
-the taps and the sizes and skips the gestures. Every suite prints the checks that passed even when a later
+the taps and the sizes and skips the gestures. `touch` and `layout` also ask for a mobile context, which Firefox
+does not support: `common.context_args()` drops that one option there and keeps the viewport and the touch
+support. Every suite prints the checks that passed even when a later
 step throws, so a failure still shows how far it got.
 
 ## Writing a new one

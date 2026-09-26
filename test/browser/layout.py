@@ -1,6 +1,6 @@
 import asyncio, json
 from playwright.async_api import async_playwright
-from common import URL, launcher
+from common import URL, launcher, context_args
 VP = [('phone-s', 320, 640, True), ('phone', 375, 667, True), ('phone-l', 414, 896, True), ('phone-land', 844, 390, True),
       ('tablet', 768, 1024, True), ('tablet-land', 1024, 768, True), ('laptop-s', 1280, 720, False), ('laptop', 1366, 768, False),
       ('desktop', 1440, 900, False), ('fhd', 1920, 1080, False), ('qhd', 2560, 1440, False)]
@@ -24,7 +24,7 @@ async def main():
     async with async_playwright() as p:
         b = await launcher(p).launch()
         for name, w, h, touch in VP:
-            ctx = await b.new_context(viewport={'width': w, 'height': h}, has_touch=touch, is_mobile=touch and w < 900)
+            ctx = await b.new_context(**context_args(viewport={'width': w, 'height': h}, has_touch=touch, is_mobile=touch and w < 900))
             pg = await ctx.new_page()
             errs = []
             pg.on('pageerror', lambda e: errs.append(str(e)))

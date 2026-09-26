@@ -51,6 +51,7 @@ algorithms, and the repository around it is set up to keep it that way.
 
 ### Fixed
 
+- The touch and layout suites run on Firefox as well: the mobile-context option it does not support is dropped there, keeping the viewport and the touch support.
 - The export box and the space-time diagram carry a description for assistive technology.
 - The command line no longer fails when its output is closed early, as `| head` does.
 

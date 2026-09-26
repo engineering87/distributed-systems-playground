@@ -12,6 +12,17 @@ OUT.mkdir(parents=True, exist_ok=True)
 BROWSER = os.environ.get('DSP_BROWSER', 'chromium')
 
 
+def context_args(**kwargs):
+    """Context options, minus the ones the chosen browser refuses.
+
+    Firefox does not support isMobile; dropping it leaves the viewport and the touch
+    support, which is what the suites actually exercise.
+    """
+    if BROWSER == 'firefox':
+        kwargs.pop('is_mobile', None)
+    return kwargs
+
+
 def launcher(pw):
     """The browser type chosen by DSP_BROWSER, for `await launcher(p).launch()`."""
     if BROWSER not in ('chromium', 'firefox', 'webkit'):

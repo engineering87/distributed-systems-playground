@@ -1,12 +1,12 @@
 import asyncio
 from playwright.async_api import async_playwright
-from common import URL, launcher, BROWSER
+from common import URL, launcher, BROWSER, context_args
 res=[]
 def check(c,m): res.append(('OK  ' if c else 'FAIL')+' '+m)
 async def main():
     async with async_playwright() as p:
         b = await launcher(p).launch()
-        ctx = await b.new_context(viewport={'width':390,'height':844}, has_touch=True, is_mobile=True, device_scale_factor=2)
+        ctx = await b.new_context(**context_args(viewport={'width':390,'height':844}, has_touch=True, is_mobile=True, device_scale_factor=2))
         pg = await ctx.new_page(); errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto(URL); await pg.wait_for_timeout(1200)

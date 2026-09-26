@@ -9,6 +9,10 @@ updates:
     commit-message:
       prefix: "chore"
     labels: [dependencies]
+    groups:
+      # one pull request for all of them: they are updated together anyway
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: pip
     directory: /test/browser
