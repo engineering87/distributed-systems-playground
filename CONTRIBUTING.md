@@ -65,6 +65,8 @@ CI runs the tests and `npm run check`, which fails if `index.html` or `manual/` 
 
 **Examples.** Add the scenario to `src/examples.js`, a test that checks what the example is meant to show, and a section in [Examples](docs/examples.md). Quote only numbers you obtained from the engine with the stated seed.
 
+**Diagrams.** The diagrams of the documentation are drawn by `scripts/make-diagrams.mjs`, in a light and a dark version, with the palette of the application: four that explain the project, and one schematic per algorithm, drawn from the descriptions in `scripts/protocols.cjs`: roles, phases, messages and the reason it works. A new example needs an entry there, and the build warns when one is missing. The generator records every label as it draws it and refuses to write a picture whose text leaves the frame, so a long sentence fails the build instead of spilling over the edge. Edit the script, never the SVG: `npm run build` redraws them and `npm run check` fails when a file on disk is not what the script draws.
+
 **Badges.** The ones that carry a number — algorithms, properties, documentation pages — are checked against the repository by the test suite. Adding an example or a page means updating the badge, and the tests will say so.
 
 **Commit messages.** They follow the conventional shape, because the changelog is written from them:

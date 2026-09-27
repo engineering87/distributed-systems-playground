@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 444" width="1180" height="444" role="img" aria-label="Perfect failure detector (P): With known bounds, silence for longer than the bounds allow can only mean a crash.. ⟨HEARTBEAT⟩ every period; heard within period + 2Δ + φ: alive; crash; the window passes with no heartbeat; suspect, and never take it back. Correct only because the model is timed: raise the delays above Δ and the perfect detector starts lying.">
+  <rect width="1180" height="444" rx="14" fill="#ffffff"/>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#56687a"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2350a3"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0c7760"/>
+    </marker>
+    <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c1283b"/>
+    </marker>
+  </defs>
+  <text x="40" y="44" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#17283a" text-anchor="start">Perfect failure detector (P)</text>
+  <text x="40" y="66" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#56687a" text-anchor="start">With known bounds, silence for longer than the bounds allow can only mean a crash.</text>
+  <rect x="195" y="84" width="230" height="30" rx="8" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.4"/>
+  <text x="310" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">the monitor</text>
+  <line x1="310" y1="118" x2="310" y2="362" stroke="#dfe7eb" stroke-width="1.5"/>
+  <rect x="515" y="84" width="230" height="30" rx="8" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.4"/>
+  <text x="630" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">a live process</text>
+  <line x1="630" y1="118" x2="630" y2="362" stroke="#dfe7eb" stroke-width="1.5"/>
+  <rect x="835" y="84" width="230" height="30" rx="8" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.4"/>
+  <text x="950" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">a crashed process</text>
+  <line x1="950" y1="118" x2="950" y2="362" stroke="#dfe7eb" stroke-width="1.5"/>
+  <path d="M626 142 L318 142" stroke="#0c7760" stroke-width="1.8" fill="none" marker-end="url(#head-green)"/>
+  <text x="470" y="134" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#17283a" text-anchor="middle">⟨HEARTBEAT⟩ every period</text>
+  <path d="M310 180 q 34 0 34 10 q 0 10 -34 10" stroke="#0c7760" stroke-width="1.6" fill="none" marker-end="url(#head-green)"/>
+  <text x="356" y="204" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="start">heard within period + 2Δ + φ: alive</text>
+  <rect x="40" y="130" width="94" height="62" rx="8" fill="#fbeed8" opacity="0.55"/>
+  <text x="87" y="169" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#17283a" text-anchor="middle">watch</text>
+  <path d="M950 226 q -34 0 -34 10 q 0 10 34 10" stroke="#c1283b" stroke-width="1.6" fill="none" marker-end="url(#head-red)"/>
+  <text x="904" y="250" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="end">crash</text>
+  <path d="M310 272 q 34 0 34 10 q 0 10 -34 10" stroke="#c1283b" stroke-width="1.6" fill="none" marker-end="url(#head-red)"/>
+  <text x="356" y="296" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="start">the window passes with no heartbeat</text>
+  <path d="M310 318 q 34 0 34 10 q 0 10 -34 10" stroke="#c1283b" stroke-width="1.6" fill="none" marker-end="url(#head-red)"/>
+  <text x="356" y="342" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="start">suspect, and never take it back</text>
+  <rect x="40" y="222" width="94" height="108" rx="8" fill="#fbeed8" opacity="0.55"/>
+  <text x="87" y="284" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#17283a" text-anchor="middle">detect</text>
+  <line x1="40" y1="400" x2="1140" y2="400" stroke="#c5d1d8" stroke-width="1" stroke-dasharray="4 5"/>
+  <text x="40" y="422" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="start">Correct only because the model is timed: raise the delays above Δ and the perfect detector starts lying.</text>
+  <text x="1140" y="422" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="end">detection within period + 2Δ + φ</text>
+</svg>

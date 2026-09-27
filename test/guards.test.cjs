@@ -236,3 +236,41 @@ test('the badges of the README match what the repository contains', () => {
   assert.equal(badge('properties%20checked'), properties, 'the properties badge counts the declared properties');
   assert.equal(badge('docs'), pages, 'the docs badge counts the pages of the documentation site');
 });
+
+test('the diagrams exist in both themes and are what the script draws', () => {
+  const assets = fs.readdirSync(path.join(root, 'docs', 'assets'));
+  for (const name of ['pipeline', 'architecture', 'layers', 'verification']) {
+    for (const theme of ['light', 'dark']) {
+      const file = 'diagram-' + name + '-' + theme + '.svg';
+      assert.ok(assets.includes(file), 'missing ' + file);
+      const svg = read('docs/assets/' + file);
+      assert.match(svg, /role="img" aria-label="/, file + ' has no description');
+      assert.ok(svg.length > 2000, file + ' looks empty');
+    }
+  }
+  // both themes are used, so a reader of either one sees the same picture
+  for (const page of ['docs/engine.md', 'docs/library.md', 'docs/cli.md', 'docs/concepts.md', 'README.md']) {
+    const text = read(page);
+    assert.ok(text.includes('prefers-color-scheme: dark'), page + ' shows no dark version of its diagram');
+  }
+  assert.match(read('package.json'), /make-diagrams\.mjs --check/, 'the check keeps them up to date');
+
+  // one picture per example, drawn from its own run
+  const { EXAMPLES } = require('../src/examples.js');
+  const examples = read('docs/examples.md');
+  for (const ex of EXAMPLES) {
+    for (const theme of ['light', 'dark']) {
+      assert.ok(assets.includes('diagram-example-' + ex.key + '-' + theme + '.svg'), 'no diagram for ' + ex.key);
+    }
+    assert.ok(examples.includes('diagram-example-' + ex.key + '-light.svg'), ex.key + ' is not shown in examples.md');
+  }
+});
+
+// The generator can place a label anywhere; it refuses to write a picture whose text leaves the frame.
+test('the diagram generator refuses labels outside the frame', () => {
+  const src = read('scripts/make-diagrams.mjs');
+  assert.ok(src.includes('label(s) outside the frame'), 'the check is gone from the generator');
+  assert.ok(src.includes('drawn.push('), 'labels are no longer recorded as they are drawn');
+  // and the pictures on disk were produced by that generator, which npm run check verifies
+  assert.match(read('package.json'), /make-diagrams\.mjs --check/);
+});

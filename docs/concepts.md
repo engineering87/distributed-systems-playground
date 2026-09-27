@@ -2,6 +2,11 @@
 
 This page is a short course in the ideas the playground is built around. Each section explains a concept, points to the literature, and ends with *In the playground*: where you can see the concept at work. It does not replace a textbook; the [references](#further-reading) at the end are good places to go deeper.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-architecture-dark.svg">
+  <img src="assets/diagram-architecture-light.svg" alt="One engine, four ways to use it: core, runner, library and examples feed the page, the workers, the command line and the tests, and the build produces index.html, the documentation site and the npm package" width="100%">
+</picture>
+
 ## Contents
 
 - [Processes and messages](#processes-and-messages)

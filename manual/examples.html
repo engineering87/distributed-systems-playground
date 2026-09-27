@@ -190,9 +190,13 @@ document.addEventListener('DOMContentLoaded', function () {
 <main>
 <h1 id="examples">Examples<a class="anchor" href="#examples" aria-label="Link to this section">#</a></h1>
 <p>Each example is a complete scenario: topology, code, timing model, inputs and faults. Load one from the <em>Example</em> menu; the run starts playing right away. Loading an example replaces the current scenario, and the notification offers <strong>Undo</strong>.</p>
-<p>For every example this page gives the setup, what to watch, a few experiments, and the simplifications that matter for it. The numbers quoted come from the default seed; a different seed gives a different but equally reproducible run.</p>
+<p>Each section opens with a schematic of the protocol: the roles, the phases, the messages between them, and the sentence that says why the algorithm works. It is the shape of the algorithm, not a recording of one run — the run is what you get when you press <strong>Run</strong>. For every example this page gives the setup, what to watch, a few experiments, and the simplifications that matter for it. The numbers quoted come from the default seed; a different seed gives a different but equally reproducible run.</p>
 <h2 id="flooding-broadcast">Flooding broadcast<a class="anchor" href="#flooding-broadcast" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> broadcast on an arbitrary graph · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> 3×4 grid · <strong>Seed:</strong> 7</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-flooding-dark.svg">
+  <img src="../docs/assets/diagram-example-flooding-light.svg" alt="Flooding broadcast: how the protocol works — Every process forwards a message it has not seen, once, to all its neighbours." width="100%">
+</picture>
 <p>Every process that receives a message for the first time delivers it and forwards it to all its neighbors except the one it came from. p1 broadcasts <code>&quot;hello&quot;</code> at time 0 and p12 broadcasts <code>&quot;ok&quot;</code> 40 ms later.</p>
 <p><strong>What to watch.</strong> The two waves spread across the grid and cross in the middle. Each process delivers each message exactly once; the second handler silently drops copies that arrive by another path. The run uses 46 messages and ends after about 200 ms.</p>
 <p><strong>Try this.</strong></p>
@@ -200,6 +204,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> Messages are identified by their content, so broadcasting the same text twice delivers it only once.</p>
 <h2 id="ring-leader-election-chang-roberts">Ring leader election, Chang-Roberts<a class="anchor" href="#ring-leader-election-chang-roberts" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> leader election · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> directed ring of 8, identifiers in the order 3, 7, 1, 5, 2, 8, 4, 6 · <strong>Seed:</strong> 11</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-chang-roberts-dark.svg">
+  <img src="../docs/assets/diagram-example-chang-roberts-light.svg" alt="Chang-Roberts leader election: how the protocol works — Identifiers travel one way around a ring; only the largest survives a full lap." width="100%">
+</picture>
 <p>Every process starts an election by sending its own identifier clockwise. A process forwards identifiers larger than its own, replaces smaller ones with its own if it has not already done so, and declares itself leader when its own identifier comes back. The winner then circulates an <code>ELECTED</code> message.</p>
 <p><strong>What to watch.</strong> Small identifiers disappear quickly; 8 travels the whole ring. Every process outputs <code>Elected | 8</code>. The run uses 20 election messages and 8 announcement messages.</p>
 <p><strong>Try this.</strong></p>
@@ -207,6 +215,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> The algorithm assumes reliable FIFO channels and no crashes. A crash breaks the ring and the election never ends.</p>
 <h2 id="floodset-consensus">FloodSet consensus<a class="anchor" href="#floodset-consensus" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> consensus with crash failures · <strong>Model:</strong> synchronous rounds · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 5</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-floodset-dark.svg">
+  <img src="../docs/assets/diagram-example-floodset-light.svg" alt="FloodSet consensus: how the protocol works — In f + 1 synchronous rounds everybody ends up with the same set of values." width="100%">
+</picture>
 <p>Each process proposes a random value from 1 to 9. In each of the first f + 1 rounds (f = 1 here) every process sends the set of values it knows to everybody; at the end of round f + 1 it decides the minimum of its set.</p>
 <p>The program also declares three properties, checked after every step: <em>Agreement</em> (no two processes decide differently), <em>Validity</em> (a decided value is one the process knew) and <em>Termination</em> (every correct process decides).</p>
 <p><strong>What to watch.</strong> With the <em>Ideal synchronous</em> preset, the proposals are 8, 7, 7 and 3, every process decides 3, and the three properties hold. The dashed vertical lines on the diagram mark the rounds. No violation is possible.</p>
@@ -215,6 +227,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> FloodSet is written for crash-stop: a process that crashes and recovers comes back with an empty set of values, and deciding on it fails with a runtime error. Run a behaviour profile to see it: the <em>crash and recovery</em> row reports a failed run, not a broken property. In lockstep rounds a process cannot crash in the middle of its sends, so the classic scenario where a crashing process reaches only some of the others is not reproduced by a crash alone. See <a href="faults.html#crash">Faults</a>.</p>
 <h2 id="failure-detector-p">Failure detector ◇P<a class="anchor" href="#failure-detector-p" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> failure detection under partial synchrony · <strong>Model:</strong> partially synchronous, GST at 3 s · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 5</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-epfd-dark.svg">
+  <img src="../docs/assets/diagram-example-epfd-light.svg" alt="Eventually perfect failure detector (◇P): how the protocol works — Suspect whoever is silent; when you are proved wrong, wait longer next time." width="100%">
+</picture>
 <p>Every process periodically asks everybody for a heartbeat. A process that does not answer before the timeout is suspected; if an answer later arrives from a suspected process, the suspicion is withdrawn and the timeout grows by <code>DELTA0</code>. Process p3 crashes at 6 s.</p>
 <p><strong>What to watch.</strong></p>
 <ul><li>Before GST, heavy-tailed delays cause wrong suspicions: 44 <code>Suspect</code> and <code>Restore</code> outputs in the first three seconds.</li><li>After GST, a few corrections, then silence while the timeouts have grown enough.</li><li>After the crash, p1, p2 and p4 suspect p3 within a second, and nothing else.</li></ul>
@@ -224,6 +240,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> The algorithm uses <code>DirectLinks</code>, a perfect link only because the network does not lose messages here. With loss, replace it with <code>AckLinks</code> from the library.</p>
 <h2 id="failure-detector-across-a-partition-and-a-recovery">Failure detector across a partition and a recovery<a class="anchor" href="#failure-detector-across-a-partition-and-a-recovery" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> partitions, crash-recovery · <strong>Model:</strong> partially synchronous, GST at 1 s · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 5</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-epfd-partition-dark.svg">
+  <img src="../docs/assets/diagram-example-epfd-partition-light.svg" alt="◇P across a partition: how the protocol works — A partition looks exactly like a crash to the side that cannot hear." width="100%">
+</picture>
 <p>The same detector runs on five processes, with three scheduled faults: the network splits into {p1, p2} and {p3, p4, p5} from 4 s to 7 s, p5 crashes at 9 s and recovers at 11 s.</p>
 <p><strong>What to watch.</strong></p>
 <ul><li>Just before the partition heals, p1 and p2 suspect {p3, p4, p5}, and p3, p4 and p5 suspect {p1, p2}. Each side believes the other crashed.</li><li>After the partition, the suspicions are withdrawn.</li><li>While p5 is down, everybody suspects p5.</li><li>p5 restarts with its state reset and its <code>Init</code> handler restarts the heartbeats. By the end of the run nobody suspects anybody.</li></ul>
@@ -232,6 +252,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> Messages in flight when the partition starts are dropped when they arrive. The detector cannot distinguish a partition from a crash, which is exactly the point.</p>
 <h2 id="reliable-broadcast-when-the-sender-crashes">Reliable broadcast when the sender crashes<a class="anchor" href="#reliable-broadcast-when-the-sender-crashes" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> reliable broadcast, layering · <strong>Model:</strong> asynchronous, 40% message loss · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 4</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-reliable-broadcast-dark.svg">
+  <img src="../docs/assets/diagram-example-reliable-broadcast-light.svg" alt="Eager reliable broadcast: how the protocol works — Everybody relays what it delivers, so a crash mid-broadcast cannot leave half the system out." width="100%">
+</picture>
 <p>A newsroom application publishes through a stack of library modules: <em>EagerReliableBroadcast</em> on top of <em>BasicBroadcast</em> on top of <em>AckLinks</em>. p1 publishes <code>&quot;news&quot;</code> at time 0 and crashes at 40 ms, before its first retransmission.</p>
 <p><strong>What to watch.</strong></p>
 <ul><li>Many of p1's first messages are lost, and p1 is gone before it can resend them.</li><li>p2 received the news and relays it; the relays reach p3, p4 and p5.</li><li>Every process reads the news once.</li><li>Tick <strong>Layers</strong> to color messages by their origin: the application's broadcast, the relays, and the link layer's acknowledgements and retransmissions. Open the <em>Stack</em> tab to follow the events through the modules.</li></ul>
@@ -240,6 +264,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> The crash has to happen before retransmissions, because a step is never interrupted (see <a href="faults.html#crash">Faults</a>). The loss rate is what makes the partial broadcast possible.</p>
 <h2 id="causal-order-broadcast-questions-before-answers">Causal order broadcast: questions before answers<a class="anchor" href="#causal-order-broadcast-questions-before-answers" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> causal order, vector clocks · <strong>Model:</strong> asynchronous, channels without FIFO, delays from 5 to 120 ms · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 5</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-causal-broadcast-dark.svg">
+  <img src="../docs/assets/diagram-example-causal-broadcast-light.svg" alt="Causal order broadcast: how the protocol works — A message waits until everything its sender had seen has been delivered here too." width="100%">
+</picture>
 <p>p1 posts a question. p2 answers as soon as it reads it. Everything goes through <em>WaitingCausalBroadcast</em>, which attaches a vector clock to each message.</p>
 <p><strong>What to watch.</strong> Every process reads the question before the answer, even when the answer arrives first: it waits in the pending set until the question has been delivered.</p>
 <p><strong>Try this.</strong></p>
@@ -247,6 +275,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> The test suite checks 30 seeds for this example: none delivers an answer before its question.</p>
 <h2 id="gossip-spreading-a-rumor">Gossip: spreading a rumor<a class="anchor" href="#gossip-spreading-a-rumor" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> probabilistic broadcast · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> 16 processes on a ring with chords, 4 neighbors each · <strong>Seed:</strong> 7</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-gossip-dark.svg">
+  <img src="../docs/assets/diagram-example-gossip-light.svg" alt="Gossip (epidemic broadcast): how the protocol works — Tell a few random neighbours, a few times; the rumour does the rest." width="100%">
+</picture>
 <p>p1 spreads a rumor. Each process that hears it for the first time forwards it to <code>FANOUT</code> random neighbors, for at most <code>ROUNDS</code> hops.</p>
 <p><strong>What to watch.</strong> With <code>FANOUT := 2</code> and <code>ROUNDS := 4</code>, 10 of the 16 processes hear the rumor, using 16 messages. Nobody hears it twice.</p>
 <p><strong>Try this.</strong> Change the parameters at the top of <em>EagerGossip</em>:</p>
@@ -255,6 +287,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> Targets are chosen among neighbors, so the topology shapes the spread. Gossip never retries.</p>
 <h2 id="perfect-failure-detector">Perfect failure detector<a class="anchor" href="#perfect-failure-detector" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> failure detection with known bounds · <strong>Model:</strong> timed synchronous · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-perfect-detector-dark.svg">
+  <img src="../docs/assets/diagram-example-perfect-detector-light.svg" alt="Perfect failure detector (P): how the protocol works — With known bounds, silence for longer than the bounds allow can only mean a crash." width="100%">
+</picture>
 <p>Every process sends a heartbeat every 200 ms. A process that hears nothing from a neighbor for longer than <code>PERIOD + 2·DELTA + PHI</code> concludes it has crashed, and suspects it forever. p3 crashes at 1 s.</p>
 <p><strong>What to watch.</strong> p1, p2 and p4 suspect p3 within about 220 ms of the crash, and nobody else is ever suspected. The two declared properties say exactly that: <em>Accuracy</em> (<code>always</code>, no correct process is suspected) and <em>Completeness</em> (<code>eventually</code>, every crashed process is suspected by every correct one).</p>
 <p><strong>Try this.</strong></p>
@@ -262,6 +298,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> The detector is correct only because the model is timed synchronous. Under partial synchrony the same code is wrong, which is why ◇P exists.</p>
 <h2 id="eventual-leader-election-ω">Eventual leader election Ω<a class="anchor" href="#eventual-leader-election-ω" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> the weakest failure detector for consensus · <strong>Model:</strong> partially synchronous, GST at 3 s · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-omega-leader-dark.svg">
+  <img src="../docs/assets/diagram-example-omega-leader-light.svg" alt="Ω, eventual leader: how the protocol works — Trust the smallest process nobody suspects, and grow the timeout after every mistake." width="100%">
+</picture>
 <p>Each process suspects the ones it does not hear from, grows its timeout after every mistake, and trusts the smallest process it does not suspect. p1, the natural leader, crashes at 4 s.</p>
 <p><strong>What to watch.</strong> Before GST the trusted leader changes several times, because slow heartbeats look like crashes. After GST the processes settle on p1, and when p1 crashes they move to p2 together. The property <em>EventualAgreement</em> asks for the end state: eventually everybody trusts the same process, and that process is correct.</p>
 <p><strong>Try this.</strong></p>
@@ -269,18 +309,30 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> Ω never promises when the churn stops, only that it does. A run that ends during the churn says nothing.</p>
 <h2 id="mutual-exclusion-ricart-agrawala">Mutual exclusion, Ricart-Agrawala<a class="anchor" href="#mutual-exclusion-ricart-agrawala" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> coordination without a coordinator · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-mutual-exclusion-dark.svg">
+  <img src="../docs/assets/diagram-example-mutual-exclusion-light.svg" alt="Ricart-Agrawala mutual exclusion: how the protocol works — Ask everybody, enter when everybody has answered, and answer the ones you kept waiting." width="100%">
+</picture>
 <p>A process that wants the critical section stamps its request with a logical clock and asks everybody. A process that receives a request answers at once if it is not interested or if the request is older than its own, and defers the answer otherwise. Whoever collects every answer enters, holds the section for 300 ms, then answers the requests it deferred. p1, p2 and p3 ask within 7 ms of each other.</p>
 <p><strong>What to watch.</strong> The three enter one at a time, in timestamp order, and the property <em>MutualExclusion</em> (<code>always</code>, at most one process inside) holds throughout. The deferred answers are visible on the diagram as the messages that leave right after each <em>Exit</em>.</p>
 <p><strong>Try this.</strong></p>
 <ul><li>Add <code>0ms * Acquire</code> to make everybody ask at the same instant: the tie is broken by process number, which is what the <code>ts = myTs and from &lt; self</code> condition is for.</li><li>Crash a process while it holds the critical section: nobody enters again, and the algorithm gives no way out. That is the price of an algorithm written for a failure-free model.</li><li>Turn off FIFO channels: the algorithm still holds, because it depends on timestamps, not on order.</li></ul>
 <h2 id="two-phase-commit-and-the-blocked-participants">Two-phase commit and the blocked participants<a class="anchor" href="#two-phase-commit-and-the-blocked-participants" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> atomic commit and its famous weakness · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-two-phase-commit-dark.svg">
+  <img src="../docs/assets/diagram-example-two-phase-commit-light.svg" alt="Two-phase commit: how the protocol works — Ask everybody, decide once, tell everybody. And that is the problem." width="100%">
+</picture>
 <p>p1 is the coordinator: it asks everybody to prepare, collects the votes, decides and announces the outcome. Everybody votes yes here.</p>
 <p><strong>What to watch.</strong> All four processes report <code>COMMIT</code>, and both properties hold: <em>Agreement</em> (<code>always</code>, nobody decides differently) and <em>Termination</em> (<code>eventually</code>, every correct process decides).</p>
 <p><strong>Try this.</strong></p>
 <ul><li>Crash the coordinator at <code>25ms</code>, after the votes arrive and before the announcement. Nobody decides: <em>Agreement</em> still holds, <em>Termination</em> is reported broken. The participants know their own vote and nothing else, and no timeout can help them, because a missing coordinator could have decided either way. This is the blocking problem that three-phase commit and consensus-based commit exist to solve.</li><li>Crash it at <code>60ms</code> instead, after the announcement has left: the others decide normally.</li><li>Make one participant vote <code>NO</code> by editing the <code>PREPARE</code> handler, and watch the outcome change to <code>ABORT</code>.</li></ul>
 <h2 id="logical-clocks-lamport-and-vector">Logical clocks: Lamport and vector<a class="anchor" href="#logical-clocks-lamport-and-vector" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> what a clock without time can tell you · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-logical-clocks-dark.svg">
+  <img src="../docs/assets/diagram-example-logical-clocks-light.svg" alt="Logical clocks: Lamport and vector: how the protocol works — A counter that respects causality, and a vector that also refuses to invent an order." width="100%">
+</picture>
 <p>Every message carries both clocks. On receipt the Lamport counter jumps past the timestamp it received and adds one; the vector takes the entrywise maximum and then counts the local event.</p>
 <p><strong>What to watch.</strong> The <em>State</em> tab shows both clocks of the selected process. Follow a chain of messages on the diagram and read the Lamport numbers along it: they only ever grow. Now find two events on different processes with no path between them: their Lamport numbers say nothing, while their vectors are incomparable, and that is exactly the difference between the two clocks.</p>
 <p>The declared property <em>OwnEntryIsHighest</em> says what a vector clock guarantees: nobody knows more about me than I do, so my own entry is never behind the one somebody else keeps for me. <em>EverybodyTicks</em> checks that every process takes part.</p>
@@ -289,12 +341,20 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> A Lamport clock orders what is causally related and invents an order for the rest; a vector clock refuses to order what is concurrent. Neither measures time.</p>
 <h2 id="chandy-lamport-snapshot-on-fifo-channels">Chandy-Lamport snapshot on FIFO channels<a class="anchor" href="#chandy-lamport-snapshot-on-fifo-channels" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> recording a global state without stopping the system · <strong>Model:</strong> asynchronous, FIFO channels · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-snapshot-dark.svg">
+  <img src="../docs/assets/diagram-example-snapshot-light.svg" alt="Chandy-Lamport snapshot: how the protocol works — Record your own state, send a marker on every channel, and record what arrives until its marker comes." width="100%">
+</picture>
 <p>Four processes start with 100 coins each and move them around. At 6 ms p1 is asked for a snapshot: it records its own balance, sends a marker on every channel, and records what arrives on a channel until that channel's marker comes. Everybody else does the same on the first marker it receives.</p>
 <p><strong>What to watch.</strong> The four processes report 95, 110, 110 and 85: not the balances at any single instant, since there is no such instant, but a consistent cut whose total is 400, the number of coins in the system. The property <em>Conservation</em> checks exactly that, and <em>SnapshotOnce</em> that nobody finishes without having recorded its own state.</p>
 <p><strong>Try this.</strong></p>
 <ul><li><strong>Turn off FIFO channels</strong> in the <em>Timing</em> tab and run seeds 11 and 13. The recorded total becomes 370: coins vanish, because a marker can overtake a coin that should have been counted in flight. FIFO is not a detail of the algorithm, it is its hypothesis.</li><li>Move the <code>Snap</code> request later, after every transfer has arrived: the cut becomes the obvious one, with no messages in flight.</li><li>Ask two processes to snapshot at the same moment: the markers meet, and the cut is still consistent.</li></ul>
 <h2 id="majority-quorum-register">Majority-quorum register<a class="anchor" href="#majority-quorum-register" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> replication that survives a minority · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-quorum-register-dark.svg">
+  <img src="../docs/assets/diagram-example-quorum-register-light.svg" alt="Majority-quorum register: how the protocol works — Write to a majority; read from a majority and write back what you found." width="100%">
+</picture>
 <p>Every process keeps a copy of one register. Writing stamps the value and waits for a majority to store it. Reading asks everybody, takes the value with the highest stamp, and <strong>writes it back</strong> to a majority before returning: without that second phase, a later reader could still see an older value. p1 writes 42, then p3 and p5 read.</p>
 <p><strong>What to watch.</strong> Both readers return 42, and the two declared properties hold: <em>ReadsAreValid</em> (<code>always</code>, a read never returns something other than what the writer holds) and <em>OperationsReturn</em> (<code>eventually</code>, the operations finish).</p>
 <p><strong>Try this.</strong> These four runs are the whole theory of quorums, and the <a href="interface.html#batch-runs">behaviour profile</a> shows them in four rows:</p>
@@ -303,12 +363,20 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> The replica state is <code>stable</code>, so a process that comes back still has its data, as a replicated store on disk would. This is a single-writer register, so timestamps never collide. With several writers the stamps have to carry the identity of the writer as well, and the read-back phase becomes essential rather than merely useful.</p>
 <h2 id="total-order-broadcast-with-a-sequencer">Total order broadcast with a sequencer<a class="anchor" href="#total-order-broadcast-with-a-sequencer" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> agreeing on an order, cheaply · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 4 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-total-order-dark.svg">
+  <img src="../docs/assets/diagram-example-total-order-light.svg" alt="Total order broadcast with a sequencer: how the protocol works — One process decides the order; everybody delivers in that order and no other." width="100%">
+</picture>
 <p>Everybody sends its message to all; p1, the sequencer, is the only process that decides the order and announces it. A process delivers a message only once every earlier sequence number has arrived.</p>
 <p><strong>What to watch.</strong> The three messages are broadcast in the order a, b, c and delivered by everybody as <strong>b, c, a</strong>: the order is the one the sequencer saw, not the one the senders intended, and that is the point. The property <em>TotalOrder</em> (<code>always</code>) says what the algorithm promises: what one process has delivered is a prefix of what any other has delivered, so nobody ever sees two messages in a different order.</p>
 <p><strong>Try this.</strong></p>
 <ul><li><strong>Crash the sequencer</strong> at <code>3ms</code>: deliveries stop altogether. <em>TotalOrder</em> still holds — nobody has seen anything wrong — while <em>EverybodyDelivers</em> is broken. One process deciding the order is cheap and fragile at the same time; making it fault-tolerant is what consensus is for.</li><li><strong>Deliver without waiting for the order</strong>, by replacing the <code>skip</code> in the second <code>DATA</code> handler with an immediate delivery: <em>TotalOrder</em> breaks at once, which is what a property is for.</li><li>Turn off FIFO channels: the algorithm still holds, because the sequence numbers, not the channels, carry the order.</li></ul>
 <h2 id="paxos-consensus-on-one-value">Paxos: consensus on one value<a class="anchor" href="#paxos-consensus-on-one-value" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> the algorithm the previous example was missing · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-paxos-dark.svg">
+  <img src="../docs/assets/diagram-example-paxos-light.svg" alt="Paxos: consensus on one value: how the protocol works — Two majorities always meet, and a proposer adopts what it hears instead of insisting." width="100%">
+</picture>
 <p>The <a href="#total-order-broadcast-with-a-sequencer">total order example</a> ends with the sequencer crashing and everything stopping. Paxos is the answer to that sentence: nobody is indispensable.</p>
 <p>Every process is acceptor and learner; p1 proposes &quot;A&quot; and p2 proposes &quot;B&quot; five milliseconds later. A proposer picks a ballot number nobody else can use, asks a majority to promise not to accept anything older, <strong>adopts the most recent value it hears about</strong> instead of its own, and then asks that majority to accept it. Two majorities always meet, and that is the whole argument.</p>
 <p><strong>What to watch.</strong> Everybody decides &quot;B&quot;, including p1, which proposed &quot;A&quot;: the second ballot was higher, and the first proposal had not been accepted by a majority yet. The properties are <em>Agreement</em> (<code>always</code>, nobody decides differently), <em>Validity</em> (<code>always</code>, a decided value is one somebody proposed) and <em>Termination</em> (<code>eventually</code>, every correct process decides).</p>
@@ -320,6 +388,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <p><strong>Keep in mind.</strong> This is one value, one round, no reconfiguration and no leader: a proposer that keeps being outbid never gives up. Real systems add a leader (Ω), a log of values and a way to change the membership.</p>
 <h2 id="ben-or-consensus-with-a-coin">Ben-Or: consensus with a coin<a class="anchor" href="#ben-or-consensus-with-a-coin" aria-label="Link to this section">#</a></h2>
 <p><strong>Topic:</strong> buying termination with randomness · <strong>Model:</strong> asynchronous · <strong>Topology:</strong> complete graph of 5 · <strong>Seed:</strong> 3</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-ben-or-dark.svg">
+  <img src="../docs/assets/diagram-example-ben-or-light.svg" alt="Ben-Or: consensus with a coin: how the protocol works — When a round does not converge, everybody tosses a coin; the schedule cannot win for ever." width="100%">
+</picture>
 <p><a href="#paxos-consensus-on-one-value">Paxos</a> keeps agreement whatever happens but cannot promise to finish: that is FLP. Ben-Or finishes, with probability one, by giving up determinism.</p>
 <p>Three processes propose 1 and two propose 0. Each round has two phases: everybody reports its value and waits for <code>N - F</code> reports, and a value held by more than half becomes that process's proposal; then everybody reports that proposal and waits for <code>N - F</code> of them. More than <code>F</code> equal proposals decide; a single one is adopted; none at all, and the process <strong>tosses a coin</strong>. A process that has decided runs one more round to carry its value to the others, then stops.</p>
 <p><strong>What to watch.</strong> With seed 3 everybody decides 0, although 0 was the minority proposal: nothing in the algorithm favours the majority, and the coin can carry either value. Change the seed and the decision changes with it — over twenty seeds the outcome is 0 in about half of them — while <em>Agreement</em> and <em>Validity</em> hold in every one.</p>

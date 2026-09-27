@@ -2,7 +2,7 @@
 
 Each example is a complete scenario: topology, code, timing model, inputs and faults. Load one from the *Example* menu; the run starts playing right away. Loading an example replaces the current scenario, and the notification offers **Undo**.
 
-For every example this page gives the setup, what to watch, a few experiments, and the simplifications that matter for it. The numbers quoted come from the default seed; a different seed gives a different but equally reproducible run.
+Each section opens with a schematic of the protocol: the roles, the phases, the messages between them, and the sentence that says why the algorithm works. It is the shape of the algorithm, not a recording of one run — the run is what you get when you press **Run**. For every example this page gives the setup, what to watch, a few experiments, and the simplifications that matter for it. The numbers quoted come from the default seed; a different seed gives a different but equally reproducible run.
 
 ## Contents
 
@@ -30,6 +30,12 @@ For every example this page gives the setup, what to watch, a few experiments, a
 
 **Topic:** broadcast on an arbitrary graph · **Model:** asynchronous · **Topology:** 3×4 grid · **Seed:** 7
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-flooding-dark.svg">
+  <img src="assets/diagram-example-flooding-light.svg" alt="Flooding broadcast: how the protocol works — Every process forwards a message it has not seen, once, to all its neighbours." width="100%">
+</picture>
+
+
 Every process that receives a message for the first time delivers it and forwards it to all its neighbors except the one it came from. p1 broadcasts `"hello"` at time 0 and p12 broadcasts `"ok"` 40 ms later.
 
 **What to watch.** The two waves spread across the grid and cross in the middle. Each process delivers each message exactly once; the second handler silently drops copies that arrive by another path. The run uses 46 messages and ends after about 200 ms.
@@ -46,6 +52,12 @@ Every process that receives a message for the first time delivers it and forward
 
 **Topic:** leader election · **Model:** asynchronous · **Topology:** directed ring of 8, identifiers in the order 3, 7, 1, 5, 2, 8, 4, 6 · **Seed:** 11
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-chang-roberts-dark.svg">
+  <img src="assets/diagram-example-chang-roberts-light.svg" alt="Chang-Roberts leader election: how the protocol works — Identifiers travel one way around a ring; only the largest survives a full lap." width="100%">
+</picture>
+
+
 Every process starts an election by sending its own identifier clockwise. A process forwards identifiers larger than its own, replaces smaller ones with its own if it has not already done so, and declares itself leader when its own identifier comes back. The winner then circulates an `ELECTED` message.
 
 **What to watch.** Small identifiers disappear quickly; 8 travels the whole ring. Every process outputs `Elected | 8`. The run uses 20 election messages and 8 announcement messages.
@@ -61,6 +73,12 @@ Every process starts an election by sending its own identifier clockwise. A proc
 ## FloodSet consensus
 
 **Topic:** consensus with crash failures · **Model:** synchronous rounds · **Topology:** complete graph of 4 · **Seed:** 5
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-floodset-dark.svg">
+  <img src="assets/diagram-example-floodset-light.svg" alt="FloodSet consensus: how the protocol works — In f + 1 synchronous rounds everybody ends up with the same set of values." width="100%">
+</picture>
+
 
 Each process proposes a random value from 1 to 9. In each of the first f + 1 rounds (f = 1 here) every process sends the set of values it knows to everybody; at the end of round f + 1 it decides the minimum of its set.
 
@@ -80,6 +98,12 @@ The program also declares three properties, checked after every step: *Agreement
 ## Failure detector ◇P
 
 **Topic:** failure detection under partial synchrony · **Model:** partially synchronous, GST at 3 s · **Topology:** complete graph of 4 · **Seed:** 5
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-epfd-dark.svg">
+  <img src="assets/diagram-example-epfd-light.svg" alt="Eventually perfect failure detector (◇P): how the protocol works — Suspect whoever is silent; when you are proved wrong, wait longer next time." width="100%">
+</picture>
+
 
 Every process periodically asks everybody for a heartbeat. A process that does not answer before the timeout is suspected; if an answer later arrives from a suspected process, the suspicion is withdrawn and the timeout grows by `DELTA0`. Process p3 crashes at 6 s.
 
@@ -103,6 +127,12 @@ Open the *State* tab on any process to follow `suspected` and `delay`.
 
 **Topic:** partitions, crash-recovery · **Model:** partially synchronous, GST at 1 s · **Topology:** complete graph of 5 · **Seed:** 5
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-epfd-partition-dark.svg">
+  <img src="assets/diagram-example-epfd-partition-light.svg" alt="◇P across a partition: how the protocol works — A partition looks exactly like a crash to the side that cannot hear." width="100%">
+</picture>
+
+
 The same detector runs on five processes, with three scheduled faults: the network splits into {p1, p2} and {p3, p4, p5} from 4 s to 7 s, p5 crashes at 9 s and recovers at 11 s.
 
 **What to watch.**
@@ -123,6 +153,12 @@ The same detector runs on five processes, with three scheduled faults: the netwo
 ## Reliable broadcast when the sender crashes
 
 **Topic:** reliable broadcast, layering · **Model:** asynchronous, 40% message loss · **Topology:** complete graph of 5 · **Seed:** 4
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-reliable-broadcast-dark.svg">
+  <img src="assets/diagram-example-reliable-broadcast-light.svg" alt="Eager reliable broadcast: how the protocol works — Everybody relays what it delivers, so a crash mid-broadcast cannot leave half the system out." width="100%">
+</picture>
+
 
 A newsroom application publishes through a stack of library modules: *EagerReliableBroadcast* on top of *BasicBroadcast* on top of *AckLinks*. p1 publishes `"news"` at time 0 and crashes at 40 ms, before its first retransmission.
 
@@ -145,6 +181,12 @@ A newsroom application publishes through a stack of library modules: *EagerRelia
 
 **Topic:** causal order, vector clocks · **Model:** asynchronous, channels without FIFO, delays from 5 to 120 ms · **Topology:** complete graph of 5 · **Seed:** 5
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-causal-broadcast-dark.svg">
+  <img src="assets/diagram-example-causal-broadcast-light.svg" alt="Causal order broadcast: how the protocol works — A message waits until everything its sender had seen has been delivered here too." width="100%">
+</picture>
+
+
 p1 posts a question. p2 answers as soon as it reads it. Everything goes through *WaitingCausalBroadcast*, which attaches a vector clock to each message.
 
 **What to watch.** Every process reads the question before the answer, even when the answer arrives first: it waits in the pending set until the question has been delivered.
@@ -160,6 +202,12 @@ p1 posts a question. p2 answers as soon as it reads it. Everything goes through 
 ## Gossip: spreading a rumor
 
 **Topic:** probabilistic broadcast · **Model:** asynchronous · **Topology:** 16 processes on a ring with chords, 4 neighbors each · **Seed:** 7
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-gossip-dark.svg">
+  <img src="assets/diagram-example-gossip-light.svg" alt="Gossip (epidemic broadcast): how the protocol works — Tell a few random neighbours, a few times; the rumour does the rest." width="100%">
+</picture>
+
 
 p1 spreads a rumor. Each process that hears it for the first time forwards it to `FANOUT` random neighbors, for at most `ROUNDS` hops.
 
@@ -182,6 +230,12 @@ Try several seeds with the dice button: coverage varies from run to run, which i
 
 **Topic:** failure detection with known bounds · **Model:** timed synchronous · **Topology:** complete graph of 4 · **Seed:** 3
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-perfect-detector-dark.svg">
+  <img src="assets/diagram-example-perfect-detector-light.svg" alt="Perfect failure detector (P): how the protocol works — With known bounds, silence for longer than the bounds allow can only mean a crash." width="100%">
+</picture>
+
+
 Every process sends a heartbeat every 200 ms. A process that hears nothing from a neighbor for longer than `PERIOD + 2·DELTA + PHI` concludes it has crashed, and suspects it forever. p3 crashes at 1 s.
 
 **What to watch.** p1, p2 and p4 suspect p3 within about 220 ms of the crash, and nobody else is ever suspected. The two declared properties say exactly that: *Accuracy* (`always`, no correct process is suspected) and *Completeness* (`eventually`, every crashed process is suspected by every correct one).
@@ -197,6 +251,12 @@ Every process sends a heartbeat every 200 ms. A process that hears nothing from 
 ## Eventual leader election Ω
 
 **Topic:** the weakest failure detector for consensus · **Model:** partially synchronous, GST at 3 s · **Topology:** complete graph of 5 · **Seed:** 3
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-omega-leader-dark.svg">
+  <img src="assets/diagram-example-omega-leader-light.svg" alt="Ω, eventual leader: how the protocol works — Trust the smallest process nobody suspects, and grow the timeout after every mistake." width="100%">
+</picture>
+
 
 Each process suspects the ones it does not hear from, grows its timeout after every mistake, and trusts the smallest process it does not suspect. p1, the natural leader, crashes at 4 s.
 
@@ -214,6 +274,12 @@ Each process suspects the ones it does not hear from, grows its timeout after ev
 
 **Topic:** coordination without a coordinator · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-mutual-exclusion-dark.svg">
+  <img src="assets/diagram-example-mutual-exclusion-light.svg" alt="Ricart-Agrawala mutual exclusion: how the protocol works — Ask everybody, enter when everybody has answered, and answer the ones you kept waiting." width="100%">
+</picture>
+
+
 A process that wants the critical section stamps its request with a logical clock and asks everybody. A process that receives a request answers at once if it is not interested or if the request is older than its own, and defers the answer otherwise. Whoever collects every answer enters, holds the section for 300 ms, then answers the requests it deferred. p1, p2 and p3 ask within 7 ms of each other.
 
 **What to watch.** The three enter one at a time, in timestamp order, and the property *MutualExclusion* (`always`, at most one process inside) holds throughout. The deferred answers are visible on the diagram as the messages that leave right after each *Exit*.
@@ -228,6 +294,12 @@ A process that wants the critical section stamps its request with a logical cloc
 
 **Topic:** atomic commit and its famous weakness · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-two-phase-commit-dark.svg">
+  <img src="assets/diagram-example-two-phase-commit-light.svg" alt="Two-phase commit: how the protocol works — Ask everybody, decide once, tell everybody. And that is the problem." width="100%">
+</picture>
+
+
 p1 is the coordinator: it asks everybody to prepare, collects the votes, decides and announces the outcome. Everybody votes yes here.
 
 **What to watch.** All four processes report `COMMIT`, and both properties hold: *Agreement* (`always`, nobody decides differently) and *Termination* (`eventually`, every correct process decides).
@@ -241,6 +313,12 @@ p1 is the coordinator: it asks everybody to prepare, collects the votes, decides
 ## Logical clocks: Lamport and vector
 
 **Topic:** what a clock without time can tell you · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-logical-clocks-dark.svg">
+  <img src="assets/diagram-example-logical-clocks-light.svg" alt="Logical clocks: Lamport and vector: how the protocol works — A counter that respects causality, and a vector that also refuses to invent an order." width="100%">
+</picture>
+
 
 Every message carries both clocks. On receipt the Lamport counter jumps past the timestamp it received and adds one; the vector takes the entrywise maximum and then counts the local event.
 
@@ -260,6 +338,12 @@ The declared property *OwnEntryIsHighest* says what a vector clock guarantees: n
 
 **Topic:** recording a global state without stopping the system · **Model:** asynchronous, FIFO channels · **Topology:** complete graph of 4 · **Seed:** 3
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-snapshot-dark.svg">
+  <img src="assets/diagram-example-snapshot-light.svg" alt="Chandy-Lamport snapshot: how the protocol works — Record your own state, send a marker on every channel, and record what arrives until its marker comes." width="100%">
+</picture>
+
+
 Four processes start with 100 coins each and move them around. At 6 ms p1 is asked for a snapshot: it records its own balance, sends a marker on every channel, and records what arrives on a channel until that channel's marker comes. Everybody else does the same on the first marker it receives.
 
 **What to watch.** The four processes report 95, 110, 110 and 85: not the balances at any single instant, since there is no such instant, but a consistent cut whose total is 400, the number of coins in the system. The property *Conservation* checks exactly that, and *SnapshotOnce* that nobody finishes without having recorded its own state.
@@ -273,6 +357,12 @@ Four processes start with 100 coins each and move them around. At 6 ms p1 is ask
 ## Majority-quorum register
 
 **Topic:** replication that survives a minority · **Model:** asynchronous · **Topology:** complete graph of 5 · **Seed:** 3
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-quorum-register-dark.svg">
+  <img src="assets/diagram-example-quorum-register-light.svg" alt="Majority-quorum register: how the protocol works — Write to a majority; read from a majority and write back what you found." width="100%">
+</picture>
+
 
 Every process keeps a copy of one register. Writing stamps the value and waits for a majority to store it. Reading asks everybody, takes the value with the highest stamp, and **writes it back** to a majority before returning: without that second phase, a later reader could still see an older value. p1 writes 42, then p3 and p5 read.
 
@@ -295,6 +385,12 @@ Run the profile over ten seeds and the point becomes a rule: *ReadsAreValid* hol
 
 **Topic:** agreeing on an order, cheaply · **Model:** asynchronous · **Topology:** complete graph of 4 · **Seed:** 3
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-total-order-dark.svg">
+  <img src="assets/diagram-example-total-order-light.svg" alt="Total order broadcast with a sequencer: how the protocol works — One process decides the order; everybody delivers in that order and no other." width="100%">
+</picture>
+
+
 Everybody sends its message to all; p1, the sequencer, is the only process that decides the order and announces it. A process delivers a message only once every earlier sequence number has arrived.
 
 **What to watch.** The three messages are broadcast in the order a, b, c and delivered by everybody as **b, c, a**: the order is the one the sequencer saw, not the one the senders intended, and that is the point. The property *TotalOrder* (`always`) says what the algorithm promises: what one process has delivered is a prefix of what any other has delivered, so nobody ever sees two messages in a different order.
@@ -308,6 +404,12 @@ Everybody sends its message to all; p1, the sequencer, is the only process that 
 ## Paxos: consensus on one value
 
 **Topic:** the algorithm the previous example was missing · **Model:** asynchronous · **Topology:** complete graph of 5 · **Seed:** 3
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-paxos-dark.svg">
+  <img src="assets/diagram-example-paxos-light.svg" alt="Paxos: consensus on one value: how the protocol works — Two majorities always meet, and a proposer adopts what it hears instead of insisting." width="100%">
+</picture>
+
 
 The [total order example](#total-order-broadcast-with-a-sequencer) ends with the sequencer crashing and everything stopping. Paxos is the answer to that sentence: nobody is indispensable.
 
@@ -336,6 +438,12 @@ Safety costs nothing; liveness costs a majority. This is the shape of every quor
 ## Ben-Or: consensus with a coin
 
 **Topic:** buying termination with randomness · **Model:** asynchronous · **Topology:** complete graph of 5 · **Seed:** 3
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-example-ben-or-dark.svg">
+  <img src="assets/diagram-example-ben-or-light.svg" alt="Ben-Or: consensus with a coin: how the protocol works — When a round does not converge, everybody tosses a coin; the schedule cannot win for ever." width="100%">
+</picture>
+
 
 [Paxos](#paxos-consensus-on-one-value) keeps agreement whatever happens but cannot promise to finish: that is FLP. Ben-Or finishes, with probability one, by giving up determinism.
 

@@ -191,6 +191,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <h1 id="running-scenarios-outside-the-browser">Running scenarios outside the browser<a class="anchor" href="#running-scenarios-outside-the-browser" aria-label="Link to this section">#</a></h1>
 <p>The engine does not depend on the page, so the same scenario can be run from a terminal. This is useful to try an algorithm over many seeds, to compare timing models, to grade exercises, and to check a scenario in continuous integration.</p>
 <p>You need Node.js 18 or later and a copy of the repository. There is nothing to install.</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-verification-dark.svg">
+  <img src="../docs/assets/diagram-verification-light.svg" alt="From does it work to here is the fault that breaks it: scenario, properties, batch, profile and shrinking, with the failing seed going back into the page" width="100%">
+</picture>
 <h2 id="the-command-line-tool">The command line tool<a class="anchor" href="#the-command-line-tool" aria-label="Link to this section">#</a></h2>
 <p>Installed from npm it is <code>dsp</code>, with no clone at all:</p>
 <pre class="code lang-sh"><code>npx distributed-systems-playground profile scenario.json</code></pre>

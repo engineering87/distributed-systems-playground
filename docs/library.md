@@ -4,6 +4,11 @@ The library contains communication abstractions written in Upon: links that hide
 
 Most modules follow the algorithms in Cachin, Guerraoui and Rodrigues, *Introduction to Reliable and Secure Distributed Programming* (2nd edition, Springer, 2011), where you will find the proofs. This page describes what each module does, what it sends over the network, what it guarantees, and where it departs from the book. The departures are also collected in [Assumptions and simplifications](assumptions.md#the-module-library).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-layers-dark.svg">
+  <img src="assets/diagram-layers-light.svg" alt="A message goes down the stack and up the other side: your algorithm over causal or FIFO broadcast, over reliable broadcast, over perfect links, over the network" width="100%">
+</picture>
+
 ## Contents
 
 - [Using the library](#using-the-library)

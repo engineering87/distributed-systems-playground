@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 398" width="1180" height="398" role="img" aria-label="Logical clocks: Lamport and vector: A counter that respects causality, and a vector that also refuses to invent an order.. local event: clock + 1; the message carries the clock; Lamport: clock := max(mine, yours) + 1; vector: entrywise max, then my own + 1. Lamport orders what is causally related and invents an order for the rest; a vector leaves the concurrent pairs unordered.">
+  <rect width="1180" height="398" rx="14" fill="#ffffff"/>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#56687a"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2350a3"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0c7760"/>
+    </marker>
+    <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c1283b"/>
+    </marker>
+  </defs>
+  <text x="40" y="44" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#17283a" text-anchor="start">Logical clocks: Lamport and vector</text>
+  <text x="40" y="66" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#56687a" text-anchor="start">A counter that respects causality, and a vector that also refuses to invent an order.</text>
+  <rect x="195" y="84" width="230" height="30" rx="8" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.4"/>
+  <text x="310" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">a process</text>
+  <line x1="310" y1="118" x2="310" y2="316" stroke="#dfe7eb" stroke-width="1.5"/>
+  <rect x="515" y="84" width="230" height="30" rx="8" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.4"/>
+  <text x="630" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">the message</text>
+  <line x1="630" y1="118" x2="630" y2="316" stroke="#dfe7eb" stroke-width="1.5"/>
+  <rect x="835" y="84" width="230" height="30" rx="8" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.4"/>
+  <text x="950" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">the receiver</text>
+  <line x1="950" y1="118" x2="950" y2="316" stroke="#dfe7eb" stroke-width="1.5"/>
+  <path d="M310 134 q 34 0 34 10 q 0 10 -34 10" stroke="#2350a3" stroke-width="1.6" fill="none" marker-end="url(#head-blue)"/>
+  <text x="356" y="158" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="start">local event: clock + 1</text>
+  <path d="M314 188 L942 188" stroke="#2350a3" stroke-width="1.8" fill="none" marker-end="url(#head-blue)"/>
+  <text x="630" y="180" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#17283a" text-anchor="middle">the message carries the clock</text>
+  <rect x="40" y="130" width="94" height="62" rx="8" fill="#fbeed8" opacity="0.55"/>
+  <text x="87" y="169" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#17283a" text-anchor="middle">send</text>
+  <path d="M950 226 q -34 0 -34 10 q 0 10 34 10" stroke="#0c7760" stroke-width="1.6" fill="none" marker-end="url(#head-green)"/>
+  <text x="904" y="250" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="end">Lamport: clock := max(mine, yours) + 1</text>
+  <path d="M950 272 q -34 0 -34 10 q 0 10 34 10" stroke="#0c7760" stroke-width="1.6" fill="none" marker-end="url(#head-green)"/>
+  <text x="904" y="296" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#17283a" text-anchor="end">vector: entrywise max, then my own + 1</text>
+  <rect x="40" y="222" width="94" height="62" rx="8" fill="#fbeed8" opacity="0.55"/>
+  <text x="87" y="261" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#17283a" text-anchor="middle">receive</text>
+  <line x1="40" y1="354" x2="1140" y2="354" stroke="#c5d1d8" stroke-width="1" stroke-dasharray="4 5"/>
+  <text x="40" y="376" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="start">Lamport orders what is causally related and invents an order for the rest; a vector leaves the concurrent pairs unordered.</text>
+  <text x="1140" y="376" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="end">one number, or one number per process</text>
+</svg>

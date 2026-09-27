@@ -4,6 +4,11 @@ The engine does not depend on the page, so the same scenario can be run from a t
 
 You need Node.js 18 or later and a copy of the repository. There is nothing to install.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-verification-dark.svg">
+  <img src="assets/diagram-verification-light.svg" alt="From does it work to here is the fault that breaks it: scenario, properties, batch, profile and shrinking, with the failing seed going back into the page" width="100%">
+</picture>
+
 ## Contents
 
 - [The command line tool](#the-command-line-tool)

@@ -4,6 +4,11 @@ This page explains what happens between pressing **Run** and seeing the animatio
 
 For the list of modeling choices, see [Assumptions and simplifications](assumptions.md).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-pipeline-dark.svg">
+  <img src="assets/diagram-pipeline-light.svg" alt="From the code you write to the run you watch: lexer, parser, checker, interpreter and engine, with the assumed timing model and the actual network as two separate inputs" width="100%">
+</picture>
+
 ## Contents
 
 - [From code to a run](#from-code-to-a-run)

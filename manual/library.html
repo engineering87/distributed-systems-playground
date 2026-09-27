@@ -191,6 +191,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <h1 id="the-module-library">The module library<a class="anchor" href="#the-module-library" aria-label="Link to this section">#</a></h1>
 <p>The library contains communication abstractions written in Upon: links that hide message loss, and several kinds of broadcast. You add them from the <em>Add module</em> menu in the <em>Code</em> tab, and then build on them with a <code>uses</code> clause.</p>
 <p>Most modules follow the algorithms in Cachin, Guerraoui and Rodrigues, <em>Introduction to Reliable and Secure Distributed Programming</em> (2nd edition, Springer, 2011), where you will find the proofs. This page describes what each module does, what it sends over the network, what it guarantees, and where it departs from the book. The departures are also collected in <a href="assumptions.html#the-module-library">Assumptions and simplifications</a>.</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-layers-dark.svg">
+  <img src="../docs/assets/diagram-layers-light.svg" alt="A message goes down the stack and up the other side: your algorithm over causal or FIFO broadcast, over reliable broadcast, over perfect links, over the network" width="100%">
+</picture>
 <h2 id="using-the-library">Using the library<a class="anchor" href="#using-the-library" aria-label="Link to this section">#</a></h2>
 <p>Choosing a module in <em>Add module</em> appends to your code:</p>
 <ul><li>the interfaces it implements and uses, if they are not declared yet;</li><li>for every interface it uses that nothing in your code implements, a default module that does (for example, <em>EagerReliableBroadcast</em> brings <em>BasicBroadcast</em>, which brings <em>AckLinks</em>);</li><li>the module itself.</li></ul>

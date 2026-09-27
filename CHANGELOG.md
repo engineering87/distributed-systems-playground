@@ -40,6 +40,9 @@ algorithms, and the repository around it is set up to keep it that way.
 
 ### Changed
 
+- The diagram generator refuses to write a picture whose labels leave the frame, and the closing line wraps when the reason and the cost do not fit side by side.
+- Every example opens with a schematic of its protocol: roles as lifelines, phases down the side, labelled messages, and the sentence that says why it works. The eighteen descriptions live in `scripts/protocols.cjs`, apart from the code that draws them.
+- Four diagrams explain the project where words were doing the work alone: how a run is produced, how the pieces fit together, the layers a message goes through, and the loop from a question to the fault that answers it. They are drawn by `scripts/make-diagrams.mjs` in a light and a dark version, and `npm run check` fails if one is out of date.
 - The **README** is a quarter of its former size: what a reader needs before deciding to try the
   project, with everything that duplicated the documentation pointing at it instead. Two pages were
   added for the material that only lived there: [A guided tour](docs/tour.md) and

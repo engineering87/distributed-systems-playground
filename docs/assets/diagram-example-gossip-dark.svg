@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 398" width="1180" height="398" role="img" aria-label="Gossip (epidemic broadcast): Tell a few random neighbours, a few times; the rumour does the rest.. round 1: the rumour to f random neighbours; first time: deliver it; round 2: they tell f others each; already heard: stay quiet. Reach grows fast in the number of rounds and cheaply in messages, but nothing is guaranteed.">
+  <rect width="1180" height="398" rx="14" fill="#0f171e"/>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9fb0c0"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#86aef0"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4cc2a5"/>
+    </marker>
+    <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#f0808f"/>
+    </marker>
+  </defs>
+  <text x="40" y="44" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e8eef4" text-anchor="start">Gossip (epidemic broadcast)</text>
+  <text x="40" y="66" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#9fb0c0" text-anchor="start">Tell a few random neighbours, a few times; the rumour does the rest.</text>
+  <rect x="195" y="84" width="230" height="30" rx="8" fill="#151f29" stroke="#86aef0" stroke-width="1.4"/>
+  <text x="310" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#e8eef4" text-anchor="middle">a process that knows</text>
+  <line x1="310" y1="118" x2="310" y2="316" stroke="#233140" stroke-width="1.5"/>
+  <rect x="515" y="84" width="230" height="30" rx="8" fill="#151f29" stroke="#86aef0" stroke-width="1.4"/>
+  <text x="630" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#e8eef4" text-anchor="middle">f random neighbours</text>
+  <line x1="630" y1="118" x2="630" y2="316" stroke="#233140" stroke-width="1.5"/>
+  <rect x="835" y="84" width="230" height="30" rx="8" fill="#151f29" stroke="#86aef0" stroke-width="1.4"/>
+  <text x="950" y="104" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#e8eef4" text-anchor="middle">the rest</text>
+  <line x1="950" y1="118" x2="950" y2="316" stroke="#233140" stroke-width="1.5"/>
+  <path d="M314 142 L622 142" stroke="#86aef0" stroke-width="1.8" fill="none" marker-end="url(#head-blue)"/>
+  <text x="470" y="134" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#e8eef4" text-anchor="middle">round 1: the rumour to f random neighbours</text>
+  <path d="M630 180 q -34 0 -34 10 q 0 10 34 10" stroke="#4cc2a5" stroke-width="1.6" fill="none" marker-end="url(#head-green)"/>
+  <text x="584" y="204" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#e8eef4" text-anchor="end">first time: deliver it</text>
+  <path d="M634 234 L942 234" stroke="#86aef0" stroke-width="1.8" fill="none" marker-end="url(#head-blue)"/>
+  <text x="790" y="226" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#e8eef4" text-anchor="middle">round 2: they tell f others each</text>
+  <path d="M950 272 q -34 0 -34 10 q 0 10 34 10" stroke="#9fb0c0" stroke-width="1.6" fill="none" marker-end="url(#head-blue)"/>
+  <text x="904" y="296" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#e8eef4" text-anchor="end">already heard: stay quiet</text>
+  <rect x="40" y="130" width="94" height="154" rx="8" fill="#33260f" opacity="0.55"/>
+  <text x="87" y="215" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" fill="#e8eef4" text-anchor="middle">rounds</text>
+  <line x1="40" y1="354" x2="1140" y2="354" stroke="#3a4f63" stroke-width="1" stroke-dasharray="4 5"/>
+  <text x="40" y="376" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#e8eef4" text-anchor="start">Reach grows fast in the number of rounds and cheaply in messages, but nothing is guaranteed.</text>
+  <text x="1140" y="376" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#9fb0c0" text-anchor="end">fanout × rounds messages per process</text>
+</svg>

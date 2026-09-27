@@ -69,6 +69,11 @@ Ask whether it holds in general, and the answer is a table:
  FAIL partitions 1.5/s             10/15        15/15        15/15     24   100%
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/diagram-pipeline-dark.svg">
+  <img src="docs/assets/diagram-pipeline-light.svg" alt="From the code you write to the run you watch: lexer, parser, checker, interpreter and engine, with the assumed timing model and the actual network as two separate inputs" width="100%">
+</picture>
+
 ## Quick start
 
 **Online.** Open the [live demo](https://engineering87.github.io/distributed-systems-playground/). The flooding example loads and starts playing.
@@ -136,6 +141,11 @@ Each example is described in [Examples](docs/examples.md), with what to watch an
 - Presentation mode, an example gallery, image export, light and dark themes, a colour-vision-deficiency palette, and an Italian interface.
 
 A [guided tour](docs/tour.md) walks through seven of these in order.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/diagram-verification-dark.svg">
+  <img src="docs/assets/diagram-verification-light.svg" alt="From does it work to here is the fault that breaks it: a scenario declares properties, a batch runs it over many seeds, a profile summarizes what it survives, shrinking reduces a failing schedule, and the failing seed goes back into the page" width="100%">
+</picture>
 
 ## Documentation
 

@@ -190,6 +190,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <main>
 <h1 id="concepts">Concepts<a class="anchor" href="#concepts" aria-label="Link to this section">#</a></h1>
 <p>This page is a short course in the ideas the playground is built around. Each section explains a concept, points to the literature, and ends with <em>In the playground</em>: where you can see the concept at work. It does not replace a textbook; the <a href="#further-reading">references</a> at the end are good places to go deeper.</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagram-architecture-dark.svg">
+  <img src="../docs/assets/diagram-architecture-light.svg" alt="One engine, four ways to use it: core, runner, library and examples feed the page, the workers, the command line and the tests, and the build produces index.html, the documentation site and the npm package" width="100%">
+</picture>
 <h2 id="processes-and-messages">Processes and messages<a class="anchor" href="#processes-and-messages" aria-label="Link to this section">#</a></h2>
 <p>A distributed system is a set of <strong>processes</strong> that run independently and cooperate by exchanging <strong>messages</strong>. A process can be a program on a server, a phone, a sensor. What makes the system distributed is that processes share no memory: the only way to learn about another process is to receive a message from it.</p>
 <p>That single fact explains most of the difficulty. A message describes the sender's state at the moment it was sent; by the time it arrives, that state may have changed, or the sender may have stopped.</p>

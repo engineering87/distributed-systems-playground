@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 342" width="1180" height="342" role="img" aria-label="How a run is produced: code becomes tokens, a tree and checks, then the interpreter and the engine turn it into messages, a log, state, properties and activity, with the assumed timing model and the actual network as two separate inputs">
+  <rect width="1180" height="342" rx="14" fill="#ffffff"/>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#56687a"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2350a3"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0c7760"/>
+    </marker>
+    <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c1283b"/>
+    </marker>
+  </defs>
+  <text x="40" y="44" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="700" fill="#17283a" text-anchor="start">From the code you write to the run you watch</text>
+  <text x="40" y="66" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#56687a" text-anchor="start">Everything below the dotted line is data: the run is computed first, then replayed.</text>
+  <rect x="40" y="96" width="188" height="62" rx="10" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.25"/>
+  <rect x="40" y="96" width="4" height="62" rx="2" fill="#2350a3"/>
+  <text x="134" y="124" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">Upon code</text>
+  <text x="134" y="141" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">what you write</text>
+  <path d="M232 127 L246 127" stroke="#56687a" stroke-width="1.8" fill="none" marker-end="url(#head)"/>
+  <rect x="252" y="96" width="188" height="62" rx="10" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.25"/>
+  <rect x="252" y="96" width="4" height="62" rx="2" fill="#2350a3"/>
+  <text x="346" y="124" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">lexer, parser</text>
+  <text x="346" y="141" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">tokens, tree</text>
+  <path d="M444 127 L458 127" stroke="#56687a" stroke-width="1.8" fill="none" marker-end="url(#head)"/>
+  <rect x="464" y="96" width="188" height="62" rx="10" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.25"/>
+  <rect x="464" y="96" width="4" height="62" rx="2" fill="#2350a3"/>
+  <text x="558" y="124" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">checker</text>
+  <text x="558" y="141" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">errors before running</text>
+  <path d="M656 127 L670 127" stroke="#56687a" stroke-width="1.8" fill="none" marker-end="url(#head)"/>
+  <rect x="676" y="96" width="188" height="62" rx="10" fill="#f6f9fa" stroke="#6f42c1" stroke-width="1.25"/>
+  <rect x="676" y="96" width="4" height="62" rx="2" fill="#6f42c1"/>
+  <text x="770" y="124" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">interpreter</text>
+  <text x="770" y="141" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">one handler, one step</text>
+  <path d="M868 127 L882 127" stroke="#56687a" stroke-width="1.8" fill="none" marker-end="url(#head)"/>
+  <rect x="888" y="96" width="188" height="62" rx="10" fill="#f6f9fa" stroke="#6f42c1" stroke-width="1.25"/>
+  <rect x="888" y="96" width="4" height="62" rx="2" fill="#6f42c1"/>
+  <text x="982" y="124" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">engine</text>
+  <text x="982" y="141" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">events in virtual time</text>
+  <rect x="40" y="202" width="396" height="52" rx="10" fill="#dff1ec" stroke="#0c7760" stroke-width="1.25"/>
+  <rect x="40" y="202" width="4" height="52" rx="2" fill="#0c7760"/>
+  <text x="238" y="225" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">what the algorithm assumes</text>
+  <text x="238" y="242" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">timing model, DELTA, PHI, RHO, rounds</text>
+  <rect x="456" y="202" width="396" height="52" rx="10" fill="#fbeed8" stroke="#b36d0b" stroke-width="1.25"/>
+  <rect x="456" y="202" width="4" height="52" rx="2" fill="#b36d0b"/>
+  <text x="654" y="225" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="600" fill="#17283a" text-anchor="middle">what the network actually does</text>
+  <text x="654" y="242" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#56687a" text-anchor="middle">delays, loss, drift, faults, partitions</text>
+  <path d="M238 198 L238 166" stroke="#0c7760" stroke-width="1.8" fill="none" marker-end="url(#head-green)"/>
+  <path d="M654 198 L654 166" stroke="#b36d0b" stroke-width="1.8" fill="none" marker-end="url(#head-red)"/>
+  <text x="872" y="224" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#c1283b" text-anchor="start">where they disagree,</text>
+  <text x="872" y="240" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#56687a" text-anchor="start">the run records a violation</text>
+  <line x1="40" y1="274" x2="1140" y2="274" stroke="#c5d1d8" stroke-width="1" stroke-dasharray="4 5"/>
+  <rect x="40" y="290" width="152" height="44" rx="8" fill="#ffffff" stroke="#c5d1d8" stroke-width="1.25"/>
+  <text x="116" y="316.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">messages</text>
+  <rect x="208" y="290" width="152" height="44" rx="8" fill="#ffffff" stroke="#c5d1d8" stroke-width="1.25"/>
+  <text x="284" y="316.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">event log</text>
+  <rect x="376" y="290" width="152" height="44" rx="8" fill="#ffffff" stroke="#c5d1d8" stroke-width="1.25"/>
+  <text x="452" y="316.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">state per step</text>
+  <rect x="544" y="290" width="152" height="44" rx="8" fill="#ffffff" stroke="#c5d1d8" stroke-width="1.25"/>
+  <text x="620" y="316.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">properties</text>
+  <rect x="712" y="290" width="152" height="44" rx="8" fill="#ffffff" stroke="#c5d1d8" stroke-width="1.25"/>
+  <text x="788" y="316.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#17283a" text-anchor="middle">activity</text>
+  <text x="1140" y="318" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#56687a" text-anchor="end">graph · diagram · stack · log</text>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 396" width="1180" height="396" role="img" aria-label="The layers a message goes through: your algorithm over causal or FIFO broadcast, over reliable broadcast, over perfect links, over the network, with send going down and deliver coming up">
+  <rect width="1180" height="396" rx="14" fill="#ffffff"/>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#56687a"/>
+    </marker>
+    <marker id="head-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2350a3"/>
+    </marker>
+    <marker id="head-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0c7760"/>
+    </marker>
+    <marker id="head-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c1283b"/>
+    </marker>
+  </defs>
+  <text x="40" y="44" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="700" fill="#17283a" text-anchor="start">A message goes down the stack and up the other side</text>
+  <text x="40" y="66" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#56687a" text-anchor="start">Each module trusts the one below and offers a stronger promise to the one above.</text>
+  <rect x="90" y="100" width="430" height="44" rx="10" fill="#f6f9fa" stroke="#6f42c1" stroke-width="1.25"/>
+  <rect x="90" y="100" width="4" height="44" rx="2" fill="#6f42c1"/>
+  <text x="305" y="126.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#17283a" text-anchor="middle">your algorithm</text>
+  <text x="620" y="126" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="start">Broadcast, Deliver</text>
+  <rect x="90" y="154" width="430" height="44" rx="10" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.25"/>
+  <rect x="90" y="154" width="4" height="44" rx="2" fill="#2350a3"/>
+  <text x="305" y="180.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#17283a" text-anchor="middle">causal or FIFO broadcast</text>
+  <text x="620" y="180" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="start">orders what the sender ordered</text>
+  <rect x="90" y="208" width="430" height="44" rx="10" fill="#f6f9fa" stroke="#2350a3" stroke-width="1.25"/>
+  <rect x="90" y="208" width="4" height="44" rx="2" fill="#2350a3"/>
+  <text x="305" y="234.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#17283a" text-anchor="middle">reliable broadcast</text>
+  <text x="620" y="234" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="start">all or none, even if the sender crashes</text>
+  <rect x="90" y="262" width="430" height="44" rx="10" fill="#f6f9fa" stroke="#0c7760" stroke-width="1.25"/>
+  <rect x="90" y="262" width="4" height="44" rx="2" fill="#0c7760"/>
+  <text x="305" y="288.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#17283a" text-anchor="middle">perfect links</text>
+  <text x="620" y="288" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="start">no loss, no duplicates</text>
+  <rect x="90" y="316" width="430" height="44" rx="10" fill="#f6f9fa" stroke="#b36d0b" stroke-width="1.25"/>
+  <rect x="90" y="316" width="4" height="44" rx="2" fill="#b36d0b"/>
+  <text x="305" y="342.5" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#17283a" text-anchor="middle">the network</text>
+  <text x="620" y="342" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="start">delay, loss, duplication, partitions</text>
+  <path d="M68 110 L68 350" stroke="#2350a3" stroke-width="2" fill="none" marker-end="url(#head-blue)"/>
+  <text x="68" y="88" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#2350a3" text-anchor="middle">send</text>
+  <path d="M552 350 L552 110" stroke="#0c7760" stroke-width="2" fill="none" marker-end="url(#head-green)"/>
+  <text x="552" y="88" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#0c7760" text-anchor="middle">deliver</text>
+  <text x="40" y="372" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#56687a" text-anchor="start">the stack view of the page follows one message through exactly these boxes</text>
+</svg>

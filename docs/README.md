@@ -24,6 +24,7 @@ The same pages are published as a [documentation site](https://engineering87.git
 | [The timing model](timing-model.md) | assumed and actual models, distributions, presets, rounds, GST |
 | [Faults](faults.md) | crashes, recoveries, link failures, partitions |
 | [How the engine works](engine.md) | event ordering, steps, message handling, determinism |
+| [How the project is put together](../README.md#what-it-is-for) | the diagram of the pieces and how they fit |
 | [A guided tour](tour.md) | seven scenarios in order, each showing one thing the playground is for |
 | [Running scenarios outside the browser](cli.md) | the command line tool and the batch runner API |
 | [Questions, related tools and references](faq.md) | what it is and is not, how it compares, what to read |

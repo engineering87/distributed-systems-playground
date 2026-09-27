@@ -36,8 +36,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "node scripts/build.mjs && node scripts/build-docs.mjs",
-    "check": "node scripts/build.mjs --check && node scripts/build-docs.mjs --check",
+    "build": "node scripts/make-diagrams.mjs && node scripts/build.mjs && node scripts/build-docs.mjs",
+    "check": "node scripts/make-diagrams.mjs --check && node scripts/build.mjs --check && node scripts/build-docs.mjs --check",
     "test": "node --test test/core.test.cjs test/runner.test.cjs test/guards.test.cjs test/i18n.test.cjs test/docs.test.cjs",
     "dsp": "node bin/dsp.mjs",
     "test:browser": "python3 test/browser/run_all.py",
