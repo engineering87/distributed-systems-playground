@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use Distributed Systems Playground in teaching or research, please cite it as below."
 title: "Distributed Systems Playground"
-abstract: "A browser-based environment for writing distributed algorithms in event-driven pseudocode and running them on a simulated network whose timing and faults are configured separately from the assumptions of the algorithm."
+abstract: "A browser-based environment for distributed algorithms: they are written in event-driven pseudocode, run on a simulated network whose timing and faults are configured separately from the assumptions of the algorithm, and checked against properties declared next to the code — in a single run or over hundreds of runs with randomly generated faults, summarized as a profile of the conditions the algorithm survives. Eighteen algorithms are included, from reliable broadcast to Paxos and Ben-Or, together with a command line tool for continuous integration."
 type: software
 authors:
   - family-names: "Del Re"
@@ -17,3 +17,7 @@ keywords:
   - education
   - failure detectors
   - consensus
+  - fault injection
+  - property checking
+  - Paxos
+  - quorum systems
