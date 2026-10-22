@@ -55,7 +55,7 @@ algorithms, and the repository around it is set up to keep it that way.
 ### Fixed
 
 - Playwright is pinned to 1.63.0 and the workflow actions to v7 (`checkout`, `setup-node`, `setup-python`), the versions Dependabot proposed and the tags confirm.
-- The screenshots of the documentation and the social preview show the current interface, in the dark theme the rest of the material uses.
+- The screenshots, the animations and the social preview show the current interface, in the dark theme the rest of the material uses. The card of the social preview shows the tool at work — the graph and the space-time diagram — rather than the table of one algorithm.
 - The commit message checker reads a range again: it asked git to separate its output with `-z` instead of passing a NUL byte inside an argument, which Node refuses.
 - The fault suite looks for a cursor position inside the pause instead of assuming one, which differs between browser engines.
 - The touch and layout suites run on Firefox as well: the mobile-context option it does not support is dropped there, keeping the viewport and the touch support.

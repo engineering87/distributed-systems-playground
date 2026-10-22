@@ -16,6 +16,7 @@
 [![Documentation](https://img.shields.io/badge/docs-19%20pages-2350a3.svg)](https://engineering87.github.io/distributed-systems-playground/manual/)
 [![Algorithms](https://img.shields.io/badge/algorithms-18-6f42c1.svg)](docs/examples.md)
 [![Properties checked](https://img.shields.io/badge/properties%20checked-23-6f42c1.svg)](docs/language.md#properties)
+[![XERJ Corpus Hub](https://img.shields.io/badge/XERJ-corpus%20contributor-0a7c6b.svg)](https://hub.xerj.org/contributors/engineering87)
 
 [Live demo](https://engineering87.github.io/distributed-systems-playground/) · [Documentation site](https://engineering87.github.io/distributed-systems-playground/manual/) · [Getting started](docs/getting-started.md) · [Assumptions](docs/assumptions.md) · [Changelog](CHANGELOG.md)
 
