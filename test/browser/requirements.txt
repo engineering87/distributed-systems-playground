@@ -1,4 +1,4 @@
 # The browser suites need Playwright and one browser:
 #   pip install -r test/browser/requirements.txt && playwright install chromium
 # The version is pinned so that the suites, continuous integration and your machine agree.
-playwright==1.63.0
+playwright==1.64.1
